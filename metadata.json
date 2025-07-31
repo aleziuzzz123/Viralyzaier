@@ -1,0 +1,8 @@
+{
+  "name": "Viralyzaier: Supercharged AI for Viral Videos in Seconds.",
+  "description": "Viralyzaier is your AI co-pilot for creating supercharged viral videos. Go from idea to launch-ready hit with our powerful workflow.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "prompt": ""
+}
