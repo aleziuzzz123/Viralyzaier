@@ -1,7 +1,9 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import ApiKeyBanner from './components/ApiKeyBanner';
+import BackendBanner from './BackendBanner';
 import { Project, User, Toast, Platform, Opportunity, ContentGapSuggestion } from './types';
 import Dashboard from './components/Dashboard';
 import ProjectView from './components/ProjectView';
@@ -40,7 +42,7 @@ const ToastComponent: React.FC<{ toast: Toast, onDismiss: (id: number) => void }
 
 const MainApp = () => {
     const { 
-        session, user, projects, apiKeyError,
+        session, user, projects, apiKeyError, backendConfigError,
         toasts, dismissToast, activeProjectId, setActiveProjectId,
         t
     } = useAppContext();
@@ -69,7 +71,7 @@ const MainApp = () => {
     };
 
     const renderCurrentView = () => {
-        if (!user) return <div className="bg-gray-900 min-h-screen flex items-center justify-center text-white">{t('toast.loading_user')}</div>;
+        if (!user && !backendConfigError) return <div className="bg-gray-900 min-h-screen flex items-center justify-center text-white">{t('toast.loading_user')}</div>;
         const activeProject = projects.find(p => p.id === activeProjectId);
 
         switch (currentView) {
@@ -88,17 +90,18 @@ const MainApp = () => {
         }
     };
     
-    if (!session) {
+    if (!session && !backendConfigError) {
         return <Homepage />;
     }
 
-    if (!user) {
+    if (!user && !backendConfigError) {
         return <div className="bg-gray-900 min-h-screen flex items-center justify-center text-white">{t('toast.loading')}</div>;
     }
 
     return (
         <div className="min-h-screen bg-gray-900 text-white flex flex-col">
             {apiKeyError && <ApiKeyBanner />}
+            {backendConfigError && <BackendBanner />}
             
             <header className="bg-black/30 border-b border-gray-700/50 px-4 sm:px-6 h-16 flex items-center justify-between sticky top-0 z-20">
                 <div className="flex items-center space-x-6">

@@ -252,7 +252,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelectProject }) => {
                     <h1 className="text-4xl lg:text-5xl font-black text-white">
                         {t('dashboard.title')}
                     </h1>
-                     <p className="mt-2 text-lg text-gray-400">{t('dashboard.welcome_back', {planName: user?.subscription.planId})}</p>
+                     {user?.email && <p className="mt-2 text-lg text-gray-400">{t('dashboard.welcome_back', {userName: user.email.split('@')[0]})}</p>}
                 </div>
                 <button
                     onClick={handleCreateProject}

@@ -197,9 +197,11 @@ export const PauseIcon: React.FC<IconProps> = ({ className }) => (
 
 export const MagicWandIcon: React.FC<IconProps> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={className}>
-        <path fillRule="evenodd" d="M9.638 2.235a.75.75 0 01.473-.717l2.136-.854a.75.75 0 01.96.96l-.854 2.136a.75.75 0 01-.717.473L2.235 9.638a.75.75 0 01-.717-.473L.664 7.029a.75.75 0 01.96-.96l2.136.853a.75.75 0 01.473.717L9.638 2.235zM3.98 8.42a.75.75 0 01.717-.473l5.401-2.16-2.16 5.401a.75.75 0 01-.473.717l-5.401 2.16 2.16-5.401zM14.638 12.235a.75.75 0 01.473-.717l2.136-.854a.75.75 0 01.96.96l-.854 2.136a.75.75 0 01-.717.473l-9.401 3.76-3.76-9.401a.75.75 0 01.473-.717l2.136-.854a.75.75 0 01.96.96l-.854 2.136a.75.75 0 01-.717.473L4.98 13.42l5.401-2.16 2.16 5.401a.75.75 0 01-.473.717l-5.401 2.16 2.16-5.401a.75.75 0 01.717-.473l5.401-2.16z" clipRule="evenodd" />
+        <path d="M10.362 3.654a.75.75 0 01.764.023l4.5 3.5a.75.75 0 01-.803 1.282L12 6.558v8.387a.75.75 0 01-1.5 0V6.558l-2.823 1.904a.75.75 0 11-.803-1.282l4.5-3.5zM4.75 7.5a.75.75 0 000 1.5h4.5a.75.75 0 000-1.5h-4.5z" />
+        <path fillRule="evenodd" d="M1.5 7.25a.75.75 0 01.75-.75h15a.75.75 0 010 1.5h-15a.75.75 0 01-.75-.75zM1.5 12.25a.75.75 0 01.75-.75h15a.75.75 0 010 1.5h-15a.75.75 0 01-.75-.75z" clipRule="evenodd" />
     </svg>
 );
+
 
 export const StopIcon: React.FC<IconProps> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>

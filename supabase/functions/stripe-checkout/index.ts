@@ -1,4 +1,5 @@
 // Updated: 2024-07-31 - Inlined CORS headers to fix deployment error.
+// Updated: 2024-08-01 - Changed to read origin from body instead of header for reliability.
 declare const Deno: any;
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import Stripe from 'https://esm.sh/stripe@16.2.0?target=deno';
@@ -28,11 +29,15 @@ serve(async (req) => {
   }
 
   try {
-    const { planId } = await req.json();
+    const { planId, origin } = await req.json();
     const priceId = STRIPE_PRICE_IDS[planId as keyof typeof STRIPE_PRICE_IDS];
 
     if (!priceId) {
         throw new Error(`Invalid planId: ${planId}`);
+    }
+    
+    if (!origin) {
+        throw new Error('Request origin is not available in the request body.');
     }
 
     const supabase = createClient(
@@ -43,9 +48,6 @@ serve(async (req) => {
     
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not found');
-    
-    const origin = req.headers.get('origin');
-    if (!origin) throw new Error('Request origin is not available.');
 
     const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],

@@ -58,6 +58,16 @@ export interface Script {
   cta: string;
 }
 
+export interface ScriptOptimization {
+  initialScore: number;
+  finalScore: number;
+  analysisLog: {
+    step: string;
+    target: 'hooks' | 'cta' | `scene-${number}`;
+  }[];
+  finalScript: Script;
+}
+
 export interface Analysis {
   scores: {
     overall: number;

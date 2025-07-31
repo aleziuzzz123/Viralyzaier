@@ -1,8 +1,8 @@
-
 import React, { createContext, useState, useEffect, useCallback, useContext, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Project, User, PlanId, Blueprint, Toast, Platform, Opportunity, ContentGapSuggestion } from '../types';
 import * as supabase from '../services/supabaseService';
+import { isBackendConfigured } from '../services/supabaseService';
 import { type AuthSession } from '@supabase/supabase-js';
 import { createCheckoutSession, PLANS } from '../services/paymentService';
 import { fetchVideoPerformanceByUrl } from '../services/youtubeService';
@@ -15,6 +15,7 @@ interface AppContextType {
     user: User | null;
     projects: Project[];
     apiKeyError: boolean;
+    backendConfigError: boolean;
     toasts: Toast[];
     dismissedTutorials: string[];
     isUpgradeModalOpen: boolean;
@@ -61,7 +62,9 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
     const [projects, setProjects] = useState<Project[]>([]);
     
-    const [apiKeyError] = useState<boolean>(!import.meta.env.VITE_GEMINI_API_KEY);
+    const [apiKeyError] = useState<boolean>(!process.env.API_KEY);
+    const [backendConfigError] = useState<boolean>(!isBackendConfigured);
+
     const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
     
     const [isUpgradeModalOpen, setUpgradeModalOpen] = useState(false);
@@ -108,7 +111,13 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
 
     // --- AUTH & DATA LOADING ---
     useEffect(() => {
-        supabase.getSession().then(({ session }) => setSession(session));
+        if (backendConfigError) return;
+
+        supabase.getSession().then(({ session }) => setSession(session))
+        .catch(err => {
+            console.error("Failed to get initial session:", err);
+            addToast("Could not connect to the authentication service.", "error");
+        });
 
         const authListener = supabase.onAuthStateChange((_event, session) => {
             setSession(session);
@@ -120,25 +129,37 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         return () => {
             authListener?.unsubscribe();
         };
-    }, []);
+
+    }, [addToast, backendConfigError]);
 
     useEffect(() => {
-        if (session?.user) {
-            supabase.getUserProfile(session.user.id).then(profile => {
-                if (profile) {
-                    setUser(profile);
-                } else {
-                    console.error("Critical error: User is logged in but profile does not exist in DB.");
-                    addToast("Could not load your profile. Please contact support.", "error");
-                    supabase.signOut();
-                }
-            });
-            supabase.getProjectsForUser(session.user.id).then(setProjects);
+        if (session?.user && !backendConfigError) {
+            supabase.getUserProfile(session.user.id)
+                .then(profile => {
+                    if (profile) {
+                        setUser(profile);
+                    } else {
+                        console.error("Critical error: User is logged in but profile does not exist in DB.");
+                        addToast(t('toast.loading_user_error'), "error");
+                        supabase.signOut();
+                    }
+                })
+                .catch(err => {
+                    console.error('Failed to load user profile:', err);
+                    addToast(t('toast.failed_fetch_profile'), 'error');
+                });
+                
+            supabase.getProjectsForUser(session.user.id)
+                .then(setProjects)
+                .catch(err => {
+                    console.error('Failed to load projects:', err);
+                    addToast(t('toast.failed_fetch_projects'), 'error');
+                });
         } else {
             setUser(null);
             setProjects([]);
         }
-    }, [session, addToast]);
+    }, [session, addToast, t, backendConfigError]);
     
     // Immediate feedback after Stripe redirect
     useEffect(() => {
@@ -155,7 +176,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
 
     // Simulate fetching performance data for published videos
     useEffect(() => {
-        if (!session || !projects.some(p => p.status === 'Published' && p.publishedUrl && !p.performance)) return;
+        if (!session || backendConfigError || !projects.some(p => p.status === 'Published' && p.publishedUrl && !p.performance)) return;
         
         const fetchPerformanceData = async () => {
             const projectsToUpdate = projects.filter(p => p.status === 'Published' && p.publishedUrl && !p.performance);
@@ -177,7 +198,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         fetchPerformanceData();
       
         return () => clearInterval(interval);
-    }, [session, projects]);
+    }, [session, projects, backendConfigError]);
     
     const requestConfirmation = (title: string, message: string, onConfirm: () => void) => { setConfirmation({ isOpen: true, title, message, onConfirm }); };
     const handleConfirmation = () => { confirmation.onConfirm(); setConfirmation({ isOpen: false, title: '', message: '', onConfirm: () => {} }); };
@@ -192,10 +213,10 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     };
 
     const consumeCredits = useCallback(async (amount: number): Promise<boolean> => {
-        if (!user) return false;
+        if (!user || backendConfigError) return false;
         
         try {
-            const result = await supabase.invokeRpc('consume_credits_atomic', { amount_to_consume: amount });
+            const result = await supabase.invokeEdgeFunction('consume-credits', { amount_to_consume: amount });
 
             if (result.success) {
                 setUser(prev => prev ? { ...prev, aiCredits: result.newCredits } : null);
@@ -217,9 +238,10 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             addToast(errorMessage, 'error');
             return false;
         }
-    }, [user, addToast, t]);
+    }, [user, addToast, t, backendConfigError]);
 
     const handleUpdateProject = async (updatedProjectData: Partial<Project> & { id: string }) => {
+        if (backendConfigError) return null;
         try {
             const updatedProject = await supabase.updateProject(updatedProjectData.id, updatedProjectData);
             setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
@@ -231,7 +253,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     };
     
     const handleCreateProjectFromBlueprint = async (blueprint: Blueprint, selectedTitle: string) => {
-        if (!user) return;
+        if (!user || backendConfigError) return;
         
         try {
             const moodboardUrls = await Promise.all(
@@ -260,7 +282,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     };
 
     const handleCreateProjectFromIdea = async (suggestion: Opportunity | ContentGapSuggestion, platform: Platform) => {
-         if (!user) return;
+         if (!user || backendConfigError) return;
         const title = 'suggestedTitle' in suggestion ? suggestion.suggestedTitle : (suggestion.potentialTitles[0] || suggestion.idea);
         const newProjectData: Omit<Project, 'id'|'lastUpdated'> = {
             name: suggestion.idea, status: 'Idea', platform: platform, topic: suggestion.reason,
@@ -276,6 +298,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   
     const handleDeleteProject = (projectId: string) => {
         requestConfirmation(t('confirmation_modal.delete_project_title'), t('confirmation_modal.delete_project_message'), async () => {
+            if (backendConfigError) return;
             try {
                 await supabase.deleteProject(projectId);
                 addToast(t('toast.project_deleted'), 'success');
@@ -295,7 +318,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     const requirePermission = useCallback((requiredPlan: PlanId): boolean => { if (!user) return false; const userPlanIndex = PLANS.findIndex(p => p.id === user.subscription.planId); const requiredPlanIndex = PLANS.findIndex(p => p.id === requiredPlan); if (userPlanIndex >= requiredPlanIndex) { return true; } const requiredPlanDetails = PLANS[requiredPlanIndex]; setUpgradeReason({ title: t('upgrade_modal.default_title'), description: t('upgrade_modal.default_description') }); setUpgradeModalOpen(true); return false; }, [user, t]);
     
     const handleSubscriptionChange = async (planId: PlanId) => {
-        if (!user) return;
+        if (!user || backendConfigError) return;
         if (user.subscription.planId === planId && user.subscription.status === 'active') {
             addToast(t('toast.already_on_plan'), 'info');
             return;
@@ -321,7 +344,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     };
 
     const value: AppContextType = {
-        session, user, projects, apiKeyError, toasts, dismissedTutorials,
+        session, user, projects, apiKeyError, backendConfigError, toasts, dismissedTutorials,
         isUpgradeModalOpen, upgradeReason, confirmation, activeProjectId,
         language, setLanguage, t,
         addToast, dismissToast, dismissTutorial, handleLogout, consumeCredits, requirePermission,

@@ -29,6 +29,7 @@ const TitleOptimizer: React.FC<TitleOptimizerProps> = ({ onTitleSelect, onBack, 
   const [isLoading, setIsLoading] = useState<{[key: number]: boolean}>({});
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<{[key: number]: { analysis: TitleAnalysis, suggestions: string[] } }>({});
+  const [highlightedTitle, setHighlightedTitle] = useState<string | null>(null);
 
   useEffect(() => {
     setTopic(initialTopic);
@@ -133,13 +134,23 @@ const TitleOptimizer: React.FC<TitleOptimizerProps> = ({ onTitleSelect, onBack, 
                                 {results[index].suggestions.slice(0, 3).map((suggestion, sIndex) => (
                                     <li 
                                         key={sIndex}
-                                        onClick={() => onTitleSelect(suggestion)}
-                                        className="group flex items-center justify-between p-3 rounded-md bg-gray-900 hover:bg-indigo-900/50 transition-all cursor-pointer border border-transparent hover:border-indigo-500"
+                                        onClick={() => setHighlightedTitle(suggestion)}
+                                        className={`group flex items-center justify-between p-3 rounded-md transition-all cursor-pointer border ${
+                                            highlightedTitle === suggestion ? 'bg-indigo-900/50 border-indigo-500' : 'bg-gray-900 hover:bg-indigo-900/50 border-transparent hover:border-indigo-500/50'
+                                        }`}
                                     >
                                         <p className="text-gray-200">{suggestion}</p>
-                                        <span className="px-3 py-1 text-xs font-semibold text-white bg-indigo-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                                            {t('title_optimizer.select_button')}
-                                        </span>
+                                        {highlightedTitle === suggestion && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onTitleSelect(suggestion);
+                                                }}
+                                                className="ml-4 flex-shrink-0 px-3 py-1 text-xs font-semibold text-white bg-indigo-600 rounded-full transition-all hover:bg-indigo-500 animate-fade-in"
+                                            >
+                                                {t('title_optimizer.select_button')}
+                                            </button>
+                                        )}
                                     </li>
                                 ))}
                             </ul>

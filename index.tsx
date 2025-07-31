@@ -1,4 +1,3 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -28,20 +27,43 @@ class ErrorBoundary extends React.Component<{children: React.ReactNode}, { hasEr
       // Basic language detection from browser, default to English.
       const lang = navigator.language.split('-')[0] as keyof typeof translations;
       const t = translations[lang] || translations.en;
+      
+      const isSupabaseError = this.state.error?.message.includes('Supabase environment variables');
+      const isApiKeyError = this.state.error?.message.includes('Gemini API Key');
+
+      let title = t['app.error.title'];
+      let description = t['app.error.description'];
+      let errorList = [
+          <li><code>API_KEY</code> (for AI features)</li>,
+          <li><code>SUPABASE_URL</code> (for backend)</li>,
+          <li><code>SUPABASE_ANON_KEY</code> (for backend)</li>,
+      ];
+      
+      if(isSupabaseError) {
+        title = "Backend Not Configured";
+        description = "The application cannot connect to the backend because the required Supabase environment variables are missing."
+        errorList = [
+          <li><code>SUPABASE_URL</code> (for backend)</li>,
+          <li><code>SUPABASE_ANON_KEY</code> (for backend)</li>,
+        ]
+      } else if (isApiKeyError) {
+        title = "AI Not Configured";
+        description = "The application's AI features are disabled because the Gemini API Key is missing."
+        errorList = [<li><code>API_KEY</code> (for AI features)</li>]
+      }
+
 
       return (
         <div className="bg-gray-900 text-white min-h-screen flex items-center justify-center p-4">
           <div className="text-center bg-gray-800 p-8 rounded-lg shadow-2xl border border-red-500/50 max-w-lg">
-              <h1 className="text-2xl font-bold text-red-400">{t['app.error.title']}</h1>
+              <h1 className="text-2xl font-bold text-red-400">{title}</h1>
               <p className="mt-3 text-gray-300">
-                {t['app.error.description']}
+                {description}
               </p>
               <div className="mt-4 text-left bg-gray-900 p-4 rounded-md">
                 <p className="text-sm text-gray-400 font-semibold">{t['app.error.cause']}</p>
                 <ul className="list-disc list-inside text-sm text-gray-400 mt-2 space-y-1">
-                  <li><code>API_KEY</code> (for AI features)</li>
-                  <li><code>SUPABASE_URL</code> (for backend)</li>
-                  <li><code>SUPABASE_ANON_KEY</code> (for backend)</li>
+                  {errorList}
                 </ul>
                 <p className="text-xs text-gray-500 mt-3">{t['app.error.solution']}</p>
               </div>

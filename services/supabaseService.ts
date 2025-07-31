@@ -1,5 +1,4 @@
-
-import { createClient, type AuthSession } from '@supabase/supabase-js';
+import { createClient, type AuthSession, type AuthChangeEvent, type Subscription } from '@supabase/supabase-js';
 import { 
     Project, 
     User, 
@@ -18,9 +17,13 @@ import {
 } from '../types';
 import { PLANS } from './paymentService';
 
-// Define a simplified Json type to resolve complex type instantiation issues with the Supabase client.
-export type Json = any;
-
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
 // Row types for Supabase tables
 type ProfileRow = {
@@ -43,7 +46,7 @@ type ProjectRow = {
   script: Json | null
   analysis: Json | null
   competitor_analysis: Json | null
-  moodboard: Json | null
+  moodboard: string[] | null
   assets: Json | null
   sound_design: Json | null
   launch_plan: Json | null
@@ -85,7 +88,7 @@ type ProjectInsert = {
     script?: Json | null;
     analysis?: Json | null;
     competitor_analysis?: Json | null;
-    moodboard?: Json | null;
+    moodboard?: string[] | null;
     assets?: Json | null;
     sound_design?: Json | null;
     launch_plan?: Json | null;
@@ -106,7 +109,7 @@ type ProjectUpdate = {
     script?: Json | null;
     analysis?: Json | null;
     competitor_analysis?: Json | null;
-    moodboard?: Json | null;
+    moodboard?: string[] | null;
     assets?: Json | null;
     sound_design?: Json | null;
     launch_plan?: Json | null;
@@ -148,16 +151,17 @@ export type Database = {
   }
 };
 
-// CRITICAL FIX: Use environment variables for Supabase credentials.
-// This allows the application to connect to Supabase when deployed to Vercel.
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL; 
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrlFromEnv = process.env.SUPABASE_URL;
+const supabaseAnonKeyFromEnv = process.env.SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-    console.error("Supabase URL or Anon Key is not set. Please check your environment variables.");
-}
+export const isBackendConfigured = !!(supabaseUrlFromEnv && supabaseAnonKeyFromEnv);
+
+// Use placeholders if not configured to prevent crash
+const supabaseUrl = isBackendConfigured ? supabaseUrlFromEnv : 'https://placeholder.supabase.co';
+const supabaseAnonKey = isBackendConfigured ? supabaseAnonKeyFromEnv : 'placeholder.anon.key';
 
 const supabase = createClient<Database>(supabaseUrl!, supabaseAnonKey!);
+
 
 // --- Mappers ---
 const profileRowToUser = (row: ProfileRow): User => ({
@@ -165,15 +169,15 @@ const profileRowToUser = (row: ProfileRow): User => ({
     email: row.email,
     subscription: row.subscription as unknown as User['subscription'],
     aiCredits: row.ai_credits,
-    channelAudit: row.channel_audit as unknown as User['channelAudit'],
+    channelAudit: row.channel_audit as unknown as ChannelAudit | null,
 });
 
 const userToProfileUpdate = (updates: Partial<User>): ProfileUpdate => {
     const dbUpdates: ProfileUpdate = {};
     if (updates.aiCredits !== undefined) dbUpdates.ai_credits = updates.aiCredits;
-    if (updates.channelAudit !== undefined) dbUpdates.channel_audit = updates.channelAudit as Json;
+    if (updates.channelAudit !== undefined) dbUpdates.channel_audit = updates.channelAudit as unknown as Json;
     if (updates.email !== undefined) dbUpdates.email = updates.email;
-    if (updates.subscription !== undefined) dbUpdates.subscription = updates.subscription as Json;
+    if (updates.subscription !== undefined) dbUpdates.subscription = updates.subscription as unknown as Json;
     return dbUpdates;
 };
 
@@ -187,7 +191,7 @@ const projectRowToProject = (row: ProjectRow): Project => ({
     script: row.script as unknown as Script | null,
     analysis: row.analysis as unknown as Analysis | null,
     competitorAnalysis: row.competitor_analysis as unknown as CompetitorAnalysisResult | null,
-    moodboard: row.moodboard as unknown as string[] | null,
+    moodboard: row.moodboard,
     assets: (row.assets as unknown as { [key: string]: SceneAssets } | null) || {},
     soundDesign: row.sound_design as unknown as SoundDesign | null,
     launchPlan: row.launch_plan as unknown as LaunchPlan | null,
@@ -205,14 +209,14 @@ const projectToProjectUpdate = (updates: Partial<Project>): ProjectUpdate => {
     if(updates.platform !== undefined) dbUpdates.platform = updates.platform;
     if(updates.status !== undefined) dbUpdates.status = updates.status;
     if(updates.title !== undefined) dbUpdates.title = updates.title;
-    if(updates.script !== undefined) dbUpdates.script = updates.script as Json;
-    if(updates.analysis !== undefined) dbUpdates.analysis = updates.analysis as Json;
-    if(updates.competitorAnalysis !== undefined) dbUpdates.competitor_analysis = updates.competitorAnalysis as Json;
-    if(updates.moodboard !== undefined) dbUpdates.moodboard = updates.moodboard as Json;
-    if(updates.assets !== undefined) dbUpdates.assets = updates.assets as Json;
-    if(updates.soundDesign !== undefined) dbUpdates.sound_design = updates.soundDesign as Json;
-    if(updates.launchPlan !== undefined) dbUpdates.launch_plan = updates.launchPlan as Json;
-    if(updates.performance !== undefined) dbUpdates.performance = updates.performance as Json;
+    if(updates.script !== undefined) dbUpdates.script = updates.script as unknown as Json;
+    if(updates.analysis !== undefined) dbUpdates.analysis = updates.analysis as unknown as Json;
+    if(updates.competitorAnalysis !== undefined) dbUpdates.competitor_analysis = updates.competitorAnalysis as unknown as Json;
+    if(updates.moodboard !== undefined) dbUpdates.moodboard = updates.moodboard;
+    if(updates.assets !== undefined) dbUpdates.assets = updates.assets as unknown as Json;
+    if(updates.soundDesign !== undefined) dbUpdates.sound_design = updates.soundDesign as unknown as Json;
+    if(updates.launchPlan !== undefined) dbUpdates.launch_plan = updates.launchPlan as unknown as Json;
+    if(updates.performance !== undefined) dbUpdates.performance = updates.performance as unknown as Json;
     if(updates.scheduledDate !== undefined) dbUpdates.scheduled_date = updates.scheduledDate;
     if(updates.publishedUrl !== undefined) dbUpdates.published_url = updates.publishedUrl;
     if(updates.lastUpdated !== undefined) dbUpdates.last_updated = updates.lastUpdated;
@@ -228,9 +232,9 @@ export const getSession = async (): Promise<{ session: AuthSession | null }> => 
     return data;
 };
 
-export const onAuthStateChange = (callback: (event: string, session: AuthSession | null) => void) => {
+export const onAuthStateChange = (callback: (event: AuthChangeEvent, session: AuthSession | null) => void) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-        callback(event, session);
+        callback(event as AuthChangeEvent, session);
     });
     return subscription;
 };
@@ -279,13 +283,16 @@ export const getUserProfile = async (userId: string): Promise<User | null> => {
 
 export const updateUserProfile = async (userId: string, updates: Partial<User>): Promise<User> => {
     const dbUpdates = userToProfileUpdate(updates);
+    
     const { data, error } = await supabase
         .from('profiles')
-        .update(dbUpdates as any)
+        .update(dbUpdates)
         .eq('id', userId)
         .select()
         .single();
+
     if (error) throw error;
+    if (!data) throw new Error("User profile not found after update.");
     return profileRowToUser(data);
 };
 
@@ -308,14 +315,14 @@ export const createProject = async (projectData: Omit<Project, 'id' | 'lastUpdat
         platform: projectData.platform,
         status: projectData.status,
         title: projectData.title,
-        script: projectData.script as Json,
-        analysis: projectData.analysis as Json,
-        competitor_analysis: projectData.competitorAnalysis as Json,
-        moodboard: projectData.moodboard as Json,
-        assets: projectData.assets as Json,
-        sound_design: projectData.soundDesign as Json,
-        launch_plan: projectData.launchPlan as Json,
-        performance: projectData.performance as Json,
+        script: projectData.script as unknown as Json,
+        analysis: projectData.analysis as unknown as Json,
+        competitor_analysis: projectData.competitorAnalysis as unknown as Json,
+        moodboard: projectData.moodboard,
+        assets: projectData.assets as unknown as Json,
+        sound_design: projectData.soundDesign as unknown as Json,
+        launch_plan: projectData.launchPlan as unknown as Json,
+        performance: projectData.performance as unknown as Json,
         scheduled_date: projectData.scheduledDate,
         published_url: projectData.publishedUrl || null,
         workflow_step: projectData.workflowStep,
@@ -323,7 +330,7 @@ export const createProject = async (projectData: Omit<Project, 'id' | 'lastUpdat
 
     const { data, error } = await supabase
         .from('projects')
-        .insert([insertData] as any)
+        .insert([insertData])
         .select()
         .single();
 
@@ -333,13 +340,16 @@ export const createProject = async (projectData: Omit<Project, 'id' | 'lastUpdat
 
 export const updateProject = async (projectId: string, updates: Partial<Project>): Promise<Project> => {
     const dbUpdates = projectToProjectUpdate({ ...updates, lastUpdated: new Date().toISOString() });
+    
     const { data, error } = await supabase
         .from('projects')
-        .update(dbUpdates as any)
+        .update(dbUpdates)
         .eq('id', projectId)
         .select()
         .single();
+
     if (error) throw error;
+    if (!data) throw new Error("Project not found after update.");
     return projectRowToProject(data);
 };
 
@@ -366,14 +376,23 @@ export const uploadFile = async (file: Blob, path: string): Promise<string> => {
 };
 
 // --- Remote Procedure Calls (RPC) ---
-export const invokeRpc = async (name: keyof Database['public']['Functions'], params: object): Promise<any> => {
+export const invokeRpc = async <T extends keyof Database['public']['Functions']>(
+    name: T,
+    params: Database['public']['Functions'][T]['Args']
+): Promise<Database['public']['Functions'][T]['Returns']> => {
     const { data, error } = await supabase.rpc(name, params);
-    if (error) throw error;
-    return data;
+    if (error) {
+        console.error(`Error invoking RPC function '${String(name)}':`, error);
+        throw error;
+    }
+    if (data === null || data === undefined) {
+        throw new Error(`RPC function '${String(name)}' returned null or undefined data.`);
+    }
+    return data as unknown as Database['public']['Functions'][T]['Returns'];
 };
 
 // --- Edge Functions ---
-export const invokeEdgeFunction = async (name: string, body: object): Promise<any> => {
+export const invokeEdgeFunction = async (name: string, body: any): Promise<any> => {
     const { data, error } = await supabase.functions.invoke(name, {
         body,
     });

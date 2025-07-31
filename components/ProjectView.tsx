@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { Project, Analysis, Script as ScriptType, WorkflowStep, Platform } from '../types';
 import { TitleIcon, ScriptIcon, SparklesIcon, TrashIcon, PhotoIcon, CtaIcon, LockClosedIcon, CheckIcon, YouTubeIcon, TikTokIcon, InstagramIcon, MusicNoteIcon, RocketLaunchIcon, TrendIcon, TargetIcon } from './Icons';
@@ -222,18 +221,23 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
     };
 
     const handleTitleSelect = (title: string) => {
-        // Only update the title, preserving the original, broader topic.
-        const updates: Partial<Project> & { id:string } = { id: project.id, title: title };
-        
-        if (project.workflowStep < 2) {
+        const updates: Partial<Project> & { id: string } = { id: project.id, title: title };
+
+        const isFirstCompletion = project.workflowStep < 2;
+        if (isFirstCompletion) {
             updates.workflowStep = 2;
-            handleUpdateProject(updates);
+        }
+
+        handleUpdateProject(updates);
+
+        if (isFirstCompletion) {
             addToast(t('toast.brief_complete'), 'success');
-            setActiveStep(2);
         } else {
-            handleUpdateProject(updates);
             addToast(t('toast.topic_title_updated'), 'success');
         }
+
+        // Always navigate to the script page after selection.
+        setActiveStep(2);
     };
 
     const handleTrendSelect = (trend: string) => {

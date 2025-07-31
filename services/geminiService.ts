@@ -1,9 +1,10 @@
 
+
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
-import { Analysis, Blueprint, CompetitorAnalysisResult, Platform, Script, TitleAnalysis, ContentGapSuggestion, VideoPerformance, PerformanceReview, SceneAssets, SoundDesign, LaunchPlan, ChannelAudit, Opportunity } from '../types';
+import { Analysis, Blueprint, CompetitorAnalysisResult, Platform, Script, TitleAnalysis, ContentGapSuggestion, VideoPerformance, PerformanceReview, SceneAssets, SoundDesign, LaunchPlan, ChannelAudit, Opportunity, ScriptOptimization } from '../types';
 import * as supabase from './supabaseService';
 
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+const apiKey = process.env.API_KEY;
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 const AI_NOT_CONFIGURED_ERROR = "Gemini API Key is not configured. Please set the API_KEY environment variable.";
@@ -87,6 +88,85 @@ Your output MUST be a JSON object with the following structure:
     return { ...blueprintContent, moodboard: moodboardBase64, platform };
 };
 
+export const generateOptimizedScript = async (
+    platform: Platform,
+    desiredLengthInSeconds: number,
+    input: { topic: string } | { userScript: string }
+): Promise<ScriptOptimization> => {
+    checkAi();
+
+    const isGenerating = 'topic' in input;
+    const promptContext = isGenerating
+        ? `Generate a new script about "${input.topic}".`
+        : `Analyze and improve this existing script: "${input.userScript.substring(0, 2000)}..."`;
+
+    const prompt = `You are an expert scriptwriter and viral content analyst for ${platform}. Your task is to create a perfectly optimized script.
+The desired script length is approximately ${desiredLengthInSeconds} seconds.
+Context: ${promptContext}
+
+Your output must be a single JSON object with the following structure.
+- "initialScore": An integer from 0-100 representing the baseline virality score. If generating a new script, this should be 0. If improving a script, provide an honest assessment of the original.
+- "finalScore": An integer from 90-100. This is the score of your improved script.
+- "analysisLog": An array of 5-7 objects, where each object details one optimization step. Each object must have:
+    - "step": A short, descriptive string of the action taken (e.g., "Rewriting hook for more impact", "Improving pacing in scene 2", "Strengthening the call to action").
+    - "target": A string identifying the part of the script being changed ('hooks', 'cta', or 'scene-X' where X is the scene number, e.g., 'scene-2').
+- "finalScript": The fully optimized script object, following the specified structure. It must include:
+    - "hooks": An array of 3-5 distinct, psychologically-driven hook options.
+    - "scenes": An array of scene objects, each with "timecode", "visual", "voiceover", and "onScreenText". The total duration should respect the desiredLengthInSeconds.
+    - "cta": A strong, clear call to action.`;
+
+    const response = await ai!.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    initialScore: { type: Type.INTEGER },
+                    finalScore: { type: Type.INTEGER },
+                    analysisLog: {
+                        type: Type.ARRAY,
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                step: { type: Type.STRING },
+                                target: { type: Type.STRING }
+                            },
+                            required: ["step", "target"]
+                        }
+                    },
+                    finalScript: {
+                        type: Type.OBJECT,
+                        properties: {
+                            hooks: { type: Type.ARRAY, items: { type: Type.STRING } },
+                            scenes: {
+                                type: Type.ARRAY,
+                                items: {
+                                    type: Type.OBJECT,
+                                    properties: {
+                                        timecode: { type: Type.STRING },
+                                        visual: { type: Type.STRING },
+                                        voiceover: { type: Type.STRING },
+                                        onScreenText: { type: Type.STRING }
+                                    },
+                                    required: ["timecode", "visual", "voiceover", "onScreenText"]
+                                }
+                            },
+                            cta: { type: Type.STRING }
+                        },
+                        required: ["hooks", "scenes", "cta"]
+                    }
+                },
+                required: ["initialScore", "finalScore", "analysisLog", "finalScript"]
+            }
+        }
+    });
+
+    return parseGeminiJson<ScriptOptimization>(response);
+};
+
+
 export const analyzeVideo = async (frames: string[], title: string, platform: Platform): Promise<Analysis> => {
     checkAi();
     const textPrompt = `You are a viral video expert. A user has uploaded a video titled "${title}" for ${platform}. I am providing you with three keyframes from the video: the hook (first frame), the mid-point (second frame), and a late-stage frame (third frame).
@@ -154,6 +234,7 @@ Your output must be a JSON object with:
     return analysis;
 };
 
+// This function is now superseded by generateOptimizedScript but kept for potential legacy use or simpler contexts.
 export const generateScript = async (topic: string, title: string, platform: Platform): Promise<Script> => {
     checkAi();
     const prompt = `You are an expert scriptwriter for viral videos on ${platform}. Your task is to generate a script for a video about "${topic}" with the title "${title}". The script must be engineered for maximum retention and engagement, tailored specifically for the ${platform} format.
@@ -202,6 +283,7 @@ Your output must be a JSON object with this exact structure:
     });
     return parseGeminiJson(response);
 };
+
 
 export const analyzeTitles = async (topic: string, titles: string[], platform: Platform): Promise<{ analysis: TitleAnalysis[], suggestions: string[] }> => {
     checkAi();
@@ -273,21 +355,75 @@ export const analyzeCompetitorVideo = async (url: string): Promise<CompetitorAna
     return parseGeminiJson(response);
 };
 
-export const performChannelAudit = async (videos: {title: string}[]): Promise<ChannelAudit> => {
+export const generateSceneAssets = async (
+    visualDescription: string,
+    onScreenText: string,
+    platform: Platform,
+    userId: string,
+    projectId: string,
+    sceneIndex: number
+): Promise<SceneAssets> => {
     checkAi();
-    const videoTitles = videos.map(v => v.title).join(', ');
-    const prompt = `You are a world-class YouTube strategist. Analyze this list of video titles from a single channel: ${videoTitles}.
 
-Your task is to perform a deep-dive audit and create a growth plan.
+    const aspectRatio = platform === 'youtube' ? '16:9' : '9:16';
 
-Your output MUST be a JSON object with:
-1. "contentPillars": An array of 3-4 core themes or topics the channel excels at.
-2. "audiencePersona": A detailed description of the target viewer (demographics, psychographics, needs, pain points).
-3. "viralFormula": A sentence that encapsulates the channel's repeatable formula for success (e.g., "Combining [Topic A] with a surprising [Emotional Element] to solve [Audience Problem]").
-4. "opportunities": An array of 3 distinct, actionable video opportunities. Each object must have an "idea", "reason" (why it will work for this channel), a "suggestedTitle", and a "type" ('Quick Win', 'Growth Bet', 'Experimental').`;
+    // Generate B-roll images
+    const imagePromise = ai!.models.generateImages({
+        model: 'imagen-3.0-generate-002',
+        prompt: `Cinematic b-roll footage for a ${platform} video. Style: high-resolution, professional photography. Subject: ${visualDescription}`,
+        config: { numberOfImages: 2, outputMimeType: 'image/jpeg', aspectRatio }
+    });
+    
+    // Generate graphics
+    const graphicPromise = onScreenText ? ai!.models.generateImages({
+        model: 'imagen-3.0-generate-002',
+        prompt: `A clean and modern on-screen graphic with a transparent background for a ${platform} video. The graphic must feature this text in a visually appealing, readable font: "${onScreenText}". The text should be the primary focus. Include only minimal, abstract design elements that complement the text without being distracting.`,
+        config: { numberOfImages: 1, outputMimeType: 'image/png', aspectRatio }
+    }) : Promise.resolve(null);
+    
+    const [imageResults, graphicResult] = await Promise.all([imagePromise, graphicPromise]);
+
+    const images = imageResults.generatedImages.map(img => `data:image/jpeg;base64,${img.image.imageBytes}`);
+    const graphics = graphicResult ? graphicResult.generatedImages.map(img => `data:image/png;base64,${img.image.imageBytes}`) : [];
+    
+    const audio = mockAudio();
+
+    return { images, graphics, audio };
+};
+
+export const performChannelAudit = async (videos: {title: string; views: number; likes: number; comments: number}[]): Promise<ChannelAudit> => {
+    checkAi();
+
+    const videoDataSummary = videos.map(v => `Title: "${v.title}", Views: ${v.views}, Likes: ${v.likes}`).join('\n');
+
+    const prompt = `
+**Primary Directive: YouTube Channel Audit**
+
+**Role:** You are an expert YouTube channel strategist. I am providing you with a list of a channel's recent videos and their performance metrics.
+
+**Video Data:**
+${videoDataSummary}
+
+**Task:** Analyze this data to identify patterns of success. Based *only* on this data, perform a comprehensive channel audit. Your analysis must be sharp and actionable.
+
+**Your final response MUST be a valid JSON object.** Do not include any other text or markdown formatting. The JSON structure must be:
+{
+    "contentPillars": ["An array of 3-5 distinct content categories or themes the channel focuses on based on the video titles."],
+    "audiencePersona": "A detailed paragraph describing the target viewer, their interests, and pain points, as inferred from the video topics and performance.",
+    "viralFormula": "A concise, actionable formula that breaks down the recurring elements in their most successful videos (e.g., 'Fast-paced editing + Controversial opinion hook + Relatable problem-solving'). Infer this from the titles of high-performing videos.",
+    "opportunities": [
+        {
+            "idea": "A specific, new video idea that combines successful themes.",
+            "reason": "Why this idea will resonate with their audience and align with their successful formula.",
+            "suggestedTitle": "A clickable, optimized title for the video.",
+            "type": "Categorize as 'Quick Win', 'Growth Bet', or 'Experimental'."
+        }
+    ]
+}`;
 
     const response = await ai!.models.generateContent({
-        model: 'gemini-2.5-flash', contents: prompt,
+        model: 'gemini-2.5-flash', 
+        contents: prompt,
         config: {
             responseMimeType: 'application/json',
             responseSchema: {
@@ -296,80 +432,59 @@ Your output MUST be a JSON object with:
                     contentPillars: { type: Type.ARRAY, items: { type: Type.STRING } },
                     audiencePersona: { type: Type.STRING },
                     viralFormula: { type: Type.STRING },
-                    opportunities: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { idea: { type: Type.STRING }, reason: { type: Type.STRING }, suggestedTitle: { type: Type.STRING }, type: { type: Type.STRING, enum: ['Quick Win', 'Growth Bet', 'Experimental'] } }, required: ["idea", "reason", "suggestedTitle", "type"] } }
+                    opportunities: {
+                        type: Type.ARRAY,
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                idea: { type: Type.STRING },
+                                reason: { type: Type.STRING },
+                                suggestedTitle: { type: Type.STRING },
+                                type: { type: Type.STRING, enum: ['Quick Win', 'Growth Bet', 'Experimental']}
+                            },
+                            required: ["idea", "reason", "suggestedTitle", "type"]
+                        }
+                    }
                 },
                 required: ["contentPillars", "audiencePersona", "viralFormula", "opportunities"]
             }
         }
     });
+
     return parseGeminiJson(response);
 };
 
-export const generateSceneAssets = async (visual: string, onScreenText: string, platform: Platform, userId: string, projectId: string, sceneIndex: number): Promise<SceneAssets> => {
+export const generateSoundDesign = async (script: Script, vibe: string, topic: string): Promise<SoundDesign> => {
     checkAi();
-    const aspectRatio = platform === 'youtube' ? '16:9' : '9:16';
-    
-    const uploadAndGetUrl = async (base64Data: string, mime: 'image/jpeg' | 'image/png', path: string): Promise<string> => {
-        const blob = await supabase.dataUrlToBlob(`data:${mime};base64,${base64Data}`);
-        return supabase.uploadFile(blob, path);
-    };
+    const prompt = `You are an AI sound designer for viral videos. The video is about "${topic}" and needs a "${vibe}" vibe. Here is the script:
+${JSON.stringify(script.scenes.map(s => ({ timecode: s.timecode, voiceover: s.voiceover })), null, 2)}
 
-    const imagePrompts = [
-        `Photorealistic B-roll footage for a ${platform} video: ${visual}`,
-        `Cinematic alternate B-roll shot for a ${platform} video about: ${visual}`,
-    ];
-    const imagePromises = imagePrompts.map(prompt => 
-        ai!.models.generateImages({ model: 'imagen-3.0-generate-002', prompt, config: { numberOfImages: 1, outputMimeType: 'image/jpeg', aspectRatio } })
-    );
-    const imageResults = await Promise.all(imagePromises);
+Your task is to suggest background music and specific sound effects (SFX).
 
-    const imageUrls = await Promise.all(imageResults.map((res, i) => {
-        const path = `${userId}/${projectId}/scene_${sceneIndex}_broll_${i}.jpg`;
-        return uploadAndGetUrl(res.generatedImages[0].image.imageBytes, 'image/jpeg', path);
-    }));
-
-    let graphicUrls: string[] = [];
-    if (onScreenText) {
-        const graphicResult = await ai!.models.generateImages({
-            model: 'imagen-3.0-generate-002',
-            prompt: `A clean, professional on-screen graphic for a ${platform} video with the text: "${onScreenText}". Minimalist style, high legibility.`,
-            config: { numberOfImages: 1, outputMimeType: 'image/png', aspectRatio }
-        });
-        const path = `${userId}/${projectId}/scene_${sceneIndex}_graphic.png`;
-        const url = await uploadAndGetUrl(graphicResult.generatedImages[0].image.imageBytes, 'image/png', path);
-        graphicUrls.push(url);
-    }
-
-    return { images: imageUrls, graphics: graphicUrls, audio: mockAudio() };
-};
-
-export const generateSoundDesign = async(script: Script, vibe: string, topic: string): Promise<SoundDesign> => {
-    checkAi();
-    const prompt = `You are a sound designer for a YouTube video about "${topic}". The desired vibe is "${vibe}". Given the script, suggest background music and specific sound effects.
-
-Your output MUST be a JSON object with:
-1.  "music": A description of the ideal background music track (e.g., "Uplifting, royalty-free corporate pop with a driving beat").
-2.  "sfx": An array of sound effect objects. Each object needs a "timecode" from the script and a "description" of the sound effect (e.g., "whoosh", "camera shutter", "gentle keyboard typing").`;
+Your output MUST be a JSON object with this structure:
+1. "music": A detailed description of the suggested background music track. Describe its genre, tempo, mood, and instrumentation (e.g., "Uplifting, driving synth-pop with a strong beat and optimistic synth melodies.").
+2. "sfx": An array of SFX objects. Each object needs a "timecode" matching the script and a "description" of the sound effect (e.g., "whoosh", "camera shutter", "gentle notification ping"). Only include SFX for key moments.`;
 
     const response = await ai!.models.generateContent({
-        model: 'gemini-2.5-flash', contents: prompt,
+        model: 'gemini-2.5-flash',
+        contents: prompt,
         config: {
             responseMimeType: 'application/json',
-            responseSchema: { 
-                type: Type.OBJECT, 
-                properties: { 
-                    music: { type: Type.STRING }, 
-                    sfx: { 
-                        type: Type.ARRAY, 
-                        items: { 
-                            type: Type.OBJECT, 
-                            properties: { 
-                                timecode: { type: Type.STRING }, 
-                                description: { type: Type.STRING } 
-                            }, 
-                            required: ["timecode", "description"] 
-                        } 
-                    } 
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    music: { type: Type.STRING },
+                    sfx: {
+                        type: Type.ARRAY,
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                timecode: { type: Type.STRING },
+                                description: { type: Type.STRING }
+                            },
+                            required: ["timecode", "description"]
+                        }
+                    }
                 },
                 required: ["music", "sfx"]
             }
@@ -378,24 +493,26 @@ Your output MUST be a JSON object with:
     return parseGeminiJson(response);
 };
 
-export const generateSeo = async (title: string, script: Script, platform: Platform): Promise<{ description: string, tags: string[] }> => {
+export const generateSeo = async (title: string, script: Script, platform: Platform): Promise<LaunchPlan['seo']> => {
     checkAi();
     const scriptSummary = script.scenes.map(s => s.voiceover).join(' ');
-    const prompt = `Generate an SEO-optimized ${platform} description and a list of high-value tags for a video titled "${title}". The script summary is: "${scriptSummary}".
+    const prompt = `You are a ${platform} SEO expert. The video is titled "${title}" and the script summary is: "${scriptSummary.substring(0, 500)}...".
+
+Generate an optimized description and relevant tags.
 
 Your output MUST be a JSON object with:
-1.  "description": A well-written, keyword-rich description.
-2.  "tags": An array of relevant, high-traffic tags.`;
+1. "description": A paragraph that is keyword-rich, engaging, and includes a call to action.
+2. "tags": An array of 15-20 highly relevant tags, including a mix of broad and specific keywords.`;
 
     const response = await ai!.models.generateContent({
         model: 'gemini-2.5-flash', contents: prompt,
         config: {
             responseMimeType: 'application/json',
-            responseSchema: { 
-                type: Type.OBJECT, 
-                properties: { 
-                    description: { type: Type.STRING }, 
-                    tags: { type: Type.ARRAY, items: { type: Type.STRING } } 
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    description: { type: Type.STRING },
+                    tags: { type: Type.ARRAY, items: { type: Type.STRING } }
                 },
                 required: ["description", "tags"]
             }
@@ -406,48 +523,59 @@ Your output MUST be a JSON object with:
 
 export const analyzeAndGenerateThumbnails = async (title: string, platform: Platform, userId: string, projectId: string): Promise<string[]> => {
     checkAi();
-    const prompts = [
-        `Ultra High-CTR YouTube thumbnail for a video titled "${title}". Style: High-contrast, emotional human face with a shocked or surprised expression. Big, bold text.`,
-        `Click-worthy YouTube thumbnail for a video titled "${title}". Style: Bright, colorful background with a mysterious, intriguing object related to the topic. Minimal text.`,
-        `Viral-style YouTube thumbnail for a video titled "${title}". Style: "Before and After" comparison showing a dramatic transformation. Clear arrows and outlines.`,
-        `Viral challenge-style YouTube thumbnail for a video titled "${title}". A person with an exaggerated, comedic expression. Bright yellow text with a black outline.`,
-        `Aesthetic, minimalist YouTube thumbnail for "${title}". A single, beautiful high-quality photo related to the topic with elegant, thin typography.`
-    ];
+    const aspectRatio = platform === 'youtube' ? '16:9' : '9:16';
+    
+    // Step 1: Brainstorm concepts
+    const brainstormPrompt = `You are a viral marketing expert specializing in YouTube thumbnails. The video title is "${title}". Brainstorm 3 distinct, high-CTR thumbnail concepts. For each concept, provide a detailed prompt for an AI image generator. The prompts should describe visual elements, colors, text, and emotion designed to maximize clicks. Focus on concepts that create curiosity and have a strong focal point.
+    
+    Respond with a JSON object with a single key "prompts" which is an array of 3 strings.`;
+    
+    const brainstormResponse = await ai!.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: brainstormPrompt,
+        config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    prompts: { type: Type.ARRAY, items: { type: Type.STRING }}
+                },
+                required: ["prompts"]
+            }
+        }
+    });
+    
+    const { prompts } = parseGeminiJson<{ prompts: string[] }>(brainstormResponse);
 
-    const imagePromises = prompts.map(p => 
-        ai!.models.generateImages({ model: 'imagen-3.0-generate-002', prompt: p, config: { numberOfImages: 1, outputMimeType: 'image/jpeg', aspectRatio: '16:9' } })
+    // Step 2: Generate images from the concepts
+    const imagePromises = prompts.slice(0, 2).map(prompt => // Capped at 2 to manage cost/time
+        ai!.models.generateImages({
+            model: 'imagen-3.0-generate-002',
+            prompt: `YouTube thumbnail for a video titled "${title}". Style: vibrant, high-contrast, clear focal point. Content: ${prompt}`,
+            config: { numberOfImages: 1, outputMimeType: 'image/jpeg', aspectRatio }
+        })
     );
 
-    const results = await Promise.all(imagePromises);
-
-    const uploadPromises = results.map((res, i) => {
-        const path = `${userId}/${projectId}/thumbnail_${i}.jpg`;
-        return supabase.dataUrlToBlob(`data:image/jpeg;base64,${res.generatedImages[0].image.imageBytes}`)
-            .then(blob => supabase.uploadFile(blob, path));
-    });
-
-    return Promise.all(uploadPromises);
+    const imageResults = await Promise.all(imagePromises);
+    return imageResults.map(res => `data:image/jpeg;base64,${res.generatedImages[0].image.imageBytes}`);
 };
 
-export const generatePromotionPlan = async (title: string, platform: Platform): Promise<{ platform: string, action: string }[]> => {
+export const generatePromotionPlan = async (title: string, platform: Platform): Promise<LaunchPlan['promotionPlan']> => {
     checkAi();
-    const prompt = `Create a simple, 3-step cross-platform promotion plan for a new ${platform} video titled "${title}".
+    const prompt = `You are a social media growth hacker. A new video titled "${title}" is about to be published on ${platform}. Create a cross-platform promotion plan.
 
-Your output MUST be a JSON array of objects, where each object has:
-1.  "platform": The social media platform for promotion (e.g., "Twitter", "Instagram Stories", "Reddit").
-2.  "action": The specific promotional message or action to take on that platform.`;
-
+Your output must be a JSON object: an array of objects, where each object has "platform" (e.g., "Twitter/X", "Instagram Stories", "Reddit", "Facebook Group") and "action" (a specific, actionable post or content idea for that platform).`;
     const response = await ai!.models.generateContent({
         model: 'gemini-2.5-flash', contents: prompt,
         config: {
             responseMimeType: 'application/json',
-            responseSchema: { 
-                type: Type.ARRAY, 
-                items: { 
-                    type: Type.OBJECT, 
-                    properties: { 
-                        platform: { type: Type.STRING }, 
-                        action: { type: Type.STRING } 
+            responseSchema: {
+                type: Type.ARRAY,
+                items: {
+                    type: Type.OBJECT,
+                    properties: {
+                        platform: { type: Type.STRING },
+                        action: { type: Type.STRING }
                     },
                     required: ["platform", "action"]
                 }
@@ -457,27 +585,20 @@ Your output MUST be a JSON array of objects, where each object has:
     return parseGeminiJson(response);
 };
 
-export const getSchedulingSuggestion = async(topic: string): Promise<string> => {
-    checkAi();
-    const prompt = `For a video topic like "${topic}", what is the best day and time to post for maximum engagement? Provide a concise recommendation and a brief reason. The output should be a single string, with the recommended time in bold (e.g., The best time to post is **Saturday at 11 AM EST** because your target audience is most active then.)`;
-    const response = await ai!.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
-    return response.text;
-}
 
-// Keep mocks for non-Gemini services
 export const reviewVideoPerformance = async (performance: VideoPerformance): Promise<PerformanceReview> => {
     checkAi();
-    const prompt = `An AI content strategist analyzing this video performance data: ${JSON.stringify(performance)}. Give a summary, 3 things that worked, and 3 things to improve. Output JSON.`;
+    const prompt = `Analyze this video performance data: ${JSON.stringify(performance)}. Provide a summary, what worked, and what to improve. Output JSON.`;
     const response = await ai!.models.generateContent({
         model: 'gemini-2.5-flash', contents: prompt,
         config: {
             responseMimeType: 'application/json',
-            responseSchema: { 
-                type: Type.OBJECT, 
-                properties: { 
-                    summary: { type: Type.STRING }, 
-                    whatWorked: { type: Type.ARRAY, items: { type: Type.STRING } }, 
-                    whatToImprove: { type: Type.ARRAY, items: { type: Type.STRING } } 
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    summary: { type: Type.STRING },
+                    whatWorked: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    whatToImprove: { type: Type.ARRAY, items: { type: Type.STRING } }
                 },
                 required: ["summary", "whatWorked", "whatToImprove"]
             }
@@ -488,19 +609,19 @@ export const reviewVideoPerformance = async (performance: VideoPerformance): Pro
 
 export const suggestContentGaps = async (successfulTopics: string[], niche: string): Promise<ContentGapSuggestion[]> => {
     checkAi();
-    const prompt = `I have a successful channel about "${niche}". My hit videos are on these topics: ${successfulTopics.join(', ')}. Suggest 3 new, related content gap ideas that will likely perform well. Output JSON with idea, reason, and potentialTitles.`;
+    const prompt = `Based on these successful video topics in the "${niche}" niche: ${successfulTopics.join(', ')}. Suggest 3 new, related video ideas. Output JSON array of objects with keys: "idea", "reason", "potentialTitles" (array of 3 strings).`;
     const response = await ai!.models.generateContent({
         model: 'gemini-2.5-flash', contents: prompt,
         config: {
             responseMimeType: 'application/json',
-            responseSchema: { 
-                type: Type.ARRAY, 
-                items: { 
-                    type: Type.OBJECT, 
-                    properties: { 
-                        idea: { type: Type.STRING }, 
-                        reason: { type: Type.STRING }, 
-                        potentialTitles: { type: Type.ARRAY, items: { type: Type.STRING } } 
+            responseSchema: {
+                type: Type.ARRAY,
+                items: {
+                    type: Type.OBJECT,
+                    properties: {
+                        idea: { type: Type.STRING },
+                        reason: { type: Type.STRING },
+                        potentialTitles: { type: Type.ARRAY, items: { type: Type.STRING } }
                     },
                     required: ["idea", "reason", "potentialTitles"]
                 }
@@ -508,4 +629,15 @@ export const suggestContentGaps = async (successfulTopics: string[], niche: stri
         }
     });
     return parseGeminiJson(response);
+};
+
+
+export const getSchedulingSuggestion = async (topic: string): Promise<string> => {
+    checkAi();
+    const prompt = `Topic: "${topic}". Based on general audience behavior and online trends, what is the absolute best day and time to post this video for maximum initial engagement? Provide a short, direct answer with a brief justification. For example: 'Post on **Saturday at 11 AM EST**. This timing catches audiences during their weekend leisure time when they are actively seeking new content.'`;
+    const response = await ai!.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt
+    });
+    return response.text;
 };
