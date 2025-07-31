@@ -151,8 +151,8 @@ export type Database = {
   }
 };
 
-const supabaseUrlFromEnv = process.env.SUPABASE_URL;
-const supabaseAnonKeyFromEnv = process.env.SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL; 
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const isBackendConfigured = !!(supabaseUrlFromEnv && supabaseAnonKeyFromEnv);
 
