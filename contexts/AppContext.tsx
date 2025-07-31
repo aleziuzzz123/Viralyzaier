@@ -62,7 +62,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
     const [projects, setProjects] = useState<Project[]>([]);
     
-    const [apiKeyError] = useState<boolean>(!process.env.API_KEY);
+    const [apiKeyError] = useState<boolean>(!import.meta.env.VITE_GEMINI_API_KEY);
     const [backendConfigError] = useState<boolean>(!isBackendConfigured);
 
     const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
