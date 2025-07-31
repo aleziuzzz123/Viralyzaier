@@ -1,6 +1,3 @@
-
-
-
 import { createClient, type AuthSession } from '@supabase/supabase-js';
 import { 
     Project, 
@@ -20,15 +17,8 @@ import {
 } from '../types';
 import { PLANS } from './paymentService';
 
-// Define a JSON type to prevent deep type instantiation errors with Supabase.
-// Replacing the recursive `Json` type with `any` to break the type instantiation loop
-// that causes "excessively deep" errors. Type safety is maintained by the application-level
-// types (User, Project) and the mapping functions.
 export type Json = any;
 
-// By defining Row types separately and then using them to construct the Database type
-// with explicit Insert and Update types, we prevent TypeScript from getting lost in 
-// deep recursive type inference, which was causing "type instantiation is excessively deep" errors.
 type ProfileRow = {
   id: string
   email: string
@@ -60,97 +50,41 @@ type ProjectRow = {
   workflow_step: WorkflowStep
 };
 
-// Explicitly defining Insert and Update types for each table. This resolves the
-// "type instantiation is excessively deep" and "not assignable to never" errors
-// that can occur when the Supabase client struggles with complex type inference.
 export type Database = {
   public: {
     Tables: {
       profiles: {
-        Row: ProfileRow;
-        Insert: {
-          id?: string;
-          email?: string;
-          subscription?: Json;
-          ai_credits?: number;
-          channel_audit?: Json | null;
-          stripe_customer_id?: string | null;
-        };
-        Update: {
-          id?: string;
-          email?: string;
-          subscription?: Json;
-          ai_credits?: number;
-          channel_audit?: Json | null;
-          stripe_customer_id?: string | null;
-        };
-      };
+        Row: ProfileRow
+        Insert: Partial<ProfileRow>
+        Update: Partial<ProfileRow>
+      }
       projects: {
-        Row: ProjectRow;
-        Insert: {
-          id?: string;
-          user_id?: string;
-          name?: string;
-          topic?: string;
-          platform?: Platform;
-          status?: ProjectStatus;
-          title?: string | null;
-          script?: Json | null;
-          analysis?: Json | null;
-          competitor_analysis?: Json | null;
-          moodboard?: Json | null;
-          assets?: Json | null;
-          sound_design?: Json | null;
-          launch_plan?: Json | null;
-          performance?: Json | null;
-          scheduled_date?: string | null;
-          published_url?: string | null;
-          last_updated?: string;
-          workflow_step?: WorkflowStep;
-        };
-        Update: {
-          id?: string;
-          user_id?: string;
-          name?: string;
-          topic?: string;
-          platform?: Platform;
-          status?: ProjectStatus;
-          title?: string | null;
-          script?: Json | null;
-          analysis?: Json | null;
-          competitor_analysis?: Json | null;
-          moodboard?: Json | null;
-          assets?: Json | null;
-          sound_design?: Json | null;
-          launch_plan?: Json | null;
-          performance?: Json | null;
-          scheduled_date?: string | null;
-          published_url?: string | null;
-          last_updated?: string;
-          workflow_step?: WorkflowStep;
-        };
-      };
-    };
+        Row: ProjectRow
+        Insert: Partial<ProjectRow>
+        Update: Partial<ProjectRow>
+      }
+    }
     Views: {
-      [_ in never]: never;
-    };
+      [_ in never]: never
+    }
     Functions: {
-      consume_credits_atomic: {
-        Args: { amount_to_consume: number };
-        Returns: { success: boolean; message: string; newCredits: number };
-      };
-    };
+        consume_credits_atomic: {
+            Args: { amount_to_consume: number };
+            Returns: { success: boolean, message: string, newCredits: number };
+        };
+    }
     CompositeTypes: {
-      [_ in never]: never;
-    };
-  };
+      [_ in never]: never
+    }
+  }
 };
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// --- THIS IS THE CORRECTED CODE BLOCK ---
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Supabase URL and Anon Key are not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables.");
+    throw new Error("Supabase URL and Anon Key are not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your Vercel project environment variables.");
 }
 
 const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
@@ -238,8 +172,6 @@ export const signInWithPassword = async (email: string, password: string): Promi
 };
 
 export const signUp = async (email: string, password: string): Promise<AuthSession | null> => {
-    // The database trigger 'on_auth_user_created' now handles profile creation automatically.
-    // This makes the client-side logic simpler and more reliable.
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
     return data.session;
@@ -252,7 +184,7 @@ export const signOut = async (): Promise<void> => {
 
 export const sendPasswordResetEmail = async (email: string): Promise<void> => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin, // Or a specific password reset page
+        redirectTo: window.location.origin,
     });
     if (error) throw error;
 };
@@ -264,8 +196,6 @@ export const getUserProfile = async (userId: string): Promise<User | null> => {
         .eq('id', userId)
         .single();
     
-    // The .single() method throws an error if no row is found, which is expected.
-    // This will be caught by the calling function.
     if (error) {
         console.error('Error fetching user profile:', error.message);
         return null;
@@ -352,7 +282,7 @@ export const dataUrlToBlob = async (dataUrl: string): Promise<Blob> => {
 
 export const uploadFile = async (file: Blob, path: string): Promise<string> => {
     const { data, error } = await supabase.storage
-        .from('assets') // Assuming a bucket named 'assets'
+        .from('assets')
         .upload(path, file, { upsert: true });
     
     if (error) throw error;
