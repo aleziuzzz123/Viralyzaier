@@ -1,4 +1,5 @@
 
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -39,9 +40,9 @@ class ErrorBoundary extends React.Component<{children: React.ReactNode}, { hasEr
               <div className="mt-4 text-left bg-gray-900 p-4 rounded-md">
                 <p className="text-sm text-gray-400 font-semibold">{t['app.error.cause']}</p>
                 <ul className="list-disc list-inside text-sm text-gray-400 mt-2 space-y-1">
-                  <li><code>API_KEY</code> (for AI features)</li>
-                  <li><code>SUPABASE_URL</code> (for backend)</li>
-                  <li><code>SUPABASE_ANON_KEY</code> (for backend)</li>
+                  <li><code>NEXT_PUBLIC_GEMINI_API_KEY</code> (for AI features)</li>
+                  <li><code>NEXT_PUBLIC_SUPABASE_URL</code> (for backend)</li>
+                  <li><code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> (for backend)</li>
                 </ul>
                 <p className="text-xs text-gray-500 mt-3">{t['app.error.solution']}</p>
               </div>

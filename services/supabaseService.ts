@@ -1,4 +1,6 @@
 
+
+
 import { createClient, type AuthSession } from '@supabase/supabase-js';
 import { 
     Project, 
@@ -65,33 +67,91 @@ export type Database = {
   public: {
     Tables: {
       profiles: {
-        Row: ProfileRow
-        Insert: Partial<ProfileRow>
-        Update: Partial<ProfileRow>
-      }
-      projects: {
-        Row: ProjectRow
-        Insert: Partial<ProjectRow>
-        Update: Partial<ProjectRow>
-      }
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-        consume_credits_atomic: {
-            Args: { amount_to_consume: number };
-            Returns: { success: boolean, message: string, newCredits: number };
+        Row: ProfileRow;
+        Insert: {
+          id?: string;
+          email?: string;
+          subscription?: Json;
+          ai_credits?: number;
+          channel_audit?: Json | null;
+          stripe_customer_id?: string | null;
         };
-    }
+        Update: {
+          id?: string;
+          email?: string;
+          subscription?: Json;
+          ai_credits?: number;
+          channel_audit?: Json | null;
+          stripe_customer_id?: string | null;
+        };
+      };
+      projects: {
+        Row: ProjectRow;
+        Insert: {
+          id?: string;
+          user_id?: string;
+          name?: string;
+          topic?: string;
+          platform?: Platform;
+          status?: ProjectStatus;
+          title?: string | null;
+          script?: Json | null;
+          analysis?: Json | null;
+          competitor_analysis?: Json | null;
+          moodboard?: Json | null;
+          assets?: Json | null;
+          sound_design?: Json | null;
+          launch_plan?: Json | null;
+          performance?: Json | null;
+          scheduled_date?: string | null;
+          published_url?: string | null;
+          last_updated?: string;
+          workflow_step?: WorkflowStep;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          name?: string;
+          topic?: string;
+          platform?: Platform;
+          status?: ProjectStatus;
+          title?: string | null;
+          script?: Json | null;
+          analysis?: Json | null;
+          competitor_analysis?: Json | null;
+          moodboard?: Json | null;
+          assets?: Json | null;
+          sound_design?: Json | null;
+          launch_plan?: Json | null;
+          performance?: Json | null;
+          scheduled_date?: string | null;
+          published_url?: string | null;
+          last_updated?: string;
+          workflow_step?: WorkflowStep;
+        };
+      };
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      consume_credits_atomic: {
+        Args: { amount_to_consume: number };
+        Returns: { success: boolean; message: string; newCredits: number };
+      };
+    };
     CompositeTypes: {
-      [_ in never]: never
-    }
-  }
+      [_ in never]: never;
+    };
+  };
 };
 
-const supabaseUrl = "https://wpgrfukcnpcoyruymxdd.supabase.co";
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndwZ3JmdWtjbnBjb3lydXlteGRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3MzQ5MjgsImV4cCI6MjA2OTMxMDkyOH0.-b5KHzKWk2N3VEY_K5CzYZfszRRL6GY-MivOVUAL1Z4";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error("Supabase URL and Anon Key are not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables.");
+}
 
 const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
 

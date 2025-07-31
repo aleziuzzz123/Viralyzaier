@@ -8,10 +8,10 @@ import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { Analysis, Blueprint, CompetitorAnalysisResult, Platform, Script, TitleAnalysis, ContentGapSuggestion, VideoPerformance, PerformanceReview, SceneAssets, SoundDesign, LaunchPlan, ChannelAudit, Opportunity } from '../types';
 import * as supabase from './supabaseService';
 
-const apiKey = process.env.API_KEY;
+const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
-const AI_NOT_CONFIGURED_ERROR = "Gemini API Key is not configured. Please set the API_KEY environment variable.";
+const AI_NOT_CONFIGURED_ERROR = "Gemini API Key is not configured. Please set the NEXT_PUBLIC_GEMINI_API_KEY environment variable.";
 
 const checkAi = () => {
     if (!ai) {
