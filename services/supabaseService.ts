@@ -150,8 +150,8 @@ export type Database = {
 
 // CRITICAL FIX: Use environment variables for Supabase credentials.
 // This allows the application to connect to Supabase when deployed to Vercel.
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL; 
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
     console.error("Supabase URL or Anon Key is not set. Please check your environment variables.");
