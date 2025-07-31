@@ -91,8 +91,8 @@ export type Database = {
   }
 };
 
-const supabaseUrl = "https://wpgrfukcnpcoyruymxdd.supabase.co";
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndwZ3JmdWtjbnBjb3lydXlteGRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3MzQ5MjgsImV4cCI6MjA2OTMxMDkyOH0.-b5KHzKWk2N3VEY_K5CzYZfszRRL6GY-MivOVUAL1Z4";
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
 
