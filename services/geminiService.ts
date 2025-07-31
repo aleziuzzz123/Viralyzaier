@@ -1,8 +1,9 @@
+
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { Analysis, Blueprint, CompetitorAnalysisResult, Platform, Script, TitleAnalysis, ContentGapSuggestion, VideoPerformance, PerformanceReview, SceneAssets, SoundDesign, LaunchPlan, ChannelAudit, Opportunity } from '../types';
 import * as supabase from './supabaseService';
 
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+const apiKey = process.env.API_KEY;
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 const AI_NOT_CONFIGURED_ERROR = "Gemini API Key is not configured. Please set the API_KEY environment variable.";
@@ -171,9 +172,29 @@ Your output must be a JSON object with this exact structure:
             responseSchema: {
                 type: Type.OBJECT,
                 properties: {
-                    hooks: { type: Type.ARRAY, items: { type: Type.STRING }, required: ["hooks"] },
-                    scenes: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { timecode: { type: Type.STRING }, visual: { type: Type.STRING }, voiceover: { type: Type.STRING }, onScreenText: { type: Type.STRING } }, required: ["timecode", "visual", "voiceover", "onScreenText"] }, required: ["scenes"] },
-                    cta: { type: Type.STRING, required: ["cta"] }
+                    hooks: {
+                        type: Type.ARRAY,
+                        items: { type: Type.STRING },
+                        description: "An array of 5 unique, killer hook options."
+                    },
+                    scenes: {
+                        type: Type.ARRAY,
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                timecode: { type: Type.STRING, description: "e.g., '0-3s'" },
+                                visual: { type: Type.STRING, description: "What the viewer sees." },
+                                voiceover: { type: Type.STRING, description: "What is said." },
+                                onScreenText: { type: Type.STRING, description: "Any text overlays." }
+                            },
+                            required: ["timecode", "visual", "voiceover", "onScreenText"]
+                        },
+                        description: "An array of scene objects."
+                    },
+                    cta: {
+                        type: Type.STRING,
+                        description: "A strong, clear Call to Action."
+                    }
                 },
                 required: ["hooks", "scenes", "cta"]
             }
@@ -209,32 +230,44 @@ Your output MUST be a JSON object with:
     return parseGeminiJson(response);
 };
 
-export const analyzeCompetitorVideo = async (title: string, transcript: string): Promise<CompetitorAnalysisResult> => {
+export const analyzeCompetitorVideo = async (url: string): Promise<CompetitorAnalysisResult> => {
     checkAi();
-    const prompt = `You are a master strategist at reverse-engineering viral videos. I have a transcript for a successful video titled "${title}".
+    const prompt = `
+**Primary Directive: YouTube Video Analysis**
 
-Your task is to deconstruct its success. Do not give generic advice.
+**Role:** You are an expert YouTube strategist specializing in reverse-engineering viral content.
 
-Your output MUST be a JSON object with:
-1.  "viralityDeconstruction": A concise paragraph explaining the core psychological reason this video worked.
-2.  "stealableStructure": An array of objects representing a step-by-step formula that someone could apply to their own video. Each object needs a "step" (e.g., "1. State a bold, relatable problem") and a "description".
-3.  "extractedKeywords": An array of the most potent keywords and phrases from the transcript.
-4.  "suggestedTitles": An array of 3 title ideas for a new video inspired by this one.`;
+**Task:** Analyze the YouTube video located at the following URL: ${url}
+
+**CRITICAL INSTRUCTIONS:**
+1.  **Use the Google Search tool exclusively** to access and understand the content of the video at the provided URL.
+2.  Your entire response **MUST BE 100% BASED ON THE SPECIFIC CONTENT of that single video**.
+3.  **DO NOT use general knowledge** or provide generic advice. Your analysis must be directly tied to the video's title, spoken content, visual themes, and description.
+4.  If you cannot access the video's content, your response should be an error object.
+
+**Output Format:** Based *only* on the video's content, generate a valid JSON object with the following structure:
+{
+  "videoTitle": "The exact, full title of the video.",
+  "viralityDeconstruction": "A concise paragraph explaining the core psychological hooks and strategic elements that make THIS specific video successful. Be specific.",
+  "stealableStructure": [
+    {
+      "step": "A short, actionable title for a step in the video's structure (e.g., '1. The Problem Hook').",
+      "description": "A description of what happens in this structural part of the video and why it's effective."
+    }
+  ],
+  "extractedKeywords": [
+    "An array of the most potent and relevant keywords, topics, and phrases mentioned or shown in the video."
+  ],
+  "suggestedTitles": [
+    "An array of 3 new, compelling title ideas for a different video that uses a similar successful formula."
+  ]
+}`;
 
     const response = await ai!.models.generateContent({
-        model: 'gemini-2.5-flash', contents: prompt,
+        model: 'gemini-2.5-flash', 
+        contents: prompt,
         config: {
-            responseMimeType: 'application/json',
-            responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                    viralityDeconstruction: { type: Type.STRING },
-                    stealableStructure: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { step: { type: Type.STRING }, description: { type: Type.STRING } }, required: ["step", "description"] } },
-                    extractedKeywords: { type: Type.ARRAY, items: { type: Type.STRING } },
-                    suggestedTitles: { type: Type.ARRAY, items: { type: Type.STRING } }
-                },
-                required: ["viralityDeconstruction", "stealableStructure", "extractedKeywords", "suggestedTitles"]
-            }
+            tools: [{googleSearch: {}}],
         }
     });
     return parseGeminiJson(response);
@@ -376,7 +409,9 @@ export const analyzeAndGenerateThumbnails = async (title: string, platform: Plat
     const prompts = [
         `Ultra High-CTR YouTube thumbnail for a video titled "${title}". Style: High-contrast, emotional human face with a shocked or surprised expression. Big, bold text.`,
         `Click-worthy YouTube thumbnail for a video titled "${title}". Style: Bright, colorful background with a mysterious, intriguing object related to the topic. Minimal text.`,
-        `Viral-style YouTube thumbnail for a video titled "${title}". Style: "Before and After" comparison showing a dramatic transformation. Clear arrows and outlines.`
+        `Viral-style YouTube thumbnail for a video titled "${title}". Style: "Before and After" comparison showing a dramatic transformation. Clear arrows and outlines.`,
+        `Viral challenge-style YouTube thumbnail for a video titled "${title}". A person with an exaggerated, comedic expression. Bright yellow text with a black outline.`,
+        `Aesthetic, minimalist YouTube thumbnail for "${title}". A single, beautiful high-quality photo related to the topic with elegant, thin typography.`
     ];
 
     const imagePromises = prompts.map(p => 

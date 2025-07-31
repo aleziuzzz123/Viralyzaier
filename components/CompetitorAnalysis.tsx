@@ -1,7 +1,6 @@
 
 import React, { useState, useCallback } from 'react';
 import { Project, CompetitorAnalysisResult } from '../types';
-import { fetchVideoDetails } from '../services/youtubeService';
 import { analyzeCompetitorVideo } from '../services/geminiService';
 import { SparklesIcon, TargetIcon, LightBulbIcon, CtaIcon, CheckIcon } from './Icons';
 import { useAppContext } from '../contexts/AppContext';
@@ -35,11 +34,10 @@ const CompetitorAnalysis: React.FC<CompetitorAnalysisProps> = ({ project, onAppl
         setResult(null);
 
         try {
-            const videoDetails = await fetchVideoDetails(url);
-            const analysisResult = await analyzeCompetitorVideo(videoDetails.title, videoDetails.transcript);
+            const analysisResult = await analyzeCompetitorVideo(url);
             setResult(analysisResult);
-            // Also update the project's topic based on the competitor's title
-            handleUpdateProject({ id: project.id, competitorAnalysis: analysisResult, topic: videoDetails.title });
+            // Also update the project's topic based on the competitor's actual title
+            handleUpdateProject({ id: project.id, competitorAnalysis: analysisResult, topic: analysisResult.videoTitle });
         } catch (e) {
             setError(e instanceof Error ? e.message : 'An unknown error occurred.');
         } finally {

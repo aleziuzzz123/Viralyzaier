@@ -38,7 +38,7 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
     const handleGenerateThumbnails = async () => {
         if (!project.title || !user) return;
         if (apiKeyError) { setError(t('blueprint_modal.error_api_key')); return; }
-        if (!await consumeCredits(3)) return;
+        if (!await consumeCredits(5)) return; // Updated cost for 5 images
         setLoading({ thumbnails: true });
         try {
             const thumbnails = await analyzeAndGenerateThumbnails(project.title, project.platform, user.id, project.id);
@@ -121,7 +121,7 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
                      ) : (
                          <button onClick={handleGenerateThumbnails} disabled={loading.thumbnails} className="w-full inline-flex items-center justify-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-full transition-colors disabled:bg-gray-600">
                              <SparklesIcon className="w-5 h-5 mr-2" />
-                            {loading.thumbnails ? t('launchpad.thumbnail_designing') : t('launchpad.thumbnail_button')}
+                            {loading.thumbnails ? t('launchpad.thumbnail_designing') : "Generate Thumbnail Options (5 Credits)"}
                          </button>
                      )}
                 </div>

@@ -1,5 +1,4 @@
 
-
 import { createClient, type AuthSession } from '@supabase/supabase-js';
 import { 
     Project, 
@@ -19,15 +18,11 @@ import {
 } from '../types';
 import { PLANS } from './paymentService';
 
-// Define a JSON type to prevent deep type instantiation errors with Supabase.
-// Replacing the recursive `Json` type with `any` to break the type instantiation loop
-// that causes "excessively deep" errors. Type safety is maintained by the application-level
-// types (User, Project) and the mapping functions.
+// Define a simplified Json type to resolve complex type instantiation issues with the Supabase client.
 export type Json = any;
 
-// By defining Row types separately and then using them to construct the Database type
-// with explicit Insert and Update types, we prevent TypeScript from getting lost in 
-// deep recursive type inference, which was causing "type instantiation is excessively deep" errors.
+
+// Row types for Supabase tables
 type ProfileRow = {
   id: string
   email: string
@@ -59,21 +54,83 @@ type ProjectRow = {
   workflow_step: WorkflowStep
 };
 
-// Explicitly defining Insert and Update types for each table. This resolves the
-// "type instantiation is excessively deep" and "not assignable to never" errors
-// that can occur when the Supabase client struggles with complex type inference.
+
+// Explicit Insert/Update types to prevent "type instantiation is excessively deep" errors.
+// By avoiding generics like Partial<> directly in the Database definition, we help TypeScript.
+type ProfileInsert = {
+    id: string;
+    email: string;
+    subscription?: Json;
+    ai_credits?: number;
+    channel_audit?: Json | null;
+    stripe_customer_id?: string | null;
+};
+type ProfileUpdate = {
+    id?: string;
+    email?: string;
+    subscription?: Json;
+    ai_credits?: number;
+    channel_audit?: Json | null;
+    stripe_customer_id?: string | null;
+};
+
+type ProjectInsert = {
+    id?: string;
+    user_id: string;
+    name: string;
+    topic: string;
+    platform: Platform;
+    status: ProjectStatus;
+    title?: string | null;
+    script?: Json | null;
+    analysis?: Json | null;
+    competitor_analysis?: Json | null;
+    moodboard?: Json | null;
+    assets?: Json | null;
+    sound_design?: Json | null;
+    launch_plan?: Json | null;
+    performance?: Json | null;
+    scheduled_date?: string | null;
+    published_url?: string | null;
+    last_updated?: string;
+    workflow_step: WorkflowStep;
+};
+type ProjectUpdate = {
+    id?: string;
+    user_id?: string;
+    name?: string;
+    topic?: string;
+    platform?: Platform;
+    status?: ProjectStatus;
+    title?: string | null;
+    script?: Json | null;
+    analysis?: Json | null;
+    competitor_analysis?: Json | null;
+    moodboard?: Json | null;
+    assets?: Json | null;
+    sound_design?: Json | null;
+    launch_plan?: Json | null;
+    performance?: Json | null;
+    scheduled_date?: string | null;
+    published_url?: string | null;
+    last_updated?: string;
+    workflow_step?: WorkflowStep;
+};
+
+
+// Main Database definition for the Supabase client.
 export type Database = {
   public: {
     Tables: {
       profiles: {
         Row: ProfileRow
-        Insert: Partial<ProfileRow>
-        Update: Partial<ProfileRow>
+        Insert: ProfileInsert
+        Update: ProfileUpdate
       }
       projects: {
         Row: ProjectRow
-        Insert: Partial<ProjectRow>
-        Update: Partial<ProjectRow>
+        Insert: ProjectInsert
+        Update: ProjectUpdate
       }
     }
     Views: {
@@ -91,10 +148,16 @@ export type Database = {
   }
 };
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// CRITICAL FIX: Use environment variables for Supabase credentials.
+// This allows the application to connect to Supabase when deployed to Vercel.
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 
-const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+if (!supabaseUrl || !supabaseAnonKey) {
+    console.error("Supabase URL or Anon Key is not set. Please check your environment variables.");
+}
+
+const supabase = createClient<Database>(supabaseUrl!, supabaseAnonKey!);
 
 // --- Mappers ---
 const profileRowToUser = (row: ProfileRow): User => ({
@@ -105,12 +168,12 @@ const profileRowToUser = (row: ProfileRow): User => ({
     channelAudit: row.channel_audit as unknown as User['channelAudit'],
 });
 
-const userToProfileUpdate = (updates: Partial<User>): Partial<ProfileRow> => {
-    const dbUpdates: Partial<ProfileRow> = {};
+const userToProfileUpdate = (updates: Partial<User>): ProfileUpdate => {
+    const dbUpdates: ProfileUpdate = {};
     if (updates.aiCredits !== undefined) dbUpdates.ai_credits = updates.aiCredits;
-    if (updates.channelAudit !== undefined) dbUpdates.channel_audit = updates.channelAudit as unknown as Json;
+    if (updates.channelAudit !== undefined) dbUpdates.channel_audit = updates.channelAudit as Json;
     if (updates.email !== undefined) dbUpdates.email = updates.email;
-    if (updates.subscription !== undefined) dbUpdates.subscription = updates.subscription as unknown as Json;
+    if (updates.subscription !== undefined) dbUpdates.subscription = updates.subscription as Json;
     return dbUpdates;
 };
 
@@ -135,21 +198,21 @@ const projectRowToProject = (row: ProjectRow): Project => ({
     workflowStep: row.workflow_step,
 });
 
-const projectToProjectUpdate = (updates: Partial<Project>): Partial<ProjectRow> => {
-    const dbUpdates: Partial<ProjectRow> = {};
+const projectToProjectUpdate = (updates: Partial<Project>): ProjectUpdate => {
+    const dbUpdates: ProjectUpdate = {};
     if(updates.name !== undefined) dbUpdates.name = updates.name;
     if(updates.topic !== undefined) dbUpdates.topic = updates.topic;
     if(updates.platform !== undefined) dbUpdates.platform = updates.platform;
     if(updates.status !== undefined) dbUpdates.status = updates.status;
     if(updates.title !== undefined) dbUpdates.title = updates.title;
-    if(updates.script !== undefined) dbUpdates.script = updates.script as unknown as Json;
-    if(updates.analysis !== undefined) dbUpdates.analysis = updates.analysis as unknown as Json;
-    if(updates.competitorAnalysis !== undefined) dbUpdates.competitor_analysis = updates.competitorAnalysis as unknown as Json;
+    if(updates.script !== undefined) dbUpdates.script = updates.script as Json;
+    if(updates.analysis !== undefined) dbUpdates.analysis = updates.analysis as Json;
+    if(updates.competitorAnalysis !== undefined) dbUpdates.competitor_analysis = updates.competitorAnalysis as Json;
     if(updates.moodboard !== undefined) dbUpdates.moodboard = updates.moodboard as Json;
-    if(updates.assets !== undefined) dbUpdates.assets = updates.assets as unknown as Json;
-    if(updates.soundDesign !== undefined) dbUpdates.sound_design = updates.soundDesign as unknown as Json;
-    if(updates.launchPlan !== undefined) dbUpdates.launch_plan = updates.launchPlan as unknown as Json;
-    if(updates.performance !== undefined) dbUpdates.performance = updates.performance as unknown as Json;
+    if(updates.assets !== undefined) dbUpdates.assets = updates.assets as Json;
+    if(updates.soundDesign !== undefined) dbUpdates.sound_design = updates.soundDesign as Json;
+    if(updates.launchPlan !== undefined) dbUpdates.launch_plan = updates.launchPlan as Json;
+    if(updates.performance !== undefined) dbUpdates.performance = updates.performance as Json;
     if(updates.scheduledDate !== undefined) dbUpdates.scheduled_date = updates.scheduledDate;
     if(updates.publishedUrl !== undefined) dbUpdates.published_url = updates.publishedUrl;
     if(updates.lastUpdated !== undefined) dbUpdates.last_updated = updates.lastUpdated;
@@ -218,7 +281,7 @@ export const updateUserProfile = async (userId: string, updates: Partial<User>):
     const dbUpdates = userToProfileUpdate(updates);
     const { data, error } = await supabase
         .from('profiles')
-        .update(dbUpdates)
+        .update(dbUpdates as any)
         .eq('id', userId)
         .select()
         .single();
@@ -238,21 +301,21 @@ export const getProjectsForUser = async (userId: string): Promise<Project[]> => 
 };
 
 export const createProject = async (projectData: Omit<Project, 'id' | 'lastUpdated'>, userId: string): Promise<Project> => {
-    const insertData: Partial<ProjectRow> = {
+    const insertData: ProjectInsert = {
         user_id: userId,
         name: projectData.name,
         topic: projectData.topic,
         platform: projectData.platform,
         status: projectData.status,
         title: projectData.title,
-        script: projectData.script as unknown as Json,
-        analysis: projectData.analysis as unknown as Json,
-        competitor_analysis: projectData.competitorAnalysis as unknown as Json,
+        script: projectData.script as Json,
+        analysis: projectData.analysis as Json,
+        competitor_analysis: projectData.competitorAnalysis as Json,
         moodboard: projectData.moodboard as Json,
-        assets: projectData.assets as unknown as Json,
-        sound_design: projectData.soundDesign as unknown as Json,
-        launch_plan: projectData.launchPlan as unknown as Json,
-        performance: projectData.performance as unknown as Json,
+        assets: projectData.assets as Json,
+        sound_design: projectData.soundDesign as Json,
+        launch_plan: projectData.launchPlan as Json,
+        performance: projectData.performance as Json,
         scheduled_date: projectData.scheduledDate,
         published_url: projectData.publishedUrl || null,
         workflow_step: projectData.workflowStep,
@@ -260,7 +323,7 @@ export const createProject = async (projectData: Omit<Project, 'id' | 'lastUpdat
 
     const { data, error } = await supabase
         .from('projects')
-        .insert([insertData])
+        .insert([insertData] as any)
         .select()
         .single();
 
@@ -272,7 +335,7 @@ export const updateProject = async (projectId: string, updates: Partial<Project>
     const dbUpdates = projectToProjectUpdate({ ...updates, lastUpdated: new Date().toISOString() });
     const { data, error } = await supabase
         .from('projects')
-        .update(dbUpdates)
+        .update(dbUpdates as any)
         .eq('id', projectId)
         .select()
         .single();

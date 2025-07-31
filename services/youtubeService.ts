@@ -2,15 +2,6 @@ import { ChannelStats, VideoDetails, VideoPerformance } from '../types';
 
 const mockDelay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
-export const fetchVideoDetails = async (url: string): Promise<VideoDetails> => {
-    await mockDelay(1000);
-    console.log(`Fetching details for ${url}`);
-    return {
-        title: "I Tried 5 Viral Breakfast Recipes",
-        transcript: "So today, we're going to try five of the most viral breakfast recipes on the internet. First up, the cloud egg. It looks so fluffy. Then we have the pancake cereal, which is just tiny pancakes in a bowl. And of course, the famous dalgona coffee. Let's see if they are worth the hype."
-    };
-};
-
 export const fetchChannelStats = async (): Promise<ChannelStats> => {
     await mockDelay(1200);
     return {

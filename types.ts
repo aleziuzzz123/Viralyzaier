@@ -99,6 +99,7 @@ export interface TitleAnalysis {
 }
 
 export interface CompetitorAnalysisResult {
+    videoTitle: string;
     viralityDeconstruction: string;
     stealableStructure: { step: string; description: string }[];
     extractedKeywords: string[];

@@ -1,14 +1,16 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { CrownIcon, CreditIcon, LogoutIcon } from './Icons';
+import { CrownIcon, CreditIcon, LogoutIcon, SparklesIcon } from './Icons';
 import { useAppContext } from '../contexts/AppContext';
+import * as supabase from '../services/supabaseService';
+import { PLANS } from '../services/paymentService';
 
 interface UserMenuProps {
     onNavigate: (view: 'pricing') => void;
 }
 
 const UserMenu: React.FC<UserMenuProps> = ({ onNavigate }) => {
-    const { user, handleLogout, t } = useAppContext();
+    const { user, setUser, handleLogout, t, addToast } = useAppContext();
     const [isOpen, setIsOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -21,6 +23,27 @@ const UserMenu: React.FC<UserMenuProps> = ({ onNavigate }) => {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+
+    const handleDevUpgrade = async () => {
+        if (user) {
+            const proPlan = PLANS.find(p => p.id === 'pro');
+            if (!proPlan) {
+                addToast('Pro plan configuration not found.', 'error');
+                return;
+            }
+            try {
+                const updatedUser = await supabase.updateUserProfile(user.id, {
+                    subscription: { planId: 'pro', status: 'active', endDate: null },
+                    aiCredits: proPlan.creditLimit,
+                });
+                setUser(updatedUser);
+                addToast('Successfully upgraded to Pro Plan (Dev Mode)!', 'success');
+                setIsOpen(false);
+            } catch (error) {
+                addToast(error instanceof Error ? error.message : 'Failed to upgrade plan.', 'error');
+            }
+        }
+    };
     
     if (!user) return null;
 
@@ -54,6 +77,11 @@ const UserMenu: React.FC<UserMenuProps> = ({ onNavigate }) => {
                     <div className="p-2 border-t border-gray-700">
                         <button onClick={() => { onNavigate('pricing'); setIsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-200 rounded-md hover:bg-gray-700">
                             {t('user_menu.manage_subscription')}
+                        </button>
+                        {/* --- Developer Override Button --- */}
+                        <button onClick={handleDevUpgrade} className="w-full text-left px-3 py-2 text-sm text-purple-400 rounded-md hover:bg-gray-700 flex items-center font-bold">
+                           <SparklesIcon className="w-5 h-5 mr-2"/>
+                            Dev Upgrade to Pro
                         </button>
                          <button onClick={() => { handleLogout(); setIsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-red-400 rounded-md hover:bg-gray-700 flex items-center">
                            <LogoutIcon className="w-5 h-5 mr-2"/>

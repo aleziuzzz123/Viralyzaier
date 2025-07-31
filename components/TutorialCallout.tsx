@@ -8,6 +8,32 @@ interface TutorialCalloutProps {
     children: React.ReactNode;
 }
 
+// Helper component to parse and style the custom tags in the tutorial text.
+const ParsedTutorialText: React.FC<{ text: string }> = ({ text }) => {
+    // Splits the string by the tags, e.g., "<1>Strategy</1>", keeping the delimiters.
+    const parts = text.split(/(<\d+>.*?<\/\d+>)/g).filter(Boolean);
+    return (
+        <>
+            {parts.map((part, index) => {
+                const match = part.match(/<(\d+)>(.*?)<\/(\d+)>/);
+                if (match) {
+                    const [, openTag, content, closeTag] = match;
+                    // Ensure the open and close tags match, then style the content.
+                    if (openTag === closeTag) {
+                        return (
+                            <strong key={index} className="font-bold text-indigo-400">
+                                {content}
+                            </strong>
+                        );
+                    }
+                }
+                // If it's not a tag, return the text part as is.
+                return part;
+            })}
+        </>
+    );
+};
+
 const TutorialCallout: React.FC<TutorialCalloutProps> = ({ id, children }) => {
     const { dismissTutorial } = useAppContext();
     
@@ -24,7 +50,10 @@ const TutorialCallout: React.FC<TutorialCalloutProps> = ({ id, children }) => {
                 </div>
                 <div>
                     <h3 className="text-xl font-bold text-white">Your Project Workflow</h3>
-                    <p className="mt-2 text-gray-300 leading-relaxed">{children}</p>
+                    <p className="mt-2 text-gray-300 leading-relaxed">
+                        {/* Use the parser for string children to apply styling */}
+                        {typeof children === 'string' ? <ParsedTutorialText text={children} /> : children}
+                    </p>
                 </div>
             </div>
         </div>
