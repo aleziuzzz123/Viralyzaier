@@ -1,5 +1,4 @@
 
-
 import React, { createContext, useState, useEffect, useCallback, useContext, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Project, User, PlanId, Blueprint, Toast, Platform, Opportunity, ContentGapSuggestion } from '../types';
@@ -62,7 +61,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
     const [projects, setProjects] = useState<Project[]>([]);
     
-    const [apiKeyError] = useState<boolean>(!process.env.NEXT_PUBLIC_GEMINI_API_KEY);
+    const [apiKeyError] = useState<boolean>(!process.env.API_KEY);
     const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
     
     const [isUpgradeModalOpen, setUpgradeModalOpen] = useState(false);

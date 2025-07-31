@@ -49,14 +49,12 @@ export const createCheckoutSession = async (planId: PlanId): Promise<{ checkoutU
         throw new Error("Cannot create a checkout session for a free plan.");
     }
     
-    // The mapping from planId to priceId now lives securely in the Edge Function.
-    // We only need to send the planId.
-    const { data, error } = await supabase.invokeEdgeFunction('stripe-checkout', { planId });
+    // The invokeEdgeFunction helper returns the data directly, or throws an error.
+    // It should not be destructured for { data, error }.
+    const data = await supabase.invokeEdgeFunction('stripe-checkout', { planId });
     
-    if (error) {
-        throw new Error(`Failed to create checkout session: ${error.message}`);
-    }
-    if (!data.checkoutUrl) {
+    if (!data || !data.checkoutUrl) {
+        console.error("The checkout function did not return a URL. Response:", data);
         throw new Error("The checkout function did not return a URL.");
     }
     

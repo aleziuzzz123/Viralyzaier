@@ -1,3 +1,5 @@
+
+
 import { createClient, type AuthSession } from '@supabase/supabase-js';
 import { 
     Project, 
@@ -17,8 +19,15 @@ import {
 } from '../types';
 import { PLANS } from './paymentService';
 
+// Define a JSON type to prevent deep type instantiation errors with Supabase.
+// Replacing the recursive `Json` type with `any` to break the type instantiation loop
+// that causes "excessively deep" errors. Type safety is maintained by the application-level
+// types (User, Project) and the mapping functions.
 export type Json = any;
 
+// By defining Row types separately and then using them to construct the Database type
+// with explicit Insert and Update types, we prevent TypeScript from getting lost in 
+// deep recursive type inference, which was causing "type instantiation is excessively deep" errors.
 type ProfileRow = {
   id: string
   email: string
@@ -50,6 +59,9 @@ type ProjectRow = {
   workflow_step: WorkflowStep
 };
 
+// Explicitly defining Insert and Update types for each table. This resolves the
+// "type instantiation is excessively deep" and "not assignable to never" errors
+// that can occur when the Supabase client struggles with complex type inference.
 export type Database = {
   public: {
     Tables: {
@@ -79,13 +91,8 @@ export type Database = {
   }
 };
 
-// --- THIS IS THE CORRECTED CODE BLOCK ---
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Supabase URL and Anon Key are not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your Vercel project environment variables.");
-}
+const supabaseUrl = "https://wpgrfukcnpcoyruymxdd.supabase.co";
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndwZ3JmdWtjbnBjb3lydXlteGRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3MzQ5MjgsImV4cCI6MjA2OTMxMDkyOH0.-b5KHzKWk2N3VEY_K5CzYZfszRRL6GY-MivOVUAL1Z4";
 
 const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
 
@@ -172,6 +179,8 @@ export const signInWithPassword = async (email: string, password: string): Promi
 };
 
 export const signUp = async (email: string, password: string): Promise<AuthSession | null> => {
+    // The database trigger 'on_auth_user_created' now handles profile creation automatically.
+    // This makes the client-side logic simpler and more reliable.
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
     return data.session;
@@ -184,7 +193,7 @@ export const signOut = async (): Promise<void> => {
 
 export const sendPasswordResetEmail = async (email: string): Promise<void> => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin,
+        redirectTo: window.location.origin, // Or a specific password reset page
     });
     if (error) throw error;
 };
@@ -196,6 +205,8 @@ export const getUserProfile = async (userId: string): Promise<User | null> => {
         .eq('id', userId)
         .single();
     
+    // The .single() method throws an error if no row is found, which is expected.
+    // This will be caught by the calling function.
     if (error) {
         console.error('Error fetching user profile:', error.message);
         return null;
@@ -282,7 +293,7 @@ export const dataUrlToBlob = async (dataUrl: string): Promise<Blob> => {
 
 export const uploadFile = async (file: Blob, path: string): Promise<string> => {
     const { data, error } = await supabase.storage
-        .from('assets')
+        .from('assets') // Assuming a bucket named 'assets'
         .upload(path, file, { upsert: true });
     
     if (error) throw error;

@@ -1,5 +1,4 @@
-
-
+// Updated: 2024-07-31 - Made function self-contained and more robust.
 declare const Deno: any;
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.44.4';
@@ -67,11 +66,16 @@ serve(async (req) => {
         return new Response(`Invalid planId: ${planId}`, { status: 400 });
       }
 
-      await supabaseAdmin.from('profiles').update({
+      const { error } = await supabaseAdmin.from('profiles').update({
           subscription: { planId, status: 'active', endDate: null },
           ai_credits: planConfig.creditLimit,
           stripe_customer_id: stripeCustomerId,
       }).eq('id', userId);
+      
+      if (error) {
+        console.error(`Supabase update failed for user ${userId}:`, error.message);
+        return new Response(`Supabase update failed: ${error.message}`, { status: 500 });
+      }
       
       console.log(`User ${userId} successfully subscribed to plan ${planId}.`);
       break;
@@ -79,21 +83,28 @@ serve(async (req) => {
 
     case 'invoice.payment_succeeded': {
       const invoice = event.data.object as Stripe.Invoice;
-      const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
-      
-      const stripeCustomerId = invoice.customer as string;
-      const planId = subscription.metadata.planId as PlanId;
+      // An invoice is created for renewals, so we retrieve the subscription details
+      if (invoice.subscription) {
+        const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
+        const stripeCustomerId = invoice.customer as string;
+        const planId = subscription.metadata.planId as PlanId;
 
-      const planConfig = PLANS_CONFIG[planId];
-      if (!planConfig) {
-        return new Response(`Invalid planId in subscription metadata: ${planId}`, { status: 400 });
+        const planConfig = PLANS_CONFIG[planId];
+        if (!planConfig || !stripeCustomerId) {
+            return new Response(`Invalid metadata in subscription renewal: ${planId}`, { status: 400 });
+        }
+
+        const { error } = await supabaseAdmin.from('profiles').update({
+            ai_credits: planConfig.creditLimit // Refill credits on renewal
+        }).eq('stripe_customer_id', stripeCustomerId);
+
+        if (error) {
+            console.error(`Supabase credit refill failed for Stripe ID ${stripeCustomerId}:`, error.message);
+            return new Response(`Supabase credit refill failed: ${error.message}`, { status: 500 });
+        }
+
+        console.log(`User with Stripe ID ${stripeCustomerId} had their credits refilled for plan ${planId}.`);
       }
-
-      await supabaseAdmin.from('profiles').update({
-        ai_credits: planConfig.creditLimit // Refill credits on renewal
-      }).eq('stripe_customer_id', stripeCustomerId);
-
-      console.log(`User with Stripe ID ${stripeCustomerId} had their credits refilled for plan ${planId}.`);
       break;
     }
       
@@ -101,13 +112,18 @@ serve(async (req) => {
       const subscription = event.data.object as Stripe.Subscription;
       const stripeCustomerId = subscription.customer as string;
 
-      await supabaseAdmin.from('profiles').update({
+      const { error } = await supabaseAdmin.from('profiles').update({
         subscription: {
-          planId: 'free', // Downgrade to free
+          planId: 'free', // Downgrade to free plan
           status: 'canceled',
-          endDate: subscription.current_period_end,
+          endDate: subscription.current_period_end, // Keep access until period ends
         },
       }).eq('stripe_customer_id', stripeCustomerId);
+      
+      if (error) {
+        console.error(`Supabase subscription cancellation failed for Stripe ID ${stripeCustomerId}:`, error.message);
+        return new Response(`Supabase cancellation update failed: ${error.message}`, { status: 500 });
+      }
       
       console.log(`User with Stripe ID ${stripeCustomerId} has canceled their subscription.`);
       break;
