@@ -1,12 +1,11 @@
-
 import React, { useState, useRef, useEffect } from 'react';
-import { CrownIcon, CreditIcon, LogoutIcon, SparklesIcon } from './Icons';
+import { CrownIcon, CreditIcon, LogoutIcon, SparklesIcon, CogIcon } from './Icons';
 import { useAppContext } from '../contexts/AppContext';
 import * as supabase from '../services/supabaseService';
 import { PLANS } from '../services/paymentService';
 
 interface UserMenuProps {
-    onNavigate: (view: 'pricing') => void;
+    onNavigate: (view: 'pricing' | 'settings') => void;
 }
 
 const UserMenu: React.FC<UserMenuProps> = ({ onNavigate }) => {
@@ -75,8 +74,13 @@ const UserMenu: React.FC<UserMenuProps> = ({ onNavigate }) => {
                         </div>
                     </div>
                     <div className="p-2 border-t border-gray-700">
-                        <button onClick={() => { onNavigate('pricing'); setIsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-200 rounded-md hover:bg-gray-700">
+                        <button onClick={() => { onNavigate('pricing'); setIsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-200 rounded-md hover:bg-gray-700 flex items-center">
+                            <CrownIcon className="w-5 h-5 mr-2"/>
                             {t('user_menu.manage_subscription')}
+                        </button>
+                        <button onClick={() => { onNavigate('settings'); setIsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-200 rounded-md hover:bg-gray-700 flex items-center">
+                            <CogIcon className="w-5 h-5 mr-2"/>
+                            {t('user_menu.settings')}
                         </button>
                         {/* --- Developer Override Button --- */}
                         <button onClick={handleDevUpgrade} className="w-full text-left px-3 py-2 text-sm text-purple-400 rounded-md hover:bg-gray-700 flex items-center font-bold">

@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Project, Blueprint, Platform } from '../types';
 import { FilePlusIcon, SparklesIcon, LightBulbIcon, YouTubeIcon, TikTokIcon, InstagramIcon } from './Icons';
@@ -15,13 +16,22 @@ const platformIcons: { [key in Platform]: React.FC<{className?: string}> } = {
 };
 
 const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
-    const { user, apiKeyError, consumeCredits, addToast, handleCreateProjectFromBlueprint, t } = useAppContext();
+    const { user, apiKeyError, consumeCredits, addToast, handleCreateProjectFromBlueprint, t, prefilledBlueprintPrompt, setPrefilledBlueprintPrompt } = useAppContext();
     const [topicOrUrl, setTopicOrUrl] = useState('');
     const [platform, setPlatform] = useState<Platform | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [blueprint, setBlueprint] = useState<Blueprint | null>(null);
     const [selectedTitle, setSelectedTitle] = useState<string | null>(null);
+    
+    useEffect(() => {
+        if (isOpen && prefilledBlueprintPrompt) {
+            setTopicOrUrl(prefilledBlueprintPrompt);
+            setPrefilledBlueprintPrompt(null); // Consume the pre-filled prompt
+            addToast("Prompt pre-filled from performance insights!", 'success');
+        }
+    }, [isOpen, prefilledBlueprintPrompt, setPrefilledBlueprintPrompt, addToast]);
+
 
     const handleGenerate = async () => {
         if (!platform) {
@@ -125,11 +135,11 @@ const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; 
                                         </button>
                                     )}
                                 </div>
-                                <input
-                                    type="text"
+                                <textarea
                                     value={topicOrUrl}
                                     onChange={e => setTopicOrUrl(e.target.value)}
                                     placeholder={t('blueprint_modal.topic_placeholder')}
+                                    rows={3}
                                     className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                 />
                             </div>

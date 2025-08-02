@@ -1,13 +1,11 @@
-
-
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { Analysis, Blueprint, CompetitorAnalysisResult, Platform, Script, TitleAnalysis, ContentGapSuggestion, VideoPerformance, PerformanceReview, SceneAssets, SoundDesign, LaunchPlan, ChannelAudit, Opportunity, ScriptOptimization } from '../types';
 import * as supabase from './supabaseService';
 
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+const apiKey = (import.meta as any).env.VITE_API_KEY;
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
-const AI_NOT_CONFIGURED_ERROR = "Gemini API Key is not configured. Please set the API_KEY environment variable.";
+const AI_NOT_CONFIGURED_ERROR = "Gemini API Key is not configured. Please set the VITE_API_KEY environment variable.";
 
 const checkAi = () => {
     if (!ai) {
@@ -26,9 +24,7 @@ const parseGeminiJson = <T>(res: GenerateContentResponse, fallback: T | null = n
     }
 };
 
-const mockAudio = () => `data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=`; // empty wav
-
-export const generateVideoBlueprint = async (topicOrUrl: string, platform: Platform): Promise<Omit<Blueprint, 'moodboard'> & { moodboard: string[] }> => {
+export const generateVideoBlueprint = async (topicOrUrl: string, platform: Platform): Promise<Blueprint> => {
     checkAi();
     const textPrompt = `You are a world-class viral video strategist for ${platform}. Your task is to generate a complete video blueprint based on the topic or URL: "${topicOrUrl}".
 
@@ -87,6 +83,106 @@ Your output MUST be a JSON object with the following structure:
     
     return { ...blueprintContent, moodboard: moodboardBase64, platform };
 };
+
+export const generateAutopilotBacklog = async (
+    platform: Platform,
+    contentPillars: string[],
+    channelAudit: ChannelAudit
+): Promise<Blueprint[]> => {
+    checkAi();
+    const prompt = `You are an AI YouTube Channel Manager. Your goal is to proactively generate a content backlog for a creator.
+
+**Creator's Strategic Data:**
+- **Platform:** ${platform}
+- **Core Content Pillars:** ${contentPillars.join(', ')}
+- **Audience Persona:** ${channelAudit.audiencePersona}
+- **Proven Viral Formula:** ${channelAudit.viralFormula}
+
+**Task:**
+Generate a content backlog of **3 diverse video blueprints**. Each blueprint must be a complete, high-quality plan that aligns with the creator's strategic data. The ideas should be fresh, engaging, and have a high potential for success.
+
+**Output Format:**
+Your response **MUST** be a JSON array containing exactly 3 blueprint objects. Each object must follow this structure:
+{
+  "strategicSummary": "A concise summary explaining why this specific video concept will work for this channel.",
+  "suggestedTitles": ["An array of 3-5 S-Tier, high-CTR titles for this video."],
+  "script": {
+    "hooks": ["An array of 3 distinct, psychologically-driven hook options."],
+    "scenes": [
+      {
+        "timecode": "e.g., '0-8s'",
+        "visual": "A description of the visual elements.",
+        "voiceover": "The voiceover script for this scene.",
+        "onScreenText": "Any text overlays for this scene."
+      }
+    ],
+    "cta": "A strong, clear call to action."
+  },
+  "moodboardDescription": ["An array of 3 descriptive prompts for an AI image generator to create a visual moodboard."]
+}`;
+
+    const response = await ai!.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+                type: Type.ARRAY,
+                items: {
+                    type: Type.OBJECT,
+                    properties: {
+                        strategicSummary: { type: Type.STRING },
+                        suggestedTitles: { type: Type.ARRAY, items: { type: Type.STRING } },
+                        script: {
+                            type: Type.OBJECT,
+                            properties: {
+                                hooks: { type: Type.ARRAY, items: { type: Type.STRING } },
+                                scenes: {
+                                    type: Type.ARRAY,
+                                    items: {
+                                        type: Type.OBJECT,
+                                        properties: { timecode: { type: Type.STRING }, visual: { type: Type.STRING }, voiceover: { type: Type.STRING }, onScreenText: { type: Type.STRING } },
+                                        required: ["timecode", "visual", "voiceover", "onScreenText"]
+                                    }
+                                },
+                                cta: { type: Type.STRING }
+                            },
+                            required: ["hooks", "scenes", "cta"]
+                        },
+                        moodboardDescription: { type: Type.ARRAY, items: { type: Type.STRING } }
+                    },
+                    required: ["strategicSummary", "suggestedTitles", "script", "moodboardDescription"]
+                }
+            }
+        }
+    });
+
+    const blueprintContents = parseGeminiJson<(Omit<Blueprint, 'moodboard' | 'platform'> & { moodboardDescription: string[] })[]>(response);
+
+    // Generate moodboards for all blueprints in parallel
+    const allMoodboardPrompts = blueprintContents.flatMap(b => b.moodboardDescription);
+    const allImagePromises = allMoodboardPrompts.map(prompt =>
+        ai!.models.generateImages({
+            model: 'imagen-3.0-generate-002',
+            prompt: `A cinematic, visually stunning image for a YouTube video moodboard: ${prompt}`,
+            config: { numberOfImages: 1, outputMimeType: 'image/jpeg', aspectRatio: '16:9' }
+        })
+    );
+
+    const allImageResults = await Promise.all(allImagePromises);
+    const allMoodboardImages = allImageResults.map(res => `data:image/jpeg;base64,${res.generatedImages[0].image.imageBytes}`);
+
+    // Re-assemble blueprints with their moodboards
+    let imageCounter = 0;
+    const finalBlueprints = blueprintContents.map(b => {
+        const moodboard = allMoodboardImages.slice(imageCounter, imageCounter + b.moodboardDescription.length);
+        imageCounter += b.moodboardDescription.length;
+        return { ...b, platform, moodboard };
+    });
+
+    return finalBlueprints;
+};
+
 
 export const generateOptimizedScript = async (
     platform: Platform,
@@ -355,42 +451,6 @@ export const analyzeCompetitorVideo = async (url: string): Promise<CompetitorAna
     return parseGeminiJson(response);
 };
 
-export const generateSceneAssets = async (
-    visualDescription: string,
-    onScreenText: string,
-    platform: Platform,
-    userId: string,
-    projectId: string,
-    sceneIndex: number
-): Promise<SceneAssets> => {
-    checkAi();
-
-    const aspectRatio = platform === 'youtube' ? '16:9' : '9:16';
-
-    // Generate B-roll images
-    const imagePromise = ai!.models.generateImages({
-        model: 'imagen-3.0-generate-002',
-        prompt: `Cinematic b-roll footage for a ${platform} video. Style: high-resolution, professional photography. Subject: ${visualDescription}`,
-        config: { numberOfImages: 2, outputMimeType: 'image/jpeg', aspectRatio }
-    });
-    
-    // Generate graphics
-    const graphicPromise = onScreenText ? ai!.models.generateImages({
-        model: 'imagen-3.0-generate-002',
-        prompt: `A clean and modern on-screen graphic with a transparent background for a ${platform} video. The graphic must feature this text in a visually appealing, readable font: "${onScreenText}". The text should be the primary focus. Include only minimal, abstract design elements that complement the text without being distracting.`,
-        config: { numberOfImages: 1, outputMimeType: 'image/png', aspectRatio }
-    }) : Promise.resolve(null);
-    
-    const [imageResults, graphicResult] = await Promise.all([imagePromise, graphicPromise]);
-
-    const images = imageResults.generatedImages.map(img => `data:image/jpeg;base64,${img.image.imageBytes}`);
-    const graphics = graphicResult ? graphicResult.generatedImages.map(img => `data:image/png;base64,${img.image.imageBytes}`) : [];
-    
-    const audio = mockAudio();
-
-    return { images, graphics, audio };
-};
-
 export const performChannelAudit = async (videos: {title: string; views: number; likes: number; comments: number}[]): Promise<ChannelAudit> => {
     checkAi();
 
@@ -586,9 +646,15 @@ Your output must be a JSON object: an array of objects, where each object has "p
 };
 
 
-export const reviewVideoPerformance = async (performance: VideoPerformance): Promise<PerformanceReview> => {
+export const reviewVideoPerformance = async (performance: VideoPerformance, title: string): Promise<PerformanceReview> => {
     checkAi();
-    const prompt = `Analyze this video performance data: ${JSON.stringify(performance)}. Provide a summary, what worked, and what to improve. Output JSON.`;
+    const prompt = `You are a YouTube strategy consultant. A client's video titled "${title}" has the following performance data: ${JSON.stringify(performance)}. 
+    
+    Provide a sharp, concise analysis. Your output must be a JSON object with three keys:
+    1. "summary": A one-sentence takeaway of the video's performance.
+    2. "whatWorked": An array of 2-3 bullet points on the positive aspects, inferring from the data (e.g., "High retention suggests the core content was engaging").
+    3. "whatToImprove": An array of 2-3 actionable suggestions for the next video (e.g., "With high retention but low views, the title or thumbnail likely needs improvement to increase CTR").`;
+
     const response = await ai!.models.generateContent({
         model: 'gemini-2.5-flash', contents: prompt,
         config: {
@@ -636,6 +702,16 @@ export const getSchedulingSuggestion = async (topic: string): Promise<string> =>
     checkAi();
     const prompt = `Topic: "${topic}". Based on general audience behavior and online trends, what is the absolute best day and time to post this video for maximum initial engagement? Provide a short, direct answer with a brief justification. For example: 'Post on **Saturday at 11 AM EST**. This timing catches audiences during their weekend leisure time when they are actively seeking new content.'`;
     const response = await ai!.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt
+    });
+    return response.text;
+};
+
+export const generateNotificationMessage = async (oldViews: number, newViews: number, title: string): Promise<string> => {
+    checkAi();
+    const prompt = `A YouTube video titled "${title}" has seen its view count change from ${oldViews} to ${newViews}. Write a short, exciting notification message for the creator. If the views increased significantly, make it celebratory. If they are stagnant or decreased, make it a neutral status update.`;
+     const response = await ai!.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt
     });

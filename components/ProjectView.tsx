@@ -1,12 +1,16 @@
 
+
+
+
+
+
 import React, { useState, useEffect } from 'react';
 import { Project, Analysis, Script as ScriptType, WorkflowStep, Platform } from '../types';
-import { TitleIcon, ScriptIcon, SparklesIcon, TrashIcon, PhotoIcon, CtaIcon, LockClosedIcon, CheckIcon, YouTubeIcon, TikTokIcon, InstagramIcon, MusicNoteIcon, RocketLaunchIcon, TrendIcon, TargetIcon } from './Icons';
+import { TitleIcon, ScriptIcon, SparklesIcon, TrashIcon, PhotoIcon, CtaIcon, LockClosedIcon, CheckIcon, YouTubeIcon, TikTokIcon, InstagramIcon, MusicNoteIcon, RocketLaunchIcon, TrendIcon, TargetIcon, CheckBadgeIcon } from './Icons';
 import TitleOptimizer from './TitleOptimizer';
 import ScriptGenerator from './ScriptGenerator';
 import AnalysisResult from './AnalysisResult';
 import VideoUploader from './VideoUploader';
-import Loader from './Loader';
 import AssetStudio from './AssetStudio';
 import Storyboard from './Storyboard';
 import Launchpad from './Launchpad';
@@ -15,6 +19,7 @@ import { analyzeVideo } from '../services/geminiService';
 import { useAppContext } from '../contexts/AppContext';
 import CompetitorAnalysis from './CompetitorAnalysis';
 import TrendExplorer from './TrendExplorer';
+import AnalysisLoader from './AnalysisLoader';
 
 interface ProjectViewProps {
     project: Project;
@@ -166,6 +171,7 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
     } = useAppContext();
     
     const [projectName, setProjectName] = useState(project.name);
+    const [isNameSaved, setIsNameSaved] = useState(false);
     const [activeStep, setActiveStep] = useState<WorkflowStep>(project.workflowStep);
     const [activeStrategyTab, setActiveStrategyTab] = useState<'topic' | 'competitor' | 'trend'>('topic');
 
@@ -174,6 +180,8 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
     const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
     const [analysisIsLoading, setAnalysisIsLoading] = useState<boolean>(false);
     const [analysisError, setAnalysisError] = useState<string | null>(null);
+    const [analysisFrames, setAnalysisFrames] = useState<string[]>([]);
+
 
     const handleFileSelect = (file: File) => {
         setVideoFile(file);
@@ -207,7 +215,8 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
     const handleNameBlur = () => {
         if (projectName.trim() && projectName !== project.name) {
             handleUpdateProject({ id: project.id, name: projectName.trim() });
-            addToast(t('toast.project_name_updated'), 'success');
+            setIsNameSaved(true);
+            setTimeout(() => setIsNameSaved(false), 2000);
         } else {
             setProjectName(project.name);
         }
@@ -280,9 +289,11 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
         
         setAnalysisIsLoading(true);
         setAnalysisError(null);
+        setAnalysisFrames([]); // Reset frames for loader
 
         try {
             const frames = await extractFrames(videoFile);
+            setAnalysisFrames(frames); // Set frames so the cool loader can render
             const result = await analyzeVideo(frames, project.title!, project.platform);
             handleAnalysisComplete(result);
         } catch (e: unknown) {
@@ -291,7 +302,7 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
         } finally {
             setAnalysisIsLoading(false);
         }
-    }, [videoFile, apiKeyError, project, consumeCredits, handleAnalysisComplete, project.title, project.platform]);
+    }, [videoFile, apiKeyError, project, consumeCredits, handleAnalysisComplete, project.title, project.platform, t]);
 
     const handleAnalysisReset = () => {
         handleUpdateProject({id: project.id, analysis: null});
@@ -359,7 +370,7 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
             case 4:
                 return <Storyboard project={project} onProceed={() => advanceWorkflow(5)} />;
             case 5:
-                if (analysisIsLoading) return <Loader />;
+                if (analysisIsLoading) return <AnalysisLoader frames={analysisFrames} />;
 
                 if (project.analysis) {
                     return <AnalysisResult result={project.analysis} onReset={handleAnalysisReset} videoPreviewUrl={videoPreviewUrl || ''} onProceedToLaunchpad={() => advanceWorkflow(6)} />;
@@ -409,9 +420,12 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
     return (
         <div className="animate-fade-in-up">
             <header className="flex justify-between items-start mb-6">
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 flex-1 min-w-0">
                     {React.createElement(platformIcons[project.platform], { className: "w-10 h-10 text-gray-500" })}
-                    <input type="text" value={projectName} onChange={handleNameChange} onBlur={handleNameBlur} onKeyPress={(e) => e.key === 'Enter' && e.currentTarget.blur()} className="text-4xl font-black text-white bg-transparent border-none focus:outline-none focus:ring-0 w-full p-0" />
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <input type="text" value={projectName} onChange={handleNameChange} onBlur={handleNameBlur} onKeyPress={(e) => e.key === 'Enter' && e.currentTarget.blur()} className="text-4xl font-black text-white bg-transparent border-none focus:outline-none focus:ring-0 p-0 truncate" />
+                        {isNameSaved && <div className="animate-fade-in text-green-400 flex items-center gap-1 text-sm"><CheckBadgeIcon className="w-6 h-6"/> Saved!</div>}
+                    </div>
                 </div>
                 <button onClick={() => handleDeleteProject(project.id)} className="p-2 text-gray-500 hover:text-red-400 transition-colors flex-shrink-0">
                     <TrashIcon className="w-6 h-6" />

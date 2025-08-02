@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Project, SoundDesign } from '../types';
 import { generateSoundDesign } from '../services/geminiService';
 import { SparklesIcon, CtaIcon, MusicNoteIcon, PlayIcon, PauseIcon } from './Icons';
@@ -27,18 +27,21 @@ const Storyboard: React.FC<StoryboardProps> = ({ project, onProceed }) => {
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
     const [currentVisual, setCurrentVisual] = useState<string | null>(null);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
     
     useEffect(() => {
         // Cleanup on component unmount
         return () => {
-            if (window.speechSynthesis.speaking) {
-                window.speechSynthesis.cancel();
+            if (audioRef.current) {
+                audioRef.current.pause();
+                audioRef.current = null;
             }
         };
     }, []);
 
     useEffect(() => {
         let sceneTimeout: ReturnType<typeof setTimeout>;
+
         if (isPlaying && project.script && project.assets) {
             const scene = project.script.scenes[currentSceneIndex];
             if (!scene) {
@@ -46,14 +49,19 @@ const Storyboard: React.FC<StoryboardProps> = ({ project, onProceed }) => {
                 return;
             }
 
-            // Display visual
-            const visualToShow = project.assets[currentSceneIndex]?.images[0] || project.moodboard?.[0] || null;
+            // Display visual - prefer b-roll video, fallback to moodboard image
+            const sceneAssets = project.assets[currentSceneIndex];
+            const visualToShow = sceneAssets?.brollVideo || project.moodboard?.[0] || null;
             setCurrentVisual(visualToShow);
 
-            // Play voiceover
-            if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
-            const utterance = new SpeechSynthesisUtterance(scene.voiceover);
-            window.speechSynthesis.speak(utterance);
+            // Play voiceover from generated asset
+            if (audioRef.current) {
+                audioRef.current.pause();
+            }
+            if (sceneAssets?.audio) {
+                audioRef.current = new Audio(sceneAssets.audio);
+                audioRef.current.play().catch(e => console.error("Audio play failed:", e));
+            }
 
             // Set timeout for next scene
             const { duration } = parseTimecode(scene.timecode);
@@ -61,8 +69,9 @@ const Storyboard: React.FC<StoryboardProps> = ({ project, onProceed }) => {
                 setCurrentSceneIndex(prev => prev + 1);
             }, duration * 1000);
         }
+        
         return () => clearTimeout(sceneTimeout);
-    }, [isPlaying, currentSceneIndex, project.script, project.assets]);
+    }, [isPlaying, currentSceneIndex, project.script, project.assets, project.moodboard]);
 
     const handleGenerateSoundDesign = async () => {
         if (!project.script) {
@@ -90,7 +99,9 @@ const Storyboard: React.FC<StoryboardProps> = ({ project, onProceed }) => {
     const togglePlayAnimatic = () => {
         if (isPlaying) {
             setIsPlaying(false);
-            if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
+            if (audioRef.current) {
+                audioRef.current.pause();
+            }
             setCurrentSceneIndex(0);
             setCurrentVisual(null);
         } else {
@@ -165,7 +176,15 @@ const Storyboard: React.FC<StoryboardProps> = ({ project, onProceed }) => {
                     <h3 className="text-2xl font-bold text-white mb-4">{t('storyboard.animatic_title')}</h3>
                      <div className="aspect-video w-full bg-black rounded-lg mb-4 flex items-center justify-center relative overflow-hidden">
                         {currentVisual ? (
-                            <img key={currentVisual} src={currentVisual} className="w-full h-full object-contain animate-fade-in-up" style={{animationDuration: '0.3s'}} alt="Animatic scene"/>
+                            <video 
+                                key={currentVisual} 
+                                src={currentVisual} 
+                                className="w-full h-full object-contain animate-fade-in" 
+                                autoPlay 
+                                loop 
+                                muted 
+                                playsInline
+                            />
                         ) : (
                             <div className="text-center text-gray-500">
                                 <MusicNoteIcon className="w-16 h-16 mx-auto" />

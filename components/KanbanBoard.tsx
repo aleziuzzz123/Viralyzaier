@@ -1,7 +1,8 @@
 
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Project, ProjectStatus, Platform } from '../types';
-import { YouTubeIcon, TikTokIcon, InstagramIcon, PlusIcon, PencilIcon } from './Icons';
+import { YouTubeIcon, TikTokIcon, InstagramIcon, PlusIcon, PencilIcon, RocketLaunchIcon } from './Icons';
 import { useAppContext } from '../contexts/AppContext';
 
 const platformIcons: { [key in Platform]: React.FC<{className?: string}> } = {
@@ -11,6 +12,7 @@ const platformIcons: { [key in Platform]: React.FC<{className?: string}> } = {
 };
 
 const statusConfig: { [key in ProjectStatus]: { color: string; bg: string; } } = {
+    'Autopilot': { color: 'border-purple-500', bg: 'bg-purple-900/20' },
     'Idea': { color: 'border-sky-500', bg: 'bg-sky-900/20' },
     'Scripting': { color: 'border-amber-500', bg: 'bg-amber-900/20' },
     'Scheduled': { color: 'border-indigo-500', bg: 'bg-indigo-900/20' },
@@ -58,6 +60,12 @@ const ProjectCard: React.FC<{
                     {React.createElement(platformIcons[project.platform], { className: "w-5 h-5 text-gray-500 flex-shrink-0" })}
                 </div>
                 <p className="text-sm text-gray-400 truncate mt-1">{project.topic || t('kanban.no_topic')}</p>
+                 {project.status === 'Autopilot' && (
+                    <div className="mt-2 text-xs font-bold text-purple-400 flex items-center gap-1.5">
+                        <RocketLaunchIcon className="w-4 h-4" />
+                        AI Generated Idea
+                    </div>
+                )}
             </div>
             {project.status === 'Published' && (
                 <div className="mt-3 pt-3 border-t border-gray-700" onClick={e => e.stopPropagation()}>
@@ -95,7 +103,7 @@ const ProjectCard: React.FC<{
                             >
                                 {project.publishedUrl}
                             </a>
-                            <button onClick={handleStartEditing} className="p-1 text-gray-400 hover:text-white flex-shrink-0" title={t('kanban.edit_url')}>
+                            <button onClick={handleStartEditing} aria-label={t('kanban.edit_url')} className="p-1 text-gray-400 hover:text-white flex-shrink-0" title={t('kanban.edit_url')}>
                                 <PencilIcon className="w-4 h-4" />
                             </button>
                         </div>
@@ -117,10 +125,11 @@ interface KanbanBoardProps {
 
 const KanbanBoard: React.FC<KanbanBoardProps> = ({ projects, onViewProject }) => {
     const { addToast, handleUpdateProject, t } = useAppContext();
-    const statuses: ProjectStatus[] = ['Idea', 'Scripting', 'Scheduled', 'Published'];
+    const statuses: ProjectStatus[] = ['Autopilot', 'Idea', 'Scripting', 'Scheduled', 'Published'];
 
     const getStatusName = (status: ProjectStatus) => {
         switch(status) {
+            case 'Autopilot': return t('kanban.status_autopilot');
             case 'Idea': return t('kanban.status_idea');
             case 'Scripting': return t('kanban.status_scripting');
             case 'Scheduled': return t('kanban.status_scheduled');
@@ -139,7 +148,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ projects, onViewProject }) =>
     };
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
             {statuses.map(status => (
                 <div 
                     key={status}

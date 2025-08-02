@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { Project, ChannelStats, VideoPerformance, PerformanceReview, ContentGapSuggestion } from '../types';
-import { fetchChannelStats, fetchVideoPerformance } from '../services/youtubeService';
+import { fetchChannelStats, fetchVideoPerformance, fetchChannelVideos } from '../services/youtubeService';
 import { reviewVideoPerformance, suggestContentGaps } from '../services/geminiService';
-import { ChartBarIcon, SparklesIcon, LightBulbIcon, ThumbsUpIcon } from './Icons';
+import { ChartBarIcon, SparklesIcon, LightBulbIcon, ThumbsUpIcon, CtaIcon, CheckBadgeIcon } from './Icons';
 import { useAppContext } from '../contexts/AppContext';
 
 interface ChannelIntelligenceProps {
@@ -18,42 +17,69 @@ const StatCard: React.FC<{ label: string; value: string | number; }> = ({ label,
 );
 
 const ChannelIntelligence: React.FC<ChannelIntelligenceProps> = ({ project }) => {
-    const { consumeCredits, handleCreateProjectFromIdea, t } = useAppContext();
+    const { user, consumeCredits, handleCreateProjectFromIdea, handleCreateProjectFromInsights, t } = useAppContext();
     const [stats, setStats] = useState<ChannelStats | null>(null);
+    const [recentVideos, setRecentVideos] = useState<{id: string, title: string}[] | null>(null);
+    const [selectedVideo, setSelectedVideo] = useState<{id: string, title: string} | null>(null);
     const [performance, setPerformance] = useState<VideoPerformance | null>(null);
     const [review, setReview] = useState<PerformanceReview | null>(null);
     const [suggestions, setSuggestions] = useState<ContentGapSuggestion[] | null>(null);
-    const [isLoading, setIsLoading] = useState({ stats: true, performance: true, review: false, gaps: false });
+    const [isLoading, setIsLoading] = useState({ stats: true, performance: false, review: false, gaps: false });
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
+        if (!user?.youtubeConnected) return;
+
         const loadInitialData = async () => {
-            setIsLoading(prev => ({ ...prev, stats: true, performance: true }));
+            setIsLoading(prev => ({ ...prev, stats: true }));
             setError(null);
             try {
-                const [channelStats, videoPerformance] = await Promise.all([
+                const [channelStats, channelVideos] = await Promise.all([
                     fetchChannelStats(),
-                    fetchVideoPerformance(project.id)
+                    fetchChannelVideos()
                 ]);
                 setStats(channelStats);
-                setPerformance(videoPerformance);
+                setRecentVideos(channelVideos.map(v => ({id: v.id, title: v.title})));
             } catch (e) {
                 setError(t('channel_intelligence.error_load'));
             } finally {
-                setIsLoading(prev => ({ ...prev, stats: false, performance: false }));
+                setIsLoading(prev => ({ ...prev, stats: false }));
             }
         };
         loadInitialData();
-    }, [project.id, t]);
+    }, [project.id, t, user?.youtubeConnected]);
+    
+    useEffect(() => {
+        if (!selectedVideo) {
+            setPerformance(null);
+            setReview(null);
+            return;
+        }
+
+        const loadPerformanceData = async () => {
+            setIsLoading(prev => ({...prev, performance: true}));
+            setError(null);
+            try {
+                const perf = await fetchVideoPerformance(selectedVideo.id);
+                setPerformance(perf);
+            } catch (e) {
+                setError("Failed to fetch video performance data.");
+            } finally {
+                setIsLoading(prev => ({...prev, performance: false}));
+            }
+        };
+        loadPerformanceData();
+
+    }, [selectedVideo]);
 
     const handleGetReview = async () => {
-        if (!performance) return;
+        if (!performance || !selectedVideo) return;
         if (!await consumeCredits(2)) return;
         
         setIsLoading(prev => ({ ...prev, review: true }));
         setError(null);
         try {
-            const result = await reviewVideoPerformance(performance);
+            const result = await reviewVideoPerformance(performance, selectedVideo.title);
             setReview(result);
         } catch (e) {
             setError(e instanceof Error ? e.message : t('channel_intelligence.error_generate_review'));
@@ -63,14 +89,14 @@ const ChannelIntelligence: React.FC<ChannelIntelligenceProps> = ({ project }) =>
     };
     
     const handleGetSuggestions = async () => {
-        if (!stats) return;
+        if (!stats || !recentVideos) return;
         if (!await consumeCredits(3)) return;
 
         setIsLoading(prev => ({ ...prev, gaps: true }));
         setError(null);
         try {
-            const successfulTopics = [stats.topPerformingVideo.title, project.title || 'Untitled'];
-            const result = await suggestContentGaps(successfulTopics, 'DIY & Crafting'); // Niche could be dynamic
+            const successfulTopics = recentVideos.slice(0, 5).map(v => v.title);
+            const result = await suggestContentGaps(successfulTopics, project.topic);
             setSuggestions(result);
         } catch (e) {
             setError(e instanceof Error ? e.message : t('channel_intelligence.error_generate_suggestions'));
@@ -78,6 +104,13 @@ const ChannelIntelligence: React.FC<ChannelIntelligenceProps> = ({ project }) =>
             setIsLoading(prev => ({ ...prev, gaps: false }));
         }
     };
+
+    if (!user?.youtubeConnected) {
+        return <div className="text-center py-16 px-6 bg-gray-800/50 rounded-2xl">
+            <h2 className="text-2xl font-bold text-white mb-3">{t('channel_hub.connect_first_title')}</h2>
+            <p className="text-gray-400 mb-6 max-w-md mx-auto">{t('channel_hub.connect_first_subtitle')}</p>
+        </div>
+    }
 
     return (
         <div className="space-y-8 animate-fade-in-up">
@@ -101,6 +134,23 @@ const ChannelIntelligence: React.FC<ChannelIntelligenceProps> = ({ project }) =>
                 {/* Performance Review */}
                 <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700 space-y-4">
                     <h3 className="text-2xl font-bold text-white">{t('channel_intelligence.performance_review_title')}</h3>
+                    
+                    <div>
+                        <label htmlFor="video-select" className="block text-sm font-medium text-gray-300 mb-2">Select a video to analyze:</label>
+                        <select
+                            id="video-select"
+                            value={selectedVideo?.id || ''}
+                            onChange={e => {
+                                const video = recentVideos?.find(v => v.id === e.target.value);
+                                if (video) setSelectedVideo(video);
+                            }}
+                            className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
+                            <option value="" disabled>-- Select a recent video --</option>
+                            {recentVideos?.map(v => <option key={v.id} value={v.id}>{v.title}</option>)}
+                        </select>
+                    </div>
+
                     {isLoading.performance ? <p>{t('channel_intelligence.performance_loading')}</p> : performance && (
                         <div className="grid grid-cols-2 gap-4 text-center">
                             <StatCard label={t('channel_intelligence.views')} value={performance.views} />
@@ -125,6 +175,10 @@ const ChannelIntelligence: React.FC<ChannelIntelligenceProps> = ({ project }) =>
                                    {review.whatToImprove.map((item, i) => <li key={i}>{item}</li>)}
                                </ul>
                            </div>
+                            <button onClick={() => handleCreateProjectFromInsights(review, project)} className="w-full mt-4 inline-flex items-center justify-center px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-full transition-colors">
+                                <CtaIcon className="w-5 h-5 mr-2" />
+                                {t('channel_intelligence.create_from_insights_button')}
+                            </button>
                         </div>
                     ) : (
                          <div className="text-center pt-4">

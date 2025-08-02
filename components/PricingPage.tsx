@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { Plan, PlanId } from '../types';
 import { PLANS } from '../services/paymentService';
@@ -19,7 +20,7 @@ const PlanCard: React.FC<{ plan: Plan; onSelect: () => void; isCurrent: boolean;
     const buttonText = isCurrent ? t('pricing.button_current') : isFree ? t('pricing.button_start') : t('pricing.button_upgrade');
     
     return (
-        <div className={`relative bg-gray-800/50 p-8 rounded-2xl border-2 transition-all duration-300
+        <div className={`relative bg-gray-800/50 p-8 rounded-2xl border-2 transition-all duration-300 flex flex-col
             ${plan.isMostPopular ? 'border-indigo-500' : 'border-gray-700'}
             ${isCurrent ? 'transform scale-105 shadow-2xl shadow-indigo-500/10' : 'hover:scale-105'}
         `}>
@@ -38,7 +39,7 @@ const PlanCard: React.FC<{ plan: Plan; onSelect: () => void; isCurrent: boolean;
                  <p className="text-sm text-gray-500 mt-1">{t('pricing.credits_limit', {limit: plan.creditLimit})}</p>
             </div>
             
-            <ul className="mt-8 space-y-4">
+            <ul className="mt-8 space-y-4 flex-grow">
                 {plan.features.map((featureKey, i) => (
                     <li key={i} className="flex items-start">
                         <CheckBadgeIcon className="w-6 h-6 mr-3 text-green-400 flex-shrink-0" />
@@ -50,7 +51,7 @@ const PlanCard: React.FC<{ plan: Plan; onSelect: () => void; isCurrent: boolean;
             <button
                 onClick={onSelect}
                 disabled={isCurrent}
-                className={`w-full mt-10 py-3 font-bold rounded-lg transition-colors duration-300
+                className={`w-full mt-10 py-3 font-bold rounded-lg transition-colors duration-300 flex-shrink-0
                     ${isCurrent ? 'bg-gray-600 text-gray-300 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-500'}
                     ${plan.isMostPopular && !isCurrent && 'bg-indigo-500 hover:bg-indigo-400'}
                 `}
@@ -79,7 +80,7 @@ const PricingPage: React.FC = () => {
                 </p>
             </header>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto items-stretch">
                 {PLANS.map(plan => (
                     <PlanCard 
                         key={plan.id}

@@ -9,6 +9,12 @@ export interface Plan {
   isMostPopular?: boolean;
 }
 
+export interface ClonedVoice {
+    id: string;
+    name: string;
+    status: 'pending' | 'ready' | 'failed';
+}
+
 export interface User {
   id:string;
   email: string;
@@ -19,9 +25,12 @@ export interface User {
   };
   aiCredits: number;
   channelAudit: ChannelAudit | null;
+  youtubeConnected: boolean;
+  content_pillars?: string[];
+  cloned_voices?: ClonedVoice[];
 }
 
-export type ProjectStatus = 'Idea' | 'Scripting' | 'Scheduled' | 'Published';
+export type ProjectStatus = 'Idea' | 'Scripting' | 'Scheduled' | 'Published' | 'Autopilot';
 export type Platform = 'youtube' | 'tiktok' | 'instagram';
 export type WorkflowStep = 1 | 2 | 3 | 4 | 5 | 6;
 
@@ -45,6 +54,17 @@ export interface Project {
   publishedUrl?: string;
   lastUpdated: string; // ISO string
   workflowStep: WorkflowStep;
+  voiceoverVoiceId?: string;
+  last_performance_check?: string; // ISO string
+}
+
+export interface Notification {
+    id: string;
+    user_id: string;
+    project_id?: string;
+    message: string;
+    is_read: boolean;
+    created_at: string;
 }
 
 export interface Script {
@@ -162,9 +182,9 @@ export interface VideoDetails {
 }
 
 export interface SceneAssets {
-    images: string[]; // base64 strings
-    graphics: string[]; // base64 strings
-    audio?: string; // base64 string
+    brollVideo?: string; // URL to the generated video
+    graphics: string[]; // base64 strings for overlays
+    audio?: string; // URL to the generated audio
 }
 
 export interface SoundDesign {
@@ -200,3 +220,208 @@ export interface Opportunity {
     suggestedTitle: string;
     type: 'Quick Win' | 'Growth Bet' | 'Experimental';
 }
+
+
+// --- SUPABASE TYPE DEFINITIONS ---
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: unknown }
+  | unknown[];
+
+export type Database = {
+  public: {
+    Tables: {
+      profiles: {
+        Row: {
+          id: string
+          email: string
+          subscription: Json
+          ai_credits: number
+          channel_audit: Json | null
+          stripe_customer_id?: string | null
+          content_pillars?: string[] | null
+          cloned_voices?: Json | null
+        }
+        Insert: {
+            id: string;
+            email: string;
+            subscription?: Json;
+            ai_credits?: number;
+            channel_audit?: Json | null;
+            stripe_customer_id?: string | null;
+            content_pillars?: string[] | null;
+            cloned_voices?: Json | null;
+        }
+        Update: {
+            id?: string;
+            email?: string;
+            subscription?: Json;
+            ai_credits?: number;
+            channel_audit?: Json | null;
+            stripe_customer_id?: string | null;
+            content_pillars?: string[] | null;
+            cloned_voices?: Json | null;
+        }
+        Relationships: []
+      }
+      projects: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          topic: string
+          platform: Platform
+          status: ProjectStatus
+          title: string | null
+          script: Json | null
+          analysis: Json | null
+          competitor_analysis: Json | null
+          moodboard: string[] | null
+          assets: Json | null
+          sound_design: Json | null
+          launch_plan: Json | null
+          performance: Json | null
+          scheduled_date: string | null
+          published_url: string | null
+          last_updated: string
+          workflow_step: number
+          voiceover_voice_id: string | null
+          last_performance_check: string | null
+        }
+        Insert: {
+            id?: string;
+            user_id: string;
+            name: string;
+            topic: string;
+            platform: Platform;
+            status: ProjectStatus;
+            title?: string | null;
+            script?: Json | null;
+            analysis?: Json | null;
+            competitor_analysis?: Json | null;
+            moodboard?: string[] | null;
+            assets?: Json | null;
+            sound_design?: Json | null;
+            launch_plan?: Json | null;
+            performance?: Json | null;
+            scheduled_date?: string | null;
+            published_url?: string | null;
+            last_updated?: string;
+            workflow_step: number;
+            voiceover_voice_id?: string | null;
+            last_performance_check?: string | null;
+        }
+        Update: {
+            id?: string;
+            user_id?: string;
+            name?: string;
+            topic?: string;
+            platform?: Platform;
+            status?: ProjectStatus;
+            title?: string | null;
+            script?: Json | null;
+            analysis?: Json | null;
+            competitor_analysis?: Json | null;
+            moodboard?: string[] | null;
+            assets?: Json | null;
+            sound_design?: Json | null;
+            launch_plan?: Json | null;
+            performance?: Json | null;
+            scheduled_date?: string | null;
+            published_url?: string | null;
+            last_updated?: string;
+            workflow_step?: number;
+            voiceover_voice_id?: string | null;
+            last_performance_check?: string | null;
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_youtube_tokens: {
+        Row: {
+          user_id: string
+          access_token: string
+          refresh_token: string
+          expires_at: string
+          scope: string
+        }
+        Insert: {
+          user_id: string
+          access_token: string
+          refresh_token: string
+          expires_at: string
+          scope: string
+        }
+        Update: {
+          user_id?: string
+          access_token?: string
+          refresh_token?: string
+          expires_at?: string
+          scope?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          id: string
+          user_id: string
+          project_id: string | null
+          message: string
+          is_read: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          project_id?: string | null
+          message: string
+          is_read?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          project_id?: string | null
+          message?: string
+          is_read?: boolean
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+        [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+};

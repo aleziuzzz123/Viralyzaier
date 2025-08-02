@@ -1,11 +1,10 @@
 import React, { createContext, useState, useEffect, useCallback, useContext, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Project, User, PlanId, Blueprint, Toast, Platform, Opportunity, ContentGapSuggestion } from '../types';
+import { Project, User, PlanId, Blueprint, Toast, Platform, Opportunity, ContentGapSuggestion, PerformanceReview, Notification, ProjectStatus } from '../types';
 import * as supabase from '../services/supabaseService';
-import { isBackendConfigured } from '../services/supabaseService';
 import { type AuthSession } from '@supabase/supabase-js';
 import { createCheckoutSession, PLANS } from '../services/paymentService';
-import { fetchVideoPerformanceByUrl } from '../services/youtubeService';
+import { fetchVideoPerformance } from '../services/youtubeService';
 import UpgradeModal from '../components/UpgradeModal';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { translations, Language, TranslationKey } from '../translations';
@@ -14,14 +13,15 @@ interface AppContextType {
     session: AuthSession | null;
     user: User | null;
     projects: Project[];
-    apiKeyError: boolean;
-    backendConfigError: boolean;
     toasts: Toast[];
     dismissedTutorials: string[];
     isUpgradeModalOpen: boolean;
     upgradeReason: { title: string; description: string };
     confirmation: ConfirmationState;
     language: Language;
+    apiKeyError: boolean;
+    prefilledBlueprintPrompt: string | null;
+    notifications: Notification[];
     
     setLanguage: (lang: Language) => void;
     t: (key: TranslationKey, replacements?: { [key: string]: string | number }) => string;
@@ -37,15 +37,21 @@ interface AppContextType {
     handleUpdateProject: (updatedProjectData: Partial<Project> & { id: string }) => Promise<Project | null>;
     handleCreateProjectFromBlueprint: (blueprint: Blueprint, selectedTitle: string) => Promise<void>;
     handleCreateProjectFromIdea: (suggestion: Opportunity | ContentGapSuggestion, platform: Platform) => Promise<void>;
+    handleCreateProjectFromInsights: (review: PerformanceReview, originalProject: Project) => void;
     handleDeleteProject: (projectId: string) => void;
+    addProjects: (newProjects: Project[]) => void;
     
     requestConfirmation: (title: string, message: string, onConfirm: () => void) => void;
     setUpgradeModalOpen: (isOpen: boolean) => void;
+    setPrefilledBlueprintPrompt: (prompt: string | null) => void;
     
     setActiveProjectId: (id: string | null) => void;
     activeProjectId: string | null;
     
-    setUser: (user: User | null) => void;
+    setUser: React.Dispatch<React.SetStateAction<User | null>>;
+    
+    markNotificationAsRead: (notificationId: string) => void;
+    markAllNotificationsAsRead: () => void;
 }
 
 interface ConfirmationState {
@@ -61,11 +67,10 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     const [session, setSession] = useState<AuthSession | null>(null);
     const [user, setUser] = useState<User | null>(null);
     const [projects, setProjects] = useState<Project[]>([]);
+    const [notifications, setNotifications] = useState<Notification[]>([]);
     
-    const [apiKeyError] = useState<boolean>(!import.meta.env.VITE_GEMINI_API_KEY);
-    const [backendConfigError] = useState<boolean>(!isBackendConfigured);
-
     const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+    const [apiKeyError] = useState(!process.env.API_KEY);
     
     const [isUpgradeModalOpen, setUpgradeModalOpen] = useState(false);
     const [upgradeReason, setUpgradeReason] = useState<{title: string, description: string}>({title: '', description: ''});
@@ -73,6 +78,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     const [toasts, setToasts] = useState<Toast[]>([]);
     const [dismissedTutorials, setDismissedTutorials] = useState<string[]>([]);
     const [confirmation, setConfirmation] = useState<ConfirmationState>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+    const [prefilledBlueprintPrompt, setPrefilledBlueprintPrompt] = useState<string | null>(null);
 
     const [language, setLanguageState] = useState<Language>(() => {
         const savedLang = localStorage.getItem('viralyzaier-lang');
@@ -111,8 +117,6 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
 
     // --- AUTH & DATA LOADING ---
     useEffect(() => {
-        if (backendConfigError) return;
-
         supabase.getSession().then(({ session }) => setSession(session))
         .catch(err => {
             console.error("Failed to get initial session:", err);
@@ -130,10 +134,10 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             authListener?.unsubscribe();
         };
 
-    }, [addToast, backendConfigError]);
+    }, [addToast]);
 
     useEffect(() => {
-        if (session?.user && !backendConfigError) {
+        if (session?.user) {
             supabase.getUserProfile(session.user.id)
                 .then(profile => {
                     if (profile) {
@@ -155,13 +159,21 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
                     console.error('Failed to load projects:', err);
                     addToast(t('toast.failed_fetch_projects'), 'error');
                 });
+            
+            supabase.getNotifications(session.user.id)
+                .then(setNotifications)
+                .catch(err => {
+                     console.error('Failed to load notifications:', err);
+                     addToast('Failed to load notifications', 'error');
+                });
         } else {
             setUser(null);
             setProjects([]);
+            setNotifications([]);
         }
-    }, [session, addToast, t, backendConfigError]);
+    }, [session, addToast, t]);
     
-    // Immediate feedback after Stripe redirect
+    // Immediate feedback after Stripe or OAuth redirect
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.has('payment_success')) {
@@ -172,33 +184,16 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             addToast('Payment was canceled. You can try again from the pricing page.', 'info');
             window.history.replaceState({}, document.title, window.location.pathname); // Clean URL
         }
-    }, [addToast]);
-
-    // Simulate fetching performance data for published videos
-    useEffect(() => {
-        if (!session || backendConfigError || !projects.some(p => p.status === 'Published' && p.publishedUrl && !p.performance)) return;
-        
-        const fetchPerformanceData = async () => {
-            const projectsToUpdate = projects.filter(p => p.status === 'Published' && p.publishedUrl && !p.performance);
-            if (projectsToUpdate.length > 0) {
-                const updatedProjectsPromises = projects.map(async (p) => {
-                    if (projectsToUpdate.find(pu => pu.id === p.id)) {
-                        const performance = await fetchVideoPerformanceByUrl(p.publishedUrl!);
-                        const updated = await supabase.updateProject(p.id, { performance });
-                        return updated;
-                    }
-                    return p;
-                });
-                const updatedProjects = await Promise.all(updatedProjectsPromises);
-                setProjects(updatedProjects);
-            }
-        };
-      
-        const interval = setInterval(fetchPerformanceData, 30000);
-        fetchPerformanceData();
-      
-        return () => clearInterval(interval);
-    }, [session, projects, backendConfigError]);
+         if (urlParams.has('youtube_connected')) {
+            addToast('YouTube channel connected successfully!', 'success');
+            if(user) supabase.getUserProfile(user.id).then(setUser); // Refresh user profile
+            window.history.replaceState({}, document.title, window.location.pathname); // Clean URL
+        }
+        if (urlParams.has('youtube_error')) {
+            addToast(`Failed to connect YouTube channel: ${urlParams.get('youtube_error')}`, 'error');
+            window.history.replaceState({}, document.title, window.location.pathname); // Clean URL
+        }
+    }, [addToast, user]);
     
     const requestConfirmation = (title: string, message: string, onConfirm: () => void) => { setConfirmation({ isOpen: true, title, message, onConfirm }); };
     const handleConfirmation = () => { confirmation.onConfirm(); setConfirmation({ isOpen: false, title: '', message: '', onConfirm: () => {} }); };
@@ -213,7 +208,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     };
 
     const consumeCredits = useCallback(async (amount: number): Promise<boolean> => {
-        if (!user || backendConfigError) return false;
+        if (!user) return false;
         
         try {
             const result = await supabase.invokeEdgeFunction('consume-credits', { amount_to_consume: amount });
@@ -238,10 +233,9 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             addToast(errorMessage, 'error');
             return false;
         }
-    }, [user, addToast, t, backendConfigError]);
+    }, [user, addToast, t]);
 
     const handleUpdateProject = async (updatedProjectData: Partial<Project> & { id: string }) => {
-        if (backendConfigError) return null;
         try {
             const updatedProject = await supabase.updateProject(updatedProjectData.id, updatedProjectData);
             setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
@@ -252,8 +246,8 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         }
     };
     
-    const handleCreateProjectFromBlueprint = async (blueprint: Blueprint, selectedTitle: string) => {
-        if (!user || backendConfigError) return;
+    const handleCreateProjectFromBlueprint = async (blueprint: Blueprint, selectedTitle: string, status: ProjectStatus = 'Idea') => {
+        if (!user) return;
         
         try {
             const moodboardUrls = await Promise.all(
@@ -265,7 +259,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             );
 
             const newProjectData: Omit<Project, 'id' | 'lastUpdated'> = {
-                name: selectedTitle, status: 'Idea', platform: blueprint.platform,
+                name: selectedTitle, status: status, platform: blueprint.platform,
                 topic: blueprint.strategicSummary, title: selectedTitle, script: blueprint.script,
                 moodboard: moodboardUrls, workflowStep: 2, analysis: null,
                 competitorAnalysis: null, scheduledDate: null, assets: {}, soundDesign: null,
@@ -280,9 +274,13 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             addToast(error instanceof Error ? error.message : t('toast.failed_update_project'), "error");
         }
     };
+    
+    const addProjects = (newProjects: Project[]) => {
+        setProjects(prev => [...newProjects, ...prev]);
+    };
 
     const handleCreateProjectFromIdea = async (suggestion: Opportunity | ContentGapSuggestion, platform: Platform) => {
-         if (!user || backendConfigError) return;
+         if (!user) return;
         const title = 'suggestedTitle' in suggestion ? suggestion.suggestedTitle : (suggestion.potentialTitles[0] || suggestion.idea);
         const newProjectData: Omit<Project, 'id'|'lastUpdated'> = {
             name: suggestion.idea, status: 'Idea', platform: platform, topic: suggestion.reason,
@@ -295,10 +293,17 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         setActiveProjectId(newProject.id);
         addToast(t('toast.project_created_idea'), 'success');
     };
+
+    const handleCreateProjectFromInsights = (review: PerformanceReview, originalProject: Project) => {
+        const insightsPrompt = `Based on a previous video titled "${originalProject.title}", here's what we learned. What worked: ${review.whatWorked.join(', ')}. What to improve: ${review.whatToImprove.join(', ')}. Generate a new video idea based on this feedback for the ${originalProject.platform} platform.`;
+        setPrefilledBlueprintPrompt(insightsPrompt);
+        // Navigate to dashboard which will trigger the blueprint modal
+        setActiveProjectId(null);
+        addToast("Blueprint prompt pre-filled with performance insights!", "success");
+    };
   
     const handleDeleteProject = (projectId: string) => {
         requestConfirmation(t('confirmation_modal.delete_project_title'), t('confirmation_modal.delete_project_message'), async () => {
-            if (backendConfigError) return;
             try {
                 await supabase.deleteProject(projectId);
                 addToast(t('toast.project_deleted'), 'success');
@@ -315,10 +320,28 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     const dismissTutorial = (id: string) => { const newDismissed = [...dismissedTutorials, id]; setDismissedTutorials(newDismissed); localStorage.setItem('viralyzaier-tutorials', JSON.stringify(newDismissed)); };
     const dismissToast = (id: number) => { setToasts(t => t.filter(toast => toast.id !== id)); };
     
-    const requirePermission = useCallback((requiredPlan: PlanId): boolean => { if (!user) return false; const userPlanIndex = PLANS.findIndex(p => p.id === user.subscription.planId); const requiredPlanIndex = PLANS.findIndex(p => p.id === requiredPlan); if (userPlanIndex >= requiredPlanIndex) { return true; } const requiredPlanDetails = PLANS[requiredPlanIndex]; setUpgradeReason({ title: t('upgrade_modal.default_title'), description: t('upgrade_modal.default_description') }); setUpgradeModalOpen(true); return false; }, [user, t]);
+    const requirePermission = useCallback((requiredPlan: PlanId): boolean => {
+      if (!user) return false;
+      const userPlanIndex = PLANS.findIndex(p => p.id === user.subscription.planId);
+      const requiredPlanIndex = PLANS.findIndex(p => p.id === requiredPlan);
+
+      // Check for active subscription or if it's a canceled plan that hasn't expired yet
+      const hasActiveSubscription = user.subscription.status === 'active' || (user.subscription.status === 'canceled' && user.subscription.endDate && user.subscription.endDate * 1000 > Date.now());
+
+      if (hasActiveSubscription && userPlanIndex >= requiredPlanIndex) {
+        return true;
+      }
+
+      setUpgradeReason({
+        title: t('upgrade_modal.default_title'),
+        description: t('upgrade_modal.default_description')
+      });
+      setUpgradeModalOpen(true);
+      return false;
+    }, [user, t]);
     
     const handleSubscriptionChange = async (planId: PlanId) => {
-        if (!user || backendConfigError) return;
+        if (!user) return;
         if (user.subscription.planId === planId && user.subscription.status === 'active') {
             addToast(t('toast.already_on_plan'), 'info');
             return;
@@ -326,13 +349,10 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
 
         try {
             if (planId === 'free') {
-                const newPlan = PLANS.find(p => p.id === planId)!;
-                const updatedUser = await supabase.updateUserProfile(user.id, {
-                    subscription: { planId: 'free', status: 'active', endDate: null },
-                    aiCredits: newPlan.creditLimit,
-                });
-                setUser(updatedUser);
-                addToast(t('toast.subscription_success', { planName: t('pricing.plan_free') }), 'success');
+                // Here you would typically call your backend to cancel the Stripe subscription
+                // For now, we simulate a downgrade.
+                addToast("Downgrading to Free is handled through your Stripe customer portal.", "info");
+
             } else {
                 const { checkoutUrl } = await createCheckoutSession(planId);
                 window.location.href = checkoutUrl;
@@ -342,15 +362,36 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             addToast(t('toast.subscription_failed', { error: errorMessage }), 'error');
         }
     };
+    
+    const markNotificationAsRead = useCallback(async (notificationId: string) => {
+        try {
+            await supabase.markNotificationAsRead(notificationId);
+            setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n));
+        } catch (error) {
+            addToast("Failed to mark notification as read.", "error");
+        }
+    }, [addToast]);
+
+    const markAllNotificationsAsRead = useCallback(async () => {
+        if (!user) return;
+        try {
+            await supabase.markAllNotificationsAsRead(user.id);
+            setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+        } catch (error) {
+            addToast("Failed to mark all notifications as read.", "error");
+        }
+    }, [user, addToast]);
 
     const value: AppContextType = {
-        session, user, projects, apiKeyError, backendConfigError, toasts, dismissedTutorials,
+        session, user, projects, toasts, dismissedTutorials,
         isUpgradeModalOpen, upgradeReason, confirmation, activeProjectId,
-        language, setLanguage, t,
+        language, setLanguage, t, apiKeyError, prefilledBlueprintPrompt,
+        notifications, markNotificationAsRead, markAllNotificationsAsRead,
         addToast, dismissToast, dismissTutorial, handleLogout, consumeCredits, requirePermission,
         handleSubscriptionChange, handleUpdateProject, handleCreateProjectFromBlueprint,
         handleCreateProjectFromIdea, handleDeleteProject, requestConfirmation, setUpgradeModalOpen,
-        setActiveProjectId, setUser,
+        setActiveProjectId, setUser, setPrefilledBlueprintPrompt, handleCreateProjectFromInsights,
+        addProjects,
     };
     
     return (

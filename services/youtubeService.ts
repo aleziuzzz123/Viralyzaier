@@ -1,49 +1,114 @@
-import { ChannelStats, VideoDetails, VideoPerformance } from '../types';
+import { ChannelStats, VideoPerformance } from '../types';
+import { invokeEdgeFunction } from './supabaseService';
 
-const mockDelay = (ms: number) => new Promise(res => setTimeout(res, ms));
+// This service is now a client for our secure backend proxy.
+// It no longer contains any AI simulation logic.
 
 export const fetchChannelStats = async (): Promise<ChannelStats> => {
-    await mockDelay(1200);
+    const data = await invokeEdgeFunction('youtube-api-proxy', {
+        endpoint: 'channels',
+        params: {
+            part: 'snippet,statistics',
+            mine: true
+        }
+    });
+
+    if (!data.items || data.items.length === 0) {
+        throw new Error("Could not fetch channel statistics.");
+    }
+
+    const stats = data.items[0].statistics;
+    const snippet = data.items[0].snippet;
+
+    // We need a top performing video, which requires another call. Let's get the most recent videos first.
+    const videos = await fetchChannelVideos();
+    const topVideo = videos.length > 0 ? videos.sort((a,b) => b.views - a.views)[0] : { title: 'N/A', views: 0 };
+
     return {
-        subscriberCount: 125000,
-        totalViews: 15000000,
-        totalVideos: 250,
+        subscriberCount: parseInt(stats.subscriberCount, 10),
+        totalViews: parseInt(stats.viewCount, 10),
+        totalVideos: parseInt(stats.videoCount, 10),
         topPerformingVideo: {
-            title: "My Morning Routine (2023)",
-            views: 1200000
+            title: topVideo.title,
+            views: topVideo.views,
         }
     };
 };
 
-export const fetchVideoPerformance = async (projectId: string): Promise<VideoPerformance> => {
-    await mockDelay(800);
-    console.log(`Fetching performance for project ${projectId}`);
+export const fetchVideoPerformance = async (videoId: string): Promise<VideoPerformance> => {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const startDate = thirtyDaysAgo.toISOString().split('T')[0];
+
+    const data = await invokeEdgeFunction('youtube-api-proxy', {
+        endpoint: 'reports',
+        isAnalytics: true,
+        params: {
+            ids: 'channel==MINE',
+            startDate: startDate,
+            endDate: new Date().toISOString().split('T')[0],
+            metrics: 'views,likes,comments,averageViewDuration,estimatedMinutesWatched',
+            dimensions: 'video',
+            filters: `video==${videoId}`
+        }
+    });
+    
+    if (!data.rows || data.rows.length === 0) {
+        // Return zeroed data if no performance metrics are available yet.
+        return { views: 0, likes: 0, comments: 0, retention: 0 };
+    }
+
+    const row = data.rows[0];
+    const views = row[1] || 0;
+    const avgDuration = row[4] || 0; // averageViewDuration
+    const totalMinutes = row[5] || 0; // estimatedMinutesWatched
+
+    // Simplified retention calculation
+    const retention = (views > 0 && totalMinutes > 0) ? Math.round((totalMinutes / views) / (avgDuration / 60) * 100) : 0;
+
     return {
-        views: Math.floor(Math.random() * 50000) + 1000,
-        likes: Math.floor(Math.random() * 2000) + 100,
-        comments: Math.floor(Math.random() * 200) + 10,
-        retention: Math.floor(Math.random() * 40) + 30
+        views: views,
+        likes: row[2] || 0,
+        comments: row[3] || 0,
+        retention: isNaN(retention) ? 0 : retention,
     };
 };
 
-export const fetchVideoPerformanceByUrl = async (url: string): Promise<VideoPerformance> => {
-     await mockDelay(800);
-     console.log(`Fetching performance for url ${url}`);
-     return {
-        views: Math.floor(Math.random() * 50000) + 1000,
-        likes: Math.floor(Math.random() * 2000) + 100,
-        comments: Math.floor(Math.random() * 200) + 10,
-        retention: Math.floor(Math.random() * 40) + 30
-    };
-}
-
 export const fetchChannelVideos = async (): Promise<{id: string, title: string, views: number, likes: number, comments: number}[]> => {
-    await mockDelay(1500);
-    return [
-        { id: 'vid1', title: 'My Most Productive Day Ever', views: 54000, likes: 2300, comments: 150 },
-        { id: 'vid2', title: 'React JS for Beginners in 2 hours', views: 120000, likes: 8000, comments: 450 },
-        { id: 'vid3', title: 'I built a SaaS with an AI co-pilot', views: 250000, likes: 15000, comments: 800 },
-        { id: 'vid4', title: 'Unboxing the new M3 MacBook Pro', views: 89000, likes: 4100, comments: 200 },
-        { id: 'vid5', title: 'What\'s on my iPhone? (2024)', views: 32000, likes: 1800, comments: 120 },
-    ];
+    const searchData = await invokeEdgeFunction('youtube-api-proxy', {
+        endpoint: 'search',
+        params: {
+            part: 'snippet',
+            forMine: true,
+            type: 'video',
+            order: 'date',
+            maxResults: 10
+        }
+    });
+
+    if (!searchData.items || searchData.items.length === 0) {
+        return [];
+    }
+    
+    const videoIds = searchData.items.map((item: any) => item.id.videoId).join(',');
+
+    const videoDetailsData = await invokeEdgeFunction('youtube-api-proxy', {
+        endpoint: 'videos',
+        params: {
+            part: 'snippet,statistics',
+            id: videoIds,
+        }
+    });
+    
+     if (!videoDetailsData.items) {
+        return [];
+    }
+
+    return videoDetailsData.items.map((item: any) => ({
+        id: item.id,
+        title: item.snippet.title,
+        views: parseInt(item.statistics.viewCount || '0', 10),
+        likes: parseInt(item.statistics.likeCount || '0', 10),
+        comments: parseInt(item.statistics.commentCount || '0', 10),
+    }));
 };

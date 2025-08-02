@@ -1,48 +1,12 @@
 
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Project, Script, Platform, ScriptOptimization, PlanId } from '../types';
 import { generateOptimizedScript } from '../services/geminiService';
 import { SparklesIcon, LightBulbIcon, CtaIcon, PencilIcon, MagicWandIcon } from './Icons';
 import { useAppContext } from '../contexts/AppContext';
 import { PLANS } from '../services/paymentService';
-
-const ViralityGauge: React.FC<{ score: number }> = ({ score }) => {
-    const getScoreColor = (s: number) => {
-        if (s >= 90) return 'text-green-400';
-        if (s >= 75) return 'text-lime-400';
-        if (s >= 50) return 'text-yellow-400';
-        if (s >= 25) return 'text-orange-400';
-        return 'text-red-500';
-    };
-    const radius = 54;
-    const circumference = 2 * Math.PI * radius;
-    const offset = circumference - (score / 100) * circumference;
-
-    return (
-        <div className="relative w-40 h-40">
-            <svg className="w-full h-full" viewBox="0 0 120 120">
-                <circle className="text-gray-700" strokeWidth="10" stroke="currentColor" fill="transparent" r={radius} cx="60" cy="60" />
-                <circle
-                    className={`${getScoreColor(score)} transition-all duration-1000 ease-in-out`}
-                    strokeWidth="10"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={offset}
-                    strokeLinecap="round"
-                    stroke="currentColor"
-                    fill="transparent"
-                    r={radius}
-                    cx="60"
-                    cy="60"
-                    style={{ transform: 'rotate(-90deg)', transformOrigin: 'center' }}
-                />
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center">
-                <span className={`text-4xl font-black ${getScoreColor(score)}`}>{Math.round(score)}</span>
-                <span className={`text-xl font-bold ${getScoreColor(score)}`}>%</span>
-            </div>
-        </div>
-    );
-};
+import ViralityGauge from './ViralityGauge';
 
 
 const ScriptGenerator: React.FC<{
@@ -265,6 +229,11 @@ const ScriptGenerator: React.FC<{
                 <h1 className="text-3xl font-bold text-white">{t('script_optimizer.final_script_title')}</h1>
                 <p className="mt-2 text-lg text-gray-400">Your script is now optimized and ready to go!</p>
             </header>
+
+            <div className="flex flex-col items-center bg-gray-800/50 p-6 rounded-2xl border border-gray-700 max-w-sm mx-auto">
+                <h3 className="text-xl font-bold text-white mb-4">{t('script_optimizer.virality_score_final')}</h3>
+                {optimizationResult && <ViralityGauge score={optimizationResult.finalScore} size="sm" />}
+            </div>
             
             {optimizationResult?.finalScript && (
                  <div className="space-y-8">

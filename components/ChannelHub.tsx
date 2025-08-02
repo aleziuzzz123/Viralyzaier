@@ -1,10 +1,9 @@
-
 import React, { useState } from 'react';
 import { Opportunity, Platform } from '../types';
 import { fetchChannelVideos } from '../services/youtubeService';
 import { performChannelAudit } from '../services/geminiService';
 import * as supabase from '../services/supabaseService';
-import { SparklesIcon, ChartPieIcon } from './Icons';
+import { SparklesIcon, ChartPieIcon, YouTubeIcon } from './Icons';
 import { useAppContext } from '../contexts/AppContext';
 
 interface ChannelHubProps {}
@@ -14,17 +13,33 @@ const ChannelHub: React.FC<ChannelHubProps> = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    const handleConnectChannel = () => {
+        const googleClientId = (import.meta as any).env.VITE_GOOGLE_CLIENT_ID;
+        if (!googleClientId) {
+            setError("Google Client ID is not configured.");
+            return;
+        }
+        
+        const redirectUri = `${(import.meta as any).env.VITE_SUPABASE_URL}/functions/v1/youtube-oauth-callback`;
+        const scope = "https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly";
+
+        const oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent`;
+        
+        window.location.href = oauthUrl;
+    };
+
     const handleAnalyzeChannel = async () => {
-        if (!user || !requirePermission('viralyzaier')) return;
+        if (!user || !requirePermission('viralyzaier') || !user.youtubeConnected) return;
         if (apiKeyError) {
             setError(t('blueprint_modal.error_api_key'));
             return;
         }
-        if (!await consumeCredits(10)) return; // Channel audit is a high-value action
+        if (!await consumeCredits(10)) return; 
 
         setIsLoading(true);
         setError(null);
         try {
+            // Now fetches REAL videos from the user's connected channel
             const videos = await fetchChannelVideos();
             const auditResult = await performChannelAudit(videos);
             const updatedUser = await supabase.updateUserProfile(user.id, { channelAudit: auditResult });
@@ -32,13 +47,14 @@ const ChannelHub: React.FC<ChannelHubProps> = () => {
             addToast("Channel audit complete! Your growth plan is ready.", 'success');
         } catch (e) {
             setError(e instanceof Error ? e.message : "An unknown error occurred during channel audit.");
+            addToast(e instanceof Error ? e.message : "Failed to audit channel.", "error");
         } finally {
             setIsLoading(false);
         }
     };
     
     if (!user) return null;
-    const { channelAudit } = user;
+    const { channelAudit, youtubeConnected } = user;
     
     const getOpportunityType = (type: 'Quick Win' | 'Growth Bet' | 'Experimental') => {
         switch(type) {
@@ -62,11 +78,24 @@ const ChannelHub: React.FC<ChannelHubProps> = () => {
 
             {error && <p className="text-red-400 text-center bg-red-500/10 p-3 rounded-lg">{error}</p>}
 
-            {!channelAudit ? (
+            {!youtubeConnected ? (
+                 <div className="text-center py-16 px-6 bg-gray-800/50 rounded-2xl border border-gray-700">
+                    <YouTubeIcon className="w-20 h-20 mx-auto text-red-500 mb-4" />
+                    <h2 className="text-2xl font-bold text-white mb-3">{t('channel_hub.connect_title')}</h2>
+                    <p className="text-gray-400 mb-6 max-w-md mx-auto">{t('channel_hub.connect_subtitle')}</p>
+                    <button
+                        onClick={handleConnectChannel}
+                        className="inline-flex items-center px-8 py-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-full transition-all duration-300 ease-in-out transform hover:scale-105 shadow-lg"
+                    >
+                        <YouTubeIcon className="w-6 h-6 mr-3" />
+                        {t('channel_hub.connect_button')}
+                    </button>
+                </div>
+            ) : !channelAudit ? (
                 <div className="text-center py-16 px-6 bg-gray-800/50 rounded-2xl border border-gray-700">
                     <ChartPieIcon className="w-16 h-16 mx-auto text-sky-500 mb-4" />
                     <h2 className="text-2xl font-bold text-white mb-3">{t('channel_hub.get_plan_title')}</h2>
-                    <p className="text-gray-400 mb-6 max-w-md mx-auto">{t('channel_hub.get_plan_subtitle')}</p>
+                    <p className="text-gray-400 mb-6 max-w-md mx-auto">{t('channel_hub.get_plan_subtitle_connected')}</p>
                     <button
                         onClick={handleAnalyzeChannel}
                         disabled={isLoading}

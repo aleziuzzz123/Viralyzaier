@@ -1,12 +1,10 @@
-
-
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { TrendData } from '../types';
 
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+const apiKey = (import.meta as any).env.VITE_API_KEY;
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
-const AI_NOT_CONFIGURED_ERROR = "Gemini API Key is not configured. Please set the API_KEY environment variable.";
+const AI_NOT_CONFIGURED_ERROR = "Gemini API Key is not configured. Please set the VITE_API_KEY environment variable.";
 
 const checkAi = () => {
     if (!ai) {

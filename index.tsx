@@ -28,28 +28,33 @@ class ErrorBoundary extends React.Component<{children: React.ReactNode}, { hasEr
       const lang = navigator.language.split('-')[0] as keyof typeof translations;
       const t = translations[lang] || translations.en;
       
-      const isSupabaseError = this.state.error?.message.includes('Supabase environment variables');
-      const isApiKeyError = this.state.error?.message.includes('Gemini API Key');
-
       let title = t['app.error.title'];
       let description = t['app.error.description'];
-      let errorList = [
-          <li><code>API_KEY</code> (for AI features)</li>,
-          <li><code>SUPABASE_URL</code> (for backend)</li>,
-          <li><code>SUPABASE_ANON_KEY</code> (for backend)</li>,
+      let errorListItems = [];
+
+      const requiredKeys = [
+        { key: 'VITE_API_KEY', purpose: 'for Core AI features (Gemini)' },
+        { key: 'VITE_SUPABASE_URL', purpose: 'for Backend & Database' },
+        { key: 'VITE_SUPABASE_ANON_KEY', purpose: 'for Backend & Database' },
+        { key: 'VITE_ELEVENLABS_API_KEY', purpose: 'for AI Voice Generation' },
+        { key: 'VITE_RUNWAYML_API_KEY', purpose: 'for AI Video Generation' },
+        { key: 'VITE_GOOGLE_CLIENT_ID', purpose: 'for YouTube API Connection' },
       ];
-      
-      if(isSupabaseError) {
-        title = "Backend Not Configured";
-        description = "The application cannot connect to the backend because the required Supabase environment variables are missing."
-        errorList = [
-          <li><code>SUPABASE_URL</code> (for backend)</li>,
-          <li><code>SUPABASE_ANON_KEY</code> (for backend)</li>,
-        ]
-      } else if (isApiKeyError) {
-        title = "AI Not Configured";
-        description = "The application's AI features are disabled because the Gemini API Key is missing."
-        errorList = [<li><code>API_KEY</code> (for AI features)</li>]
+
+      // Vite exposes env variables on import.meta.env
+      const envVars = (import.meta as any).env;
+
+      const missingKeys = requiredKeys.filter(item => !envVars[item.key]);
+
+      if (missingKeys.length > 0) {
+        title = "Environment Not Configured";
+        description = "The application cannot start because one or more required environment variables are missing in your Vercel/hosting setup.";
+        errorListItems = missingKeys.map(item => <li key={item.key}><code>{item.key}</code> ({item.purpose})</li>);
+      } else {
+        // Generic error if no keys are missing but an error still occurred
+        errorListItems = [
+          <li key="generic">An unexpected error occurred. Check the console for details.</li>
+        ];
       }
 
 
@@ -63,7 +68,7 @@ class ErrorBoundary extends React.Component<{children: React.ReactNode}, { hasEr
               <div className="mt-4 text-left bg-gray-900 p-4 rounded-md">
                 <p className="text-sm text-gray-400 font-semibold">{t['app.error.cause']}</p>
                 <ul className="list-disc list-inside text-sm text-gray-400 mt-2 space-y-1">
-                  {errorList}
+                  {errorListItems}
                 </ul>
                 <p className="text-xs text-gray-500 mt-3">{t['app.error.solution']}</p>
               </div>
