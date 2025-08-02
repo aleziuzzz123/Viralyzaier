@@ -54,76 +54,83 @@ const ProjectCard: React.FC<{
     };
 
     return (
-        <div 
+        <div
             draggable
             onDragStart={(e) => e.dataTransfer.setData('projectId', project.id)}
-            className="bg-gray-800 p-4 rounded-lg border border-gray-700 hover:border-indigo-500 cursor-pointer transition-all duration-200 shadow-md hover:shadow-indigo-500/10 mb-4"
+            className="bg-gray-800 rounded-lg border border-gray-700 hover:border-indigo-500 cursor-pointer transition-all duration-200 shadow-md hover:shadow-indigo-500/10 mb-4 overflow-hidden"
         >
-            <div onClick={onViewProject}>
-                <div className="flex items-start justify-between">
-                    <h4 className="font-bold text-gray-200 truncate pr-2 flex-1">{project.name}</h4>
-                    {React.createElement(platformIcons[project.platform], { className: "w-5 h-5 text-gray-500 flex-shrink-0" })}
+            {project.moodboard && project.moodboard.length > 0 && (
+                <div className="aspect-video w-full" onClick={onViewProject}>
+                    <img src={project.moodboard[0]} alt={`${project.name} moodboard`} className="w-full h-full object-cover" />
                 </div>
-                <p className="text-sm text-gray-400 truncate mt-1">{project.topic || t('kanban.no_topic')}</p>
-                 {project.status === 'Autopilot' && (
-                    <div className="mt-2 text-xs font-bold text-purple-400 flex items-center gap-1.5">
-                        <RocketLaunchIcon className="w-4 h-4" />
-                        AI Generated Idea
+            )}
+            <div className="p-4">
+                <div onClick={onViewProject}>
+                    <div className="flex items-start justify-between">
+                        <h4 className="font-bold text-gray-200 truncate pr-2 flex-1">{project.name}</h4>
+                        {React.createElement(platformIcons[project.platform], { className: "w-5 h-5 text-gray-500 flex-shrink-0" })}
                     </div>
-                )}
-                 {project.status === 'Scheduled' && project.scheduledDate && (
-                    <div className="mt-2 text-xs font-semibold text-indigo-300">
-                        {new Date(project.scheduledDate).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+                    <p className="text-sm text-gray-400 truncate mt-1">{project.topic || t('kanban.no_topic')}</p>
+                     {project.status === 'Autopilot' && (
+                        <div className="mt-2 text-xs font-bold text-purple-400 flex items-center gap-1.5">
+                            <RocketLaunchIcon className="w-4 h-4" />
+                            AI Generated Idea
+                        </div>
+                    )}
+                     {project.status === 'Scheduled' && project.scheduledDate && (
+                        <div className="mt-2 text-xs font-semibold text-indigo-300">
+                            {new Date(project.scheduledDate).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+                        </div>
+                    )}
+                </div>
+                {project.status === 'Published' && (
+                    <div className="mt-3 pt-3 border-t border-gray-700" onClick={e => e.stopPropagation()}>
+                        {isEditingUrl ? (
+                            <div className="flex items-center gap-2">
+                                <input
+                                    ref={inputRef}
+                                    type="url"
+                                    value={url}
+                                    onChange={(e) => setUrl(e.target.value)}
+                                    onBlur={handleUrlSave}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            handleUrlSave();
+                                        }
+                                        if (e.key === 'Escape') {
+                                            setUrl(project.publishedUrl || '');
+                                            setIsEditingUrl(false);
+                                        }
+                                    }}
+                                    placeholder={t('kanban.url_placeholder')}
+                                    className="w-full text-xs bg-gray-900 border border-gray-600 rounded-md px-2 py-1 text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                />
+                            </div>
+                        ) : project.publishedUrl ? (
+                            <div className="flex items-center justify-between gap-2">
+                                <a 
+                                   href={project.publishedUrl} 
+                                   target="_blank" 
+                                   rel="noopener noreferrer" 
+                                   className="text-xs text-indigo-400 hover:underline truncate block flex-grow" 
+                                   onClick={e => e.stopPropagation()}
+                                   title={project.publishedUrl}
+                                >
+                                    {project.publishedUrl}
+                                </a>
+                                <button onClick={handleStartEditing} aria-label={t('kanban.edit_url')} className="p-1 text-gray-400 hover:text-white flex-shrink-0" title={t('kanban.edit_url')}>
+                                    <PencilIcon className="w-4 h-4" />
+                                </button>
+                            </div>
+                        ) : (
+                            <button onClick={handleStartEditing} className="w-full flex items-center justify-center gap-1 text-xs text-gray-400 hover:text-white p-1 rounded-md bg-gray-700/50 hover:bg-gray-700">
+                               <PlusIcon className="w-4 h-4"/> {t('kanban.add_url')}
+                            </button>
+                        )}
                     </div>
                 )}
             </div>
-            {project.status === 'Published' && (
-                <div className="mt-3 pt-3 border-t border-gray-700" onClick={e => e.stopPropagation()}>
-                    {isEditingUrl ? (
-                        <div className="flex items-center gap-2">
-                            <input
-                                ref={inputRef}
-                                type="url"
-                                value={url}
-                                onChange={(e) => setUrl(e.target.value)}
-                                onBlur={handleUrlSave}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        handleUrlSave();
-                                    }
-                                    if (e.key === 'Escape') {
-                                        setUrl(project.publishedUrl || '');
-                                        setIsEditingUrl(false);
-                                    }
-                                }}
-                                placeholder={t('kanban.url_placeholder')}
-                                className="w-full text-xs bg-gray-900 border border-gray-600 rounded-md px-2 py-1 text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                            />
-                        </div>
-                    ) : project.publishedUrl ? (
-                        <div className="flex items-center justify-between gap-2">
-                            <a 
-                               href={project.publishedUrl} 
-                               target="_blank" 
-                               rel="noopener noreferrer" 
-                               className="text-xs text-indigo-400 hover:underline truncate block flex-grow" 
-                               onClick={e => e.stopPropagation()}
-                               title={project.publishedUrl}
-                            >
-                                {project.publishedUrl}
-                            </a>
-                            <button onClick={handleStartEditing} aria-label={t('kanban.edit_url')} className="p-1 text-gray-400 hover:text-white flex-shrink-0" title={t('kanban.edit_url')}>
-                                <PencilIcon className="w-4 h-4" />
-                            </button>
-                        </div>
-                    ) : (
-                        <button onClick={handleStartEditing} className="w-full flex items-center justify-center gap-1 text-xs text-gray-400 hover:text-white p-1 rounded-md bg-gray-700/50 hover:bg-gray-700">
-                           <PlusIcon className="w-4 h-4"/> {t('kanban.add_url')}
-                        </button>
-                    )}
-                </div>
-            )}
         </div>
     );
 };

@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { Project } from '../types';
 import { generateSeo, analyzeAndGenerateThumbnails, generatePromotionPlan } from '../services/geminiService';
@@ -17,6 +18,19 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
     const copyToClipboard = (text: string) => {
         navigator.clipboard.writeText(text);
         addToast(t('toast.copied'), 'success');
+    };
+
+    const handleCopyForYouTube = () => {
+        if (!project.title || !project.launchPlan?.seo) {
+            addToast("SEO data not available.", 'error');
+            return;
+        }
+
+        const { description, tags } = project.launchPlan.seo;
+        const clipboardText = `TITLE:\n${project.title}\n\nDESCRIPTION:\n${description}\n\nTAGS:\n${tags.join(', ')}`;
+        
+        navigator.clipboard.writeText(clipboardText);
+        addToast("Title, description, and tags copied!", 'success');
     };
 
     const handleGenerateSeo = async () => {
@@ -78,22 +92,33 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* SEO */}
-                <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700 space-y-4">
+                <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700 space-y-4 flex flex-col">
                     <h3 className="text-2xl font-bold text-white">{t('launchpad.seo_title')}</h3>
                     {project.launchPlan?.seo ? (
-                        <div className="space-y-4 animate-fade-in-up">
-                            <div>
-                                <h4 className="font-semibold text-gray-300 mb-2">{t('launchpad.description_title')}</h4>
-                                <div className="bg-gray-900/50 p-3 rounded-lg text-sm text-gray-400 relative">
-                                    <p>{project.launchPlan.seo.description}</p>
-                                    <button onClick={() => copyToClipboard(project.launchPlan!.seo!.description)} className="absolute top-2 right-2 p-1 text-gray-400 hover:text-white"><ClipboardCopyIcon className="w-4 h-4" /></button>
+                        <div className="space-y-4 animate-fade-in-up flex-grow flex flex-col">
+                            <div className="flex-grow">
+                                <div>
+                                    <h4 className="font-semibold text-gray-300 mb-2">{t('launchpad.description_title')}</h4>
+                                    <div className="bg-gray-900/50 p-3 rounded-lg text-sm text-gray-400 relative">
+                                        <p>{project.launchPlan.seo.description}</p>
+                                        <button onClick={() => copyToClipboard(project.launchPlan!.seo!.description)} className="absolute top-2 right-2 p-1 text-gray-400 hover:text-white"><ClipboardCopyIcon className="w-4 h-4" /></button>
+                                    </div>
+                                </div>
+                                <div className="mt-4">
+                                    <h4 className="font-semibold text-gray-300 mb-2">{t('launchpad.tags_title')}</h4>
+                                    <div className="flex flex-wrap gap-2">
+                                        {project.launchPlan.seo.tags.map(tag => <span key={tag} className="px-2 py-1 bg-gray-700 text-xs rounded-full">{tag}</span>)}
+                                    </div>
                                 </div>
                             </div>
-                            <div>
-                                <h4 className="font-semibold text-gray-300 mb-2">{t('launchpad.tags_title')}</h4>
-                                <div className="flex flex-wrap gap-2">
-                                    {project.launchPlan.seo.tags.map(tag => <span key={tag} className="px-2 py-1 bg-gray-700 text-xs rounded-full">{tag}</span>)}
-                                </div>
+                            <div className="mt-4 border-t border-gray-700/50 pt-4">
+                                <button
+                                    onClick={handleCopyForYouTube}
+                                    className="w-full inline-flex items-center justify-center px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-full transition-colors"
+                                >
+                                    <ClipboardCopyIcon className="w-5 h-5 mr-2" />
+                                    {t('launchpad.copy_for_youtube')}
+                                </button>
                             </div>
                         </div>
                     ) : (
