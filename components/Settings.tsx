@@ -1,17 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import { useAppContext } from '../contexts/AppContext';
-import { SparklesIcon, UploadIcon, UserCircleIcon, TrashIcon } from './Icons'; // Assuming you have a YouTube icon or we can add one
+import { SparklesIcon, UploadIcon, UserCircleIcon, TrashIcon } from './Icons';
 import { invokeEdgeFunction } from '../services/supabaseService';
 import { ClonedVoice } from '../types';
-
-// A simple YouTube icon component to add to your Icons file or use directly
-const YouTubeIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-        <path d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17" />
-        <path d="m10 15 5-3-5-3z" />
-    </svg>
-);
-
 
 const Settings: React.FC = () => {
     const { user, t, requirePermission, addToast, setUser, consumeCredits } = useAppContext();
@@ -25,42 +16,6 @@ const Settings: React.FC = () => {
             setSelectedFiles(Array.from(event.target.files));
         }
     };
-
-    // --- THIS IS THE NEW, CORRECT FUNCTION FOR THE YOUTUBE BUTTON ---
-    const handleYoutubeConnect = async () => {
-        // 1. Reads the Google Client ID from your Vercel variables.
-        const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-
-        // Shows a message if the variable is somehow missing.
-        if (!googleClientId) {
-            alert("Configuration Error: Google Client ID is missing.");
-            console.error("VITE_GOOGLE_CLIENT_ID is not set in Vercel environment variables.");
-            return;
-        }
-
-        // 2. The address of your Supabase Edge Function.
-        const redirectUri = 'https://wpgrfukcnpcoyruymxdd.supabase.co/functions/v1/youtube-oauth-callback';
-
-        // 3. The permissions you are asking for.
-        const scope = [
-            'https://www.googleapis.com/auth/youtube.readonly',
-            'https://www.googleapis.com/auth/userinfo.email',
-            'https://www.googleapis.com/auth/userinfo.profile'
-        ].join(' ');
-
-        // 4. Builds the correct URL to send the user to Google.
-        const googleAuthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-        googleAuthUrl.searchParams.set('client_id', googleClientId);
-        googleAuthUrl.searchParams.set('redirect_uri', redirectUri);
-        googleAuthUrl.searchParams.set('response_type', 'code');
-        googleAuthUrl.searchParams.set('scope', scope);
-        googleAuthUrl.searchParams.set('access_type', 'offline');
-        googleAuthUrl.searchParams.set('prompt', 'consent');
-
-        // 5. Sends the user to Google to get their permission.
-        window.location.href = googleAuthUrl.toString();
-    };
-
 
     const handleCloneVoice = useCallback(async () => {
         if (!requirePermission('viralyzaier')) return;
@@ -125,24 +80,6 @@ const Settings: React.FC = () => {
                 <p className="mt-4 text-lg text-gray-400 max-w-2xl mx-auto">{t('settings.subtitle')}</p>
             </header>
 
-            {/* --- NEW YOUTUBE CONNECTION SECTION --- */}
-            <div className="max-w-4xl mx-auto bg-gray-800/50 p-8 rounded-2xl border border-gray-700">
-                <h2 className="text-2xl font-bold text-white mb-2 flex items-center">
-                    <YouTubeIcon className="w-6 h-6 mr-3 text-red-500" />
-                    YouTube Integration
-                </h2>
-                <p className="text-gray-400 mb-6">Connect your YouTube channel to allow Viralyzaier to access your channel statistics and help you grow.</p>
-                <button
-                    onClick={handleYoutubeConnect}
-                    className="w-full inline-flex items-center justify-center px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-full transition-colors"
-                >
-                    <YouTubeIcon className="w-5 h-5 mr-2" />
-                    Connect YouTube Channel
-                </button>
-            </div>
-
-
-            {/* --- EXISTING VOICE CLONING SECTION --- */}
             <div className="max-w-4xl mx-auto bg-gray-800/50 p-8 rounded-2xl border border-gray-700">
                 <h2 className="text-2xl font-bold text-white mb-2 flex items-center">
                     <SparklesIcon className="w-6 h-6 mr-3 text-purple-400" />
@@ -188,7 +125,7 @@ const Settings: React.FC = () => {
                             <label className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-gray-700 text-white rounded-lg cursor-pointer hover:bg-gray-600">
                                 <UploadIcon className="w-6 h-6" />
                                 <span>{selectedFiles.length > 0 ? `${selectedFiles.length} file(s) selected` : t('settings.upload_button')}</span>
-                                <input type="file" multiple accept="audio/mpeg, audio/wav" onChange={handleFilechange} className="hidden" />
+                                <input type="file" multiple accept="audio/mpeg, audio/wav" onChange={handleFileChange} className="hidden" />
                             </label>
                         </div>
                         {error && <p className="text-red-400 text-sm">{error}</p>}
