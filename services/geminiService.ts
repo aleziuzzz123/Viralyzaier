@@ -2,10 +2,10 @@ import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { Analysis, Blueprint, CompetitorAnalysisResult, Platform, Script, TitleAnalysis, ContentGapSuggestion, VideoPerformance, PerformanceReview, SceneAssets, SoundDesign, LaunchPlan, ChannelAudit, Opportunity, ScriptOptimization } from '../types';
 import * as supabase from './supabaseService';
 
-const apiKey = (import.meta as any).env.VITE_API_KEY;
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
-const AI_NOT_CONFIGURED_ERROR = "Gemini API Key is not configured. Please set the VITE_API_KEY environment variable.";
+const AI_NOT_CONFIGURED_ERROR = "Gemini API Key is not configured. Please set the VITE_GEMINI_API_KEY environment variable.";
 
 const checkAi = () => {
     if (!ai) {

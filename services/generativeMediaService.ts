@@ -1,7 +1,7 @@
 import { Platform } from "../types";
 
-const RUNWAYML_API_KEY = (import.meta as any).env.VITE_RUNWAYML_API_KEY;
-const ELEVENLABS_API_KEY = (import.meta as any).env.VITE_ELEVENLABS_API_KEY;
+const RUNWAYML_API_KEY = import.meta.env.VITE_RUNWAYML_API_KEY;
+const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY;
 
 const checkRunwayKey = () => { if (!RUNWAYML_API_KEY) throw new Error("RunwayML API Key is not configured."); };
 const checkElevenLabsKey = () => { if (!ELEVENLABS_API_KEY) throw new Error("ElevenLabs API Key is not configured."); };

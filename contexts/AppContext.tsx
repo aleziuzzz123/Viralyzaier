@@ -48,7 +48,7 @@ interface AppContextType {
     setActiveProjectId: (id: string | null) => void;
     activeProjectId: string | null;
     
-    setUser: React.Dispatch<React.SetStateAction<User | null>>;
+    setUser: (user: User | null) => void;
     
     markNotificationAsRead: (notificationId: string) => void;
     markAllNotificationsAsRead: () => void;
@@ -70,7 +70,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     const [notifications, setNotifications] = useState<Notification[]>([]);
     
     const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
-    const [apiKeyError] = useState(!process.env.API_KEY);
+    const [apiKeyError] = useState(!import.meta.env.VITE_GEMINI_API_KEY);
     
     const [isUpgradeModalOpen, setUpgradeModalOpen] = useState(false);
     const [upgradeReason, setUpgradeReason] = useState<{title: string, description: string}>({title: '', description: ''});

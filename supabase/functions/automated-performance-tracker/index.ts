@@ -13,7 +13,7 @@ const corsHeaders = {
 // --- Environment Variables ---
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-const GEMINI_API_KEY = Deno.env.get('API_KEY');
+const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
 const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID');
 const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET');
 const YOUTUBE_API_KEY = Deno.env.get('YOUTUBE_API_KEY');

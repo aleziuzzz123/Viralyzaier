@@ -33,7 +33,7 @@ class ErrorBoundary extends React.Component<{children: React.ReactNode}, { hasEr
       let errorListItems = [];
 
       const requiredKeys = [
-        { key: 'VITE_API_KEY', purpose: 'for Core AI features (Gemini)' },
+        { key: 'VITE_GEMINI_API_KEY', purpose: 'for Core AI features (Gemini)' },
         { key: 'VITE_SUPABASE_URL', purpose: 'for Backend & Database' },
         { key: 'VITE_SUPABASE_ANON_KEY', purpose: 'for Backend & Database' },
         { key: 'VITE_ELEVENLABS_API_KEY', purpose: 'for AI Voice Generation' },
@@ -42,7 +42,7 @@ class ErrorBoundary extends React.Component<{children: React.ReactNode}, { hasEr
       ];
 
       // Vite exposes env variables on import.meta.env
-      const envVars = (import.meta as any).env;
+      const envVars = import.meta.env;
 
       const missingKeys = requiredKeys.filter(item => !envVars[item.key]);
 

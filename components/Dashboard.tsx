@@ -43,7 +43,7 @@ const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; 
             return;
         }
         if (apiKeyError) {
-            setError(t('blueprint_modal.error_api_key'));
+            setError("Gemini API Key is not configured. Please add VITE_GEMINI_API_KEY to your environment variables.");
             return;
         }
         if (!await consumeCredits(5)) return;

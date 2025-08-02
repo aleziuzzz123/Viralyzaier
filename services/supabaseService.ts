@@ -159,11 +159,9 @@ export const getUserProfile = async (userId: string): Promise<User | null> => {
 
     const { data: profileData, error: profileError } = profileResult;
     
-    if (profileError) {
-        if (profileError.code !== 'PGRST116') { // Ignore "not found" errors
-            console.error('Error fetching user profile:', profileError.message);
-        }
-        return null;
+    if (profileError && profileError.code !== 'PGRST116') {
+        console.error('Error fetching user profile:', profileError.message);
+        throw profileError;
     }
     
     if (!profileData) {
@@ -181,7 +179,7 @@ export const updateUserProfile = async (userId: string, updates: Partial<User>):
     
     const { data, error } = await supabase
         .from('profiles')
-        .update(dbUpdates)
+        .update(dbUpdates as any)
         .eq('id', userId)
         .select()
         .single();
@@ -244,7 +242,7 @@ export const createProject = async (projectData: Omit<Project, 'id' | 'lastUpdat
 
     const { data, error } = await supabase
         .from('projects')
-        .insert([insertData])
+        .insert([insertData] as any)
         .select()
         .single();
 
@@ -259,7 +257,7 @@ export const updateProject = async (projectId: string, updates: Partial<Project>
     
     const { data, error } = await supabase
         .from('projects')
-        .update(dbUpdates)
+        .update(dbUpdates as any)
         .eq('id', projectId)
         .select()
         .single();
@@ -289,7 +287,7 @@ export const getNotifications = async (userId: string): Promise<Notification[]> 
 export const markNotificationAsRead = async (notificationId: string): Promise<void> => {
     const { error } = await supabase
         .from('notifications')
-        .update({ is_read: true })
+        .update({ is_read: true } as any)
         .eq('id', notificationId);
 
     if (error) throw error;
@@ -298,7 +296,7 @@ export const markNotificationAsRead = async (notificationId: string): Promise<vo
 export const markAllNotificationsAsRead = async (userId: string): Promise<void> => {
     const { error } = await supabase
         .from('notifications')
-        .update({ is_read: true })
+        .update({ is_read: true } as any)
         .eq('user_id', userId)
         .eq('is_read', false);
     
