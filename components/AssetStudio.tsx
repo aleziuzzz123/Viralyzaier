@@ -15,7 +15,7 @@ interface AssetStudioProps {
 
 const AssetStudio: React.FC<AssetStudioProps> = ({ project, onProceed }) => {
     const { user, consumeCredits, requirePermission, handleUpdateProject, t, addToast } = useAppContext();
-    const [loadingStates, setLoadingStates] = useState<{ [key: number]: { video?: boolean, audio?: boolean } }>({});
+    const [loadingStates, setLoadingStates] = useState<{ [key: number]: { video?: boolean, audio?: boolean, message: string } }>({});
     const [isBatchLoading, setIsBatchLoading] = useState(false);
     const [isDownloading, setIsDownloading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -36,12 +36,12 @@ const AssetStudio: React.FC<AssetStudioProps> = ({ project, onProceed }) => {
         if (creditsNeeded === 0) return;
         if (!await consumeCredits(creditsNeeded)) return;
 
-        setLoadingStates(prev => ({ ...prev, [sceneIndex]: { video: hasVideo, audio: hasAudio } }));
+        setLoadingStates(prev => ({ ...prev, [sceneIndex]: { video: hasVideo, audio: hasAudio, message: t('asset_studio.loading') } }));
         setError(null);
 
         try {
             const uploadAsset = async (blob: Blob, type: 'video' | 'audio'): Promise<string> => {
-                addToast(t('toast.uploading_asset', { type }), 'info');
+                setLoadingStates(prev => ({ ...prev, [sceneIndex]: { ...prev[sceneIndex], message: t('toast.uploading_asset', { type }) } }));
                 const extension = type === 'video' ? 'mp4' : 'mp3';
                 const path = `${user.id}/${project.id}/scene_${sceneIndex + 1}_${type}.${extension}`;
                 const url = await uploadFile(blob, path);
@@ -50,7 +50,9 @@ const AssetStudio: React.FC<AssetStudioProps> = ({ project, onProceed }) => {
             };
 
             const videoPromise = hasVideo ? generateVideoClip(scene.visual, project.platform) : Promise.resolve(null);
-            const audioPromise = hasAudio ? generateVoiceover(scene.voiceover, project.voiceoverVoiceId) : Promise.resolve(null);
+            if (hasVideo) setLoadingStates(prev => ({...prev, [sceneIndex]: {...prev[sceneIndex], message: t('asset_studio.loading_video') } }));
+            
+            const audioPromise = hasAudio ? generateVoiceover(scene.voiceover, project.voiceId) : Promise.resolve(null);
 
             const [videoBlob, audioBlob] = await Promise.all([videoPromise, audioPromise]);
 
@@ -73,13 +75,13 @@ const AssetStudio: React.FC<AssetStudioProps> = ({ project, onProceed }) => {
             };
             
             const updatedAssets = { ...(project.assets || {}), [sceneIndex]: assets };
-            handleUpdateProject({ ...project, id: project.id, assets: updatedAssets });
+            handleUpdateProject({ id: project.id, assets: updatedAssets });
 
         } catch (e) {
             setError(e instanceof Error ? e.message : t('asset_studio.error_generation_failed'));
             addToast(e instanceof Error ? e.message : t('asset_studio.error_generation_failed'), 'error');
         } finally {
-            setLoadingStates(prev => ({ ...prev, [sceneIndex]: {} }));
+            setLoadingStates(prev => ({ ...prev, [sceneIndex]: { message: '' } }));
         }
     };
     
@@ -103,7 +105,7 @@ const AssetStudio: React.FC<AssetStudioProps> = ({ project, onProceed }) => {
                 const hasAudio = !!scene.voiceover.trim();
 
                 const videoBlob = hasVideo ? await generateVideoClip(scene.visual, project.platform) : null;
-                const audioBlob = hasAudio ? await generateVoiceover(scene.voiceover, project.voiceoverVoiceId) : null;
+                const audioBlob = hasAudio ? await generateVoiceover(scene.voiceover, project.voiceId) : null;
 
                 const videoUrl = videoBlob ? await uploadFile(videoBlob, `${user.id}/${project.id}/scene_${index + 1}_video.mp4`) : undefined;
                 const audioUrl = audioBlob ? await uploadFile(audioBlob, `${user.id}/${project.id}/scene_${index + 1}_audio.mp3`) : undefined;
@@ -170,28 +172,6 @@ const AssetStudio: React.FC<AssetStudioProps> = ({ project, onProceed }) => {
         }
     };
     
-    const handleDownload = async (url: string, filename: string) => {
-        try {
-            const response = await fetch(url);
-            const blob = await response.blob();
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = filename;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(link.href);
-        } catch (error) {
-            console.error("Download failed:", error);
-            addToast("Failed to download asset.", "error");
-        }
-    };
-
-    const playAudio = (url: string) => {
-        const audio = new Audio(url);
-        audio.play();
-    };
-
     if (!project.script) {
         return (
             <div className="text-center py-16 px-6 bg-gray-800/50 rounded-2xl">
@@ -220,8 +200,8 @@ const AssetStudio: React.FC<AssetStudioProps> = ({ project, onProceed }) => {
                     </label>
                     <select 
                         id="voice-select" 
-                        value={project.voiceoverVoiceId || ''} 
-                        onChange={e => handleUpdateProject({ id: project.id, voiceoverVoiceId: e.target.value })}
+                        value={project.voiceId || ''} 
+                        onChange={e => handleUpdateProject({ id: project.id, voiceId: e.target.value })}
                         className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
                         {availableVoices.map(voice => (
@@ -282,8 +262,7 @@ const AssetStudio: React.FC<AssetStudioProps> = ({ project, onProceed }) => {
                              {isLoading && (
                                  <div className="flex flex-col items-center justify-center space-y-4 text-center mt-8">
                                     <SparklesIcon className="w-12 h-12 text-teal-400 animate-pulse"/>
-                                    <p className="text-lg text-gray-200 font-semibold">{t('asset_studio.loading')}</p>
-                                    <p className="text-sm text-gray-500">{t('asset_studio.loading_video')}</p>
+                                    <p className="text-lg text-gray-200 font-semibold">{loadingStates[index]?.message || t('asset_studio.loading')}</p>
                                 </div>
                             )}
                             
@@ -295,8 +274,8 @@ const AssetStudio: React.FC<AssetStudioProps> = ({ project, onProceed }) => {
                                             {sceneAssets.brollVideo ? (
                                                 <div className="relative group aspect-video">
                                                     <video key={sceneAssets.brollVideo} src={sceneAssets.brollVideo} className="w-full h-full rounded-lg object-cover shadow-lg bg-black" controls loop/>
-                                                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                        <button onClick={() => handleDownload(sceneAssets.brollVideo!, `scene_${index+1}_broll.mp4`)} className="p-2 bg-white/20 backdrop-blur-sm text-white rounded-full hover:bg-white/30"><DownloadIcon className="w-5 h-5" /></button>
+                                                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <a href={sceneAssets.brollVideo} download={`scene_${index+1}_broll.mp4`} className="p-2 bg-black/50 backdrop-blur-sm text-white rounded-full hover:bg-black/70"><DownloadIcon className="w-5 h-5" /></a>
                                                     </div>
                                                 </div>
                                             ) : (
@@ -308,13 +287,7 @@ const AssetStudio: React.FC<AssetStudioProps> = ({ project, onProceed }) => {
                                     {sceneAssets.audio && (
                                         <div>
                                             <h4 className="font-semibold text-gray-300 mb-2">{t('asset_studio.voiceover_audio_title')}</h4>
-                                            <div className="bg-gray-900/50 p-3 rounded-lg flex items-center justify-between">
-                                                <div className="flex items-center gap-3">
-                                                    <button onClick={() => playAudio(sceneAssets.audio!)} className="p-2 bg-indigo-600 rounded-full text-white hover:bg-indigo-500"><PlayIcon className="w-4 h-4"/></button>
-                                                    <span className="text-sm text-gray-400">{t('asset_studio.play_audio_button')}</span>
-                                                </div>
-                                                <button onClick={() => handleDownload(sceneAssets.audio!, `scene_${index+1}_audio.mp3`)} className="flex items-center px-3 py-1.5 bg-gray-700 text-white text-xs font-semibold rounded-full hover:bg-gray-600"><DownloadIcon className="w-4 h-4 mr-2" /> {t('asset_studio.download_asset_button')}</button>
-                                            </div>
+                                            <audio src={sceneAssets.audio} controls className="w-full" />
                                         </div>
                                     )}
                                 </div>

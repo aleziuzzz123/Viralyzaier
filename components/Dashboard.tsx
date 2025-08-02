@@ -43,7 +43,7 @@ const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; 
             return;
         }
         if (apiKeyError) {
-            setError("Gemini API Key is not configured. Please add VITE_GEMINI_API_KEY to your environment variables.");
+            setError(t('blueprint_modal.error_api_key'));
             return;
         }
         if (!await consumeCredits(5)) return;
@@ -226,24 +226,17 @@ interface DashboardProps {
 const Dashboard: React.FC<DashboardProps> = ({ onSelectProject }) => {
     const { projects, user, dismissedTutorials, addToast, t } = useAppContext();
     const [isBlueprintModalOpen, setIsBlueprintModalOpen] = useState(false);
-    const [isNewUser, setIsNewUser] = useState(false); // Local state for onboarding trigger
     
+    // Smart onboarding for new users
     useEffect(() => {
-        // This effect will run once when the component mounts.
+        // This effect will run once when the user and projects are loaded.
         // If there's a user but no projects, we assume it's a new user experience.
-        if (user && projects.length === 0 && !localStorage.getItem('hasSeenOnboarding')) {
-          setIsNewUser(true);
+        const hasSeenOnboarding = localStorage.getItem('hasSeenOnboarding');
+        if (user && projects.length === 0 && !hasSeenOnboarding) {
+          setIsBlueprintModalOpen(true);
           localStorage.setItem('hasSeenOnboarding', 'true');
         }
     }, [user, projects]);
-
-    // Smart onboarding for new users
-    useEffect(() => {
-        if (isNewUser && projects.length === 0) {
-            setIsBlueprintModalOpen(true);
-            setIsNewUser(false); // Only trigger this once
-        }
-    }, [isNewUser, projects.length]);
 
     const creditsUsed = (user ? PLANS.find(p => p.id === user.subscription.planId)!.creditLimit : 0) - (user?.aiCredits || 0);
 
@@ -273,7 +266,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelectProject }) => {
                 </button>
             </header>
 
-            {projects.length === 0 && !dismissedTutorials.includes('welcome') && !isNewUser && (
+            {projects.length === 0 && !dismissedTutorials.includes('welcome') && (
                 <TutorialCallout id="welcome">
                     {t('dashboard.tutorial_callout')}
                 </TutorialCallout>

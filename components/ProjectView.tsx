@@ -1,9 +1,5 @@
 
 
-
-
-
-
 import React, { useState, useEffect } from 'react';
 import { Project, Analysis, Script as ScriptType, WorkflowStep, Platform } from '../types';
 import { TitleIcon, ScriptIcon, SparklesIcon, TrashIcon, PhotoIcon, CtaIcon, LockClosedIcon, CheckIcon, YouTubeIcon, TikTokIcon, InstagramIcon, MusicNoteIcon, RocketLaunchIcon, TrendIcon, TargetIcon, CheckBadgeIcon } from './Icons';
@@ -237,16 +233,15 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
             updates.workflowStep = 2;
         }
 
-        handleUpdateProject(updates);
-
-        if (isFirstCompletion) {
-            addToast(t('toast.brief_complete'), 'success');
-        } else {
-            addToast(t('toast.topic_title_updated'), 'success');
-        }
-
-        // Always navigate to the script page after selection.
-        setActiveStep(2);
+        handleUpdateProject(updates).then(() => {
+            // After the project state is updated, advance the UI
+            if (isFirstCompletion) {
+                addToast(t('toast.brief_complete'), 'success');
+                setActiveStep(2); // Automatically move to the next step
+            } else {
+                addToast(t('toast.topic_title_updated'), 'success');
+            }
+        });
     };
 
     const handleTrendSelect = (trend: string) => {
@@ -257,15 +252,17 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
     };
     
     const handleScriptGenerated = (script: ScriptType) => {
-        handleUpdateProject({id: project.id, script, status: 'Scripting', workflowStep: 3 });
-        setActiveStep(3);
+        handleUpdateProject({id: project.id, script, status: 'Scripting', workflowStep: 3 }).then(() => {
+            setActiveStep(3); // Automatically move to the next step
+        });
     };
 
     const handleAnalysisComplete = (analysis: Analysis | null) => {
-         handleUpdateProject({id: project.id, analysis });
-         if (analysis) {
-             advanceWorkflow(6); // Go to launchpad on success
-         }
+         handleUpdateProject({id: project.id, analysis }).then(() => {
+             if (analysis) {
+                 advanceWorkflow(6); // Go to launchpad on success
+             }
+         });
     };
     
     const handleTopicChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -364,16 +361,16 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
                     </div>
                 );
             case 2:
-                return <ScriptGenerator project={project} onScriptGenerated={handleScriptGenerated} onProceed={() => advanceWorkflow(3)} platform={project.platform} />;
+                return <ScriptGenerator project={project} onScriptGenerated={handleScriptGenerated} onProceed={() => setActiveStep(3)} platform={project.platform} />;
             case 3:
-                return <AssetStudio project={project} onProceed={() => advanceWorkflow(4)} />;
+                return <AssetStudio project={project} onProceed={() => setActiveStep(4)} />;
             case 4:
-                return <Storyboard project={project} onProceed={() => advanceWorkflow(5)} />;
+                return <Storyboard project={project} onProceed={() => setActiveStep(5)} />;
             case 5:
                 if (analysisIsLoading) return <AnalysisLoader frames={analysisFrames} />;
 
                 if (project.analysis) {
-                    return <AnalysisResult result={project.analysis} onReset={handleAnalysisReset} videoPreviewUrl={videoPreviewUrl || ''} onProceedToLaunchpad={() => advanceWorkflow(6)} />;
+                    return <AnalysisResult result={project.analysis} onReset={handleAnalysisReset} videoPreviewUrl={videoPreviewUrl || ''} onProceedToLaunchpad={() => setActiveStep(6)} />;
                 }
                 
                 if (project.workflowStep < 5) {

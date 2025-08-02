@@ -14,16 +14,24 @@ const ChannelHub: React.FC<ChannelHubProps> = () => {
     const [error, setError] = useState<string | null>(null);
 
     const handleConnectChannel = () => {
-        const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+        if (!user) return;
+        const googleClientId = (import.meta.env as any).VITE_GOOGLE_CLIENT_ID;
+        const supabaseUrl = (import.meta.env as any).VITE_SUPABASE_URL;
+
         if (!googleClientId) {
-            setError("Google Client ID is not configured.");
+            setError("Google Client ID is not configured in Vercel environment variables.");
+            return;
+        }
+        if (!supabaseUrl) {
+            setError("Supabase URL is not configured in Vercel environment variables.");
             return;
         }
         
-        const redirectUri = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/youtube-oauth-callback`;
+        const redirectUri = `${supabaseUrl}/functions/v1/youtube-oauth-callback`;
         const scope = "https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly";
 
-        const oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent`;
+        // Pass the user's Supabase ID in the state parameter for secure and reliable callback handling.
+        const oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent&state=${user.id}`;
         
         window.location.href = oauthUrl;
     };

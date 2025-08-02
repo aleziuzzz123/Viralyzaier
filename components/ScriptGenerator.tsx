@@ -68,7 +68,8 @@ const ScriptGenerator: React.FC<{
     useEffect(() => {
         if (status === 'processing' && optimizationResult) {
             const { initialScore, finalScore, analysisLog } = optimizationResult;
-            setCurrentScore(initialScore);
+            let score = initialScore;
+            setCurrentScore(score);
             setLog([]);
             
             const totalDuration = 4000; // 4 seconds for the whole animation
@@ -78,15 +79,22 @@ const ScriptGenerator: React.FC<{
                 setTimeout(() => {
                     setLog(prev => [...prev, item.step]);
                     setHighlightedTarget(item.target);
-                    // Animate score
-                    const scoreStep = (finalScore - initialScore) / analysisLog.length;
-                    setCurrentScore(prev => Math.min(prev + scoreStep, finalScore));
                 }, index * stepDuration);
             });
             
+            const scoreInterval = setInterval(() => {
+                score += (finalScore - initialScore) / (totalDuration / 50);
+                if (score >= finalScore) {
+                    setCurrentScore(finalScore);
+                    clearInterval(scoreInterval);
+                } else {
+                    setCurrentScore(score);
+                }
+            }, 50);
+
             setTimeout(() => {
                 setHighlightedTarget(null);
-                setCurrentScore(finalScore);
+                setCurrentScore(finalScore); // Ensure it lands on the final score
             }, totalDuration);
         }
     }, [status, optimizationResult]);

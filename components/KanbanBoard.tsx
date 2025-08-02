@@ -30,6 +30,11 @@ const ProjectCard: React.FC<{
 
     const handleUrlSave = () => {
         const trimmedUrl = url.trim();
+        // Basic URL validation
+        if (trimmedUrl && !trimmedUrl.startsWith('http')) {
+            addToast('Please enter a valid URL starting with http or https.', 'error');
+            return;
+        }
         if (trimmedUrl !== (project.publishedUrl || '')) {
              handleUpdateProject({ id: project.id, publishedUrl: trimmedUrl });
              addToast(t('kanban.url_updated'), "success");
@@ -73,7 +78,7 @@ const ProjectCard: React.FC<{
                         <div className="flex items-center gap-2">
                             <input
                                 ref={inputRef}
-                                type="text"
+                                type="url"
                                 value={url}
                                 onChange={(e) => setUrl(e.target.value)}
                                 onBlur={handleUrlSave}
