@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useAppContext } from '../contexts/AppContext';
-import { SparklesIcon, UploadIcon, UserCircleIcon, TrashIcon } from './Icons';
+import { SparklesIcon, UploadIcon, UserCircleIcon, TrashIcon, RefreshIcon } from './Icons';
 import { invokeEdgeFunction } from '../services/supabaseService';
 import { ClonedVoice } from '../types';
 
@@ -9,11 +9,19 @@ const Settings: React.FC = () => {
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [voiceName, setVoiceName] = useState('');
     const [isCloning, setIsCloning] = useState(false);
+    const [isSyncing, setIsSyncing] = useState(false);
     const [error, setError] = useState('');
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         if (event.target.files) {
-            setSelectedFiles(Array.from(event.target.files));
+            const files = Array.from(event.target.files);
+            // Limit to 5 files for sanity
+            if (files.length > 5) {
+                addToast("You can upload a maximum of 5 files.", "error");
+                setSelectedFiles(files.slice(0, 5));
+            } else {
+                setSelectedFiles(files);
+            }
         }
     };
 
@@ -60,18 +68,22 @@ const Settings: React.FC = () => {
         }
 
     }, [requirePermission, voiceName, selectedFiles, consumeCredits, setUser, addToast, t]);
+    
+    const handleSyncVoices = async () => {
+        if (!user) return;
+        setIsSyncing(true);
+        try {
+            const syncedVoices = await invokeEdgeFunction('elevenlabs-sync-voices', {});
+            setUser(prevUser => prevUser ? { ...prevUser, cloned_voices: syncedVoices } : null);
+            addToast("Voice statuses have been updated!", "success");
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'Failed to sync voices.';
+            addToast(errorMessage, 'error');
+        } finally {
+            setIsSyncing(false);
+        }
+    };
 
-    const handleDevClone = async () => {
-        if (!requirePermission('viralyzaier')) return;
-         if (!await consumeCredits(50)) return;
-        setUser(prevUser => {
-            if (!prevUser) return null;
-            const newVoice = { id: `dev_${Date.now()}`, name: voiceName || 'Dev Voice', status: 'ready' } as ClonedVoice;
-            const updatedVoices = [...(prevUser.cloned_voices || []), newVoice];
-            return { ...prevUser, cloned_voices: updatedVoices };
-        });
-        addToast("Dev voice added successfully!", 'success');
-    }
 
     return (
         <div className="animate-fade-in-up space-y-12">
@@ -89,7 +101,13 @@ const Settings: React.FC = () => {
 
                 <div className="space-y-6">
                     <div>
-                        <h3 className="text-lg font-semibold text-white mb-3">{t('settings.your_voices')}</h3>
+                        <div className="flex justify-between items-center mb-3">
+                            <h3 className="text-lg font-semibold text-white">{t('settings.your_voices')}</h3>
+                             <button onClick={handleSyncVoices} disabled={isSyncing} className="flex items-center text-xs font-semibold text-indigo-400 hover:text-indigo-300 disabled:opacity-50">
+                                <RefreshIcon className={`w-4 h-4 mr-1.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                                {isSyncing ? 'Syncing...' : 'Refresh Status'}
+                            </button>
+                        </div>
                         {user?.cloned_voices && user.cloned_voices.length > 0 ? (
                             <ul className="space-y-3">
                                 {user.cloned_voices.map(voice => (
@@ -113,6 +131,7 @@ const Settings: React.FC = () => {
                     </div>
                     
                     <div className="border-t border-gray-700 pt-6 space-y-4">
+                         <h3 className="text-lg font-semibold text-white">Add a New Voice</h3>
                          <input
                             type="text"
                             value={voiceName}
@@ -127,6 +146,11 @@ const Settings: React.FC = () => {
                                 <span>{selectedFiles.length > 0 ? `${selectedFiles.length} file(s) selected` : t('settings.upload_button')}</span>
                                 <input type="file" multiple accept="audio/mpeg, audio/wav" onChange={handleFileChange} className="hidden" />
                             </label>
+                             {selectedFiles.length > 0 && (
+                                <ul className="mt-3 text-xs text-gray-400 list-disc list-inside">
+                                    {selectedFiles.map(f => <li key={f.name}>{f.name}</li>)}
+                                </ul>
+                            )}
                         </div>
                         {error && <p className="text-red-400 text-sm">{error}</p>}
                         <button 
@@ -136,10 +160,6 @@ const Settings: React.FC = () => {
                         >
                              <SparklesIcon className="w-5 h-5 mr-2" />
                             {isCloning ? t('settings.cloning_in_progress') : t('settings.start_cloning_button')}
-                        </button>
-                        <button onClick={handleDevClone} className="w-full mt-2 text-sm text-purple-400 rounded-md hover:bg-gray-700 flex items-center justify-center font-bold p-2">
-                           <SparklesIcon className="w-5 h-5 mr-2"/>
-                            Dev Add Voice (No API)
                         </button>
                     </div>
                 </div>

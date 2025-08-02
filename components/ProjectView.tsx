@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Project, Analysis, Script as ScriptType, WorkflowStep, Platform } from '../types';
-import { TitleIcon, ScriptIcon, SparklesIcon, TrashIcon, PhotoIcon, CtaIcon, LockClosedIcon, CheckIcon, YouTubeIcon, TikTokIcon, InstagramIcon, MusicNoteIcon, RocketLaunchIcon, TrendIcon, TargetIcon, CheckBadgeIcon } from './Icons';
+import { TitleIcon, ScriptIcon, SparklesIcon, TrashIcon, PhotoIcon, CtaIcon, LockClosedIcon, CheckIcon, YouTubeIcon, TikTokIcon, InstagramIcon, MusicNoteIcon, RocketLaunchIcon, TrendIcon, TargetIcon, CheckBadgeIcon, LightBulbIcon } from './Icons';
 import TitleOptimizer from './TitleOptimizer';
 import ScriptGenerator from './ScriptGenerator';
 import AnalysisResult from './AnalysisResult';
@@ -323,6 +323,14 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
                             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-rose-500">Craft Your Strategy</h1>
                             <p className="mt-4 text-lg text-gray-400 max-w-2xl mx-auto">Start with a topic, reverse-engineer a competitor, or ride a breakout trend.</p>
                          </header>
+                        
+                         <div className="bg-gray-800/30 p-6 rounded-2xl border border-gray-700 max-w-4xl mx-auto flex items-start gap-4">
+                            <LightBulbIcon className="w-8 h-8 text-yellow-300 flex-shrink-0 mt-1" />
+                            <div>
+                                <h3 className="font-bold text-white">Your Starting Point</h3>
+                                <p className="text-sm text-gray-400 mt-1">A great video starts with a great strategy. Choose one of the three paths below to define your video's direction and create a high-potential title.</p>
+                            </div>
+                        </div>
 
                          <div className="w-full max-w-5xl mx-auto">
                             <div className="border-b border-gray-700 mb-8">

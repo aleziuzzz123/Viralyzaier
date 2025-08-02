@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Opportunity, Platform } from '../types';
 import { fetchChannelVideos } from '../services/youtubeService';
@@ -15,15 +16,15 @@ const ChannelHub: React.FC<ChannelHubProps> = () => {
 
     const handleConnectChannel = () => {
         if (!user) return;
-        const googleClientId = (import.meta.env as any).VITE_GOOGLE_CLIENT_ID;
-        const supabaseUrl = (import.meta.env as any).VITE_SUPABASE_URL;
+        const googleClientId = process.env.VITE_GOOGLE_CLIENT_ID;
+        const supabaseUrl = process.env.VITE_SUPABASE_URL;
 
         if (!googleClientId) {
-            setError("Google Client ID is not configured in Vercel environment variables.");
+            setError("VITE_GOOGLE_CLIENT_ID is not configured. Please check your environment configuration.");
             return;
         }
         if (!supabaseUrl) {
-            setError("Supabase URL is not configured in Vercel environment variables.");
+            setError("VITE_SUPABASE_URL is not configured. Please check your environment configuration.");
             return;
         }
         

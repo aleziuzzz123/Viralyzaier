@@ -15,6 +15,7 @@ import LanguageSwitcher from './components/LanguageSwitcher';
 import NotificationsPanel from './components/NotificationsPanel';
 import Autopilot from './components/Autopilot';
 import Settings from './components/Settings';
+import ScheduleModal from './components/ScheduleModal';
 
 
 type View = 'dashboard' | 'project' | 'calendar' | 'pricing' | 'channel' | 'assetLibrary' | 'autopilot' | 'settings';
@@ -150,6 +151,8 @@ const MainApp = () => {
             <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
                 <div className="w-full max-w-7xl mx-auto">{renderCurrentView()}</div>
             </main>
+            
+            <ScheduleModal />
     
             {createPortal(toasts.map(toast => <ToastComponent key={toast.id} toast={toast} onDismiss={dismissToast} />), document.getElementById('toast-container')!)}
         </div>

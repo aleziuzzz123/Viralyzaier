@@ -8,6 +8,7 @@ import TutorialCallout from './TutorialCallout';
 import KanbanBoard from './KanbanBoard';
 import { PLANS } from '../services/paymentService';
 import { useAppContext } from '../contexts/AppContext';
+import Loader from './Loader';
 
 const platformIcons: { [key in Platform]: React.FC<{className?: string}> } = {
     youtube: YouTubeIcon,
@@ -224,7 +225,7 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ onSelectProject }) => {
-    const { projects, user, dismissedTutorials, addToast, t } = useAppContext();
+    const { projects, user, dismissedTutorials, addToast, t, isInitialLoading } = useAppContext();
     const [isBlueprintModalOpen, setIsBlueprintModalOpen] = useState(false);
     
     // Smart onboarding for new users
@@ -232,11 +233,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelectProject }) => {
         // This effect will run once when the user and projects are loaded.
         // If there's a user but no projects, we assume it's a new user experience.
         const hasSeenOnboarding = localStorage.getItem('hasSeenOnboarding');
-        if (user && projects.length === 0 && !hasSeenOnboarding) {
+        if (user && projects.length === 0 && !isInitialLoading && !hasSeenOnboarding) {
           setIsBlueprintModalOpen(true);
           localStorage.setItem('hasSeenOnboarding', 'true');
         }
-    }, [user, projects]);
+    }, [user, projects, isInitialLoading]);
 
     const creditsUsed = (user ? PLANS.find(p => p.id === user.subscription.planId)!.creditLimit : 0) - (user?.aiCredits || 0);
 
@@ -247,6 +248,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelectProject }) => {
         }
         setIsBlueprintModalOpen(true);
     };
+
+    if (isInitialLoading) {
+        return <div className="flex justify-center items-center h-64"><Loader /></div>;
+    }
 
     return (
         <div className="animate-fade-in-up space-y-8">

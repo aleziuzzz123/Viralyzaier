@@ -82,11 +82,6 @@ const UserMenu: React.FC<UserMenuProps> = ({ onNavigate }) => {
                             <CogIcon className="w-5 h-5 mr-2"/>
                             {t('user_menu.settings')}
                         </button>
-                        {/* --- Developer Override Button --- */}
-                        <button onClick={handleDevUpgrade} className="w-full text-left px-3 py-2 text-sm text-purple-400 rounded-md hover:bg-gray-700 flex items-center font-bold">
-                           <SparklesIcon className="w-5 h-5 mr-2"/>
-                            Dev Upgrade to Pro
-                        </button>
                          <button onClick={() => { handleLogout(); setIsOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-red-400 rounded-md hover:bg-gray-700 flex items-center">
                            <LogoutIcon className="w-5 h-5 mr-2"/>
                             {t('user_menu.logout')}

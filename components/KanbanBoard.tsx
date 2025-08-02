@@ -71,6 +71,11 @@ const ProjectCard: React.FC<{
                         AI Generated Idea
                     </div>
                 )}
+                 {project.status === 'Scheduled' && project.scheduledDate && (
+                    <div className="mt-2 text-xs font-semibold text-indigo-300">
+                        {new Date(project.scheduledDate).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+                    </div>
+                )}
             </div>
             {project.status === 'Published' && (
                 <div className="mt-3 pt-3 border-t border-gray-700" onClick={e => e.stopPropagation()}>
@@ -129,7 +134,7 @@ interface KanbanBoardProps {
 }
 
 const KanbanBoard: React.FC<KanbanBoardProps> = ({ projects, onViewProject }) => {
-    const { addToast, handleUpdateProject, t } = useAppContext();
+    const { addToast, handleUpdateProject, t, openScheduleModal } = useAppContext();
     const statuses: ProjectStatus[] = ['Autopilot', 'Idea', 'Scripting', 'Scheduled', 'Published'];
 
     const getStatusName = (status: ProjectStatus) => {
@@ -147,8 +152,12 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ projects, onViewProject }) =>
         const projectId = e.dataTransfer.getData('projectId');
         const project = projects.find(p => p.id === projectId);
         if (project && project.status !== newStatus) {
-            handleUpdateProject({ id: project.id, status: newStatus });
-            addToast(t('kanban.project_moved', {status: getStatusName(newStatus)}), 'success');
+            if (newStatus === 'Scheduled') {
+                openScheduleModal(projectId); // Open modal instead of directly updating
+            } else {
+                handleUpdateProject({ id: project.id, status: newStatus, scheduledDate: null }); // Clear schedule date if moved out
+                addToast(t('kanban.project_moved', {status: getStatusName(newStatus)}), 'success');
+            }
         }
     };
 
