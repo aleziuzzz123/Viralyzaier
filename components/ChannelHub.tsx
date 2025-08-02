@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { Opportunity, Platform } from '../types';
 import { fetchChannelVideos } from '../services/youtubeService';
@@ -20,11 +21,11 @@ const ChannelHub: React.FC<ChannelHubProps> = () => {
         const supabaseUrl = process.env.VITE_SUPABASE_URL;
 
         if (!googleClientId) {
-            setError("VITE_GOOGLE_CLIENT_ID is not configured. Please check your environment configuration.");
+            setError("VITE_GOOGLE_CLIENT_ID is not configured. Please check your index.html file.");
             return;
         }
         if (!supabaseUrl) {
-            setError("VITE_SUPABASE_URL is not configured. Please check your environment configuration.");
+            setError("VITE_SUPABASE_URL is not configured. Please check your index.html file.");
             return;
         }
         
