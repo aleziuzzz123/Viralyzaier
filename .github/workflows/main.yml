@@ -1,0 +1,18 @@
+# .github/workflows/supabase_cron.yml
+name: Trigger Supabase Performance Tracker
+
+on:
+  schedule:
+    # This runs the job every day at 8:00 AM UTC.
+    - cron: '0 8 * * *'
+  workflow_dispatch: # Allows you to run this workflow manually from the Actions tab
+
+jobs:
+  invoke-supabase-function:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Automated Performance Tracker Function
+        run: |
+          curl -X POST "${{ secrets.SUPABASE_URL }}/functions/v1/${{ secrets.FUNCTION_NAME }}" \
+          -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+          -H "Content-Type: application/json"
