@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Project, SceneAssets } from '../types';
 import { generateVideoClip, generateVoiceover, ELEVENLABS_VOICES } from '../services/generativeMediaService';
 import { uploadFile } from '../services/supabaseService';
-import { SparklesIcon, CtaIcon, DownloadIcon, PlayIcon, PhotoIcon, MicIcon, RefreshIcon } from './Icons';
+import { SparklesIcon, CtaIcon, DownloadIcon, PlayIcon, PhotoIcon, MicIcon, RefreshIcon, WarningIcon } from './Icons';
 import { useAppContext } from '../contexts/AppContext';
 import JSZip from 'jszip';
 
@@ -14,7 +14,7 @@ interface AssetStudioProps {
 }
 
 const AssetStudio: React.FC<AssetStudioProps> = ({ project, onProceed }) => {
-    const { user, consumeCredits, requirePermission, handleUpdateProject, t, addToast } = useAppContext();
+    const { user, consumeCredits, requirePermission, handleUpdateProject, t, addToast, runwayMlApiKeyError, elevenLabsApiKeyError } = useAppContext();
     const [loadingStates, setLoadingStates] = useState<{ [key: number]: { video?: boolean, audio?: boolean, message: string } }>({});
     const [sceneErrors, setSceneErrors] = useState<{ [key: number]: string }>({});
     const [isBatchLoading, setIsBatchLoading] = useState(false);
@@ -27,6 +27,10 @@ const AssetStudio: React.FC<AssetStudioProps> = ({ project, onProceed }) => {
 
     const handleGenerateAssets = async (sceneIndex: number, regenerate: boolean = false) => {
         if (!project.script || !user || !requirePermission('viralyzaier')) return;
+        if (runwayMlApiKeyError || elevenLabsApiKeyError) {
+            addToast("API keys for media generation are not configured.", "error");
+            return;
+        }
 
         const scene = project.script.scenes[sceneIndex];
         const hasVideo = !!scene.visual.trim();
@@ -93,6 +97,10 @@ const AssetStudio: React.FC<AssetStudioProps> = ({ project, onProceed }) => {
     
     const handleGenerateAllAssets = async () => {
         if (!project.script || !user || !requirePermission('viralyzaier')) return;
+         if (runwayMlApiKeyError || elevenLabsApiKeyError) {
+            addToast("API keys for media generation are not configured.", "error");
+            return;
+        }
 
         const totalCredits = project.script.scenes.reduce((acc, scene, index) => {
              const hasVideo = !!scene.visual.trim() && !project.assets?.[index]?.brollVideo;
@@ -200,12 +208,28 @@ const AssetStudio: React.FC<AssetStudioProps> = ({ project, onProceed }) => {
       return (!needsVideo || !!assets?.brollVideo) && (!needsAudio || !!assets?.audio);
     });
 
+    const isMediaGenerationConfigured = !runwayMlApiKeyError && !elevenLabsApiKeyError;
+
     return (
         <div className="space-y-8 animate-fade-in-up">
             <header className="text-center">
                 <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-blue-500">{t('asset_studio.title')}</h1>
                 <p className="mt-4 text-lg text-gray-400 max-w-2xl mx-auto">{t('asset_studio.subtitle')}</p>
             </header>
+            
+            {!isMediaGenerationConfigured && (
+                <div className="bg-red-900/50 border border-red-500/50 text-red-300 p-4 rounded-lg flex items-center gap-4">
+                    <WarningIcon className="w-8 h-8 flex-shrink-0" />
+                    <div>
+                        <h3 className="font-bold">Media Generation Not Configured</h3>
+                        <p className="text-sm">
+                            {runwayMlApiKeyError && "RunwayML API Key is not configured. "}
+                            {elevenLabsApiKeyError && "ElevenLabs API Key is not configured. "}
+                            Please add these to your Vercel Environment Variables to enable video and audio generation.
+                        </p>
+                    </div>
+                </div>
+            )}
             
             {sceneErrors[999] && <p className="text-red-400 text-center">{sceneErrors[999]}</p>}
 
@@ -230,8 +254,8 @@ const AssetStudio: React.FC<AssetStudioProps> = ({ project, onProceed }) => {
                     {!allScenesGenerated ? (
                         <button
                             onClick={handleGenerateAllAssets}
-                            disabled={isBatchLoading}
-                            className="inline-flex items-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-full transition-colors disabled:bg-gray-600 disabled:cursor-wait"
+                            disabled={isBatchLoading || !isMediaGenerationConfigured}
+                            className="inline-flex items-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-full transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed"
                         >
                             <SparklesIcon className="w-5 h-5 mr-2" />
                             {isBatchLoading ? t('asset_studio.generating_all') : t('asset_studio.generate_all_button')}
@@ -270,7 +294,8 @@ const AssetStudio: React.FC<AssetStudioProps> = ({ project, onProceed }) => {
                                 <div className="text-center">
                                     <button 
                                         onClick={() => handleGenerateAssets(index)}
-                                        className="inline-flex items-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-full transition-colors"
+                                        disabled={!isMediaGenerationConfigured}
+                                        className="inline-flex items-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-full transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed"
                                     >
                                         <SparklesIcon className="w-5 h-5 mr-2" />
                                         {t('asset_studio.generate_scene_button')}
@@ -310,8 +335,8 @@ const AssetStudio: React.FC<AssetStudioProps> = ({ project, onProceed }) => {
                                     <div className="text-center border-t border-gray-700/50 pt-4">
                                         <button 
                                             onClick={() => handleGenerateAssets(index, true)}
-                                            disabled={isLoading}
-                                            className="inline-flex items-center px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-full transition-colors text-sm"
+                                            disabled={isLoading || !isMediaGenerationConfigured}
+                                            className="inline-flex items-center px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-full transition-colors text-sm disabled:bg-gray-600 disabled:cursor-not-allowed"
                                         >
                                             <RefreshIcon className="w-4 h-4 mr-2" />
                                             Regenerate Scene Assets
