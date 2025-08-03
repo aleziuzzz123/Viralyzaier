@@ -35,22 +35,22 @@ type NotificationRow = Database['public']['Tables']['notifications']['Row'];
 const profileRowToUser = (row: ProfileRow, youtubeConnected: boolean): User => ({
     id: row.id,
     email: row.email,
-    subscription: row.subscription as unknown as Subscription,
+    subscription: row.subscription as Subscription,
     aiCredits: row.ai_credits,
-    channelAudit: row.channel_audit as unknown as ChannelAudit | null,
+    channelAudit: row.channel_audit as ChannelAudit | null,
     youtubeConnected,
     content_pillars: row.content_pillars || [],
-    cloned_voices: (row.cloned_voices as unknown as ClonedVoice[] | null) || [],
+    cloned_voices: (row.cloned_voices as ClonedVoice[] | null) || [],
 });
 
 const userToProfileUpdate = (updates: Partial<User>): ProfileUpdate => {
     const dbUpdates: ProfileUpdate = {};
     if (updates.aiCredits !== undefined) dbUpdates.ai_credits = updates.aiCredits;
-    if (updates.channelAudit !== undefined) dbUpdates.channel_audit = updates.channelAudit as unknown as Json;
+    if (updates.channelAudit !== undefined) dbUpdates.channel_audit = updates.channelAudit;
     if (updates.email !== undefined) dbUpdates.email = updates.email;
-    if (updates.subscription !== undefined) dbUpdates.subscription = updates.subscription as unknown as Json;
+    if (updates.subscription !== undefined) dbUpdates.subscription = updates.subscription;
     if (updates.content_pillars !== undefined) dbUpdates.content_pillars = updates.content_pillars;
-    if (updates.cloned_voices !== undefined) dbUpdates.cloned_voices = updates.cloned_voices as unknown as Json;
+    if (updates.cloned_voices !== undefined) dbUpdates.cloned_voices = updates.cloned_voices;
     return dbUpdates;
 };
 
@@ -61,14 +61,14 @@ const projectRowToProject = (row: ProjectRow): Project => ({
     platform: row.platform as Platform,
     status: row.status as ProjectStatus,
     title: row.title,
-    script: row.script as unknown as Script | null,
-    analysis: row.analysis as unknown as Analysis | null,
-    competitorAnalysis: row.competitor_analysis as unknown as CompetitorAnalysisResult | null,
+    script: row.script as Script | null,
+    analysis: row.analysis as Analysis | null,
+    competitorAnalysis: row.competitor_analysis as CompetitorAnalysisResult | null,
     moodboard: row.moodboard,
-    assets: (row.assets as unknown as { [key: string]: SceneAssets } | null) || {},
-    soundDesign: row.sound_design as unknown as SoundDesign | null,
-    launchPlan: row.launch_plan as unknown as LaunchPlan | null,
-    performance: row.performance as unknown as VideoPerformance | null,
+    assets: (row.assets as { [key: string]: SceneAssets } | null) || {},
+    soundDesign: row.sound_design as SoundDesign | null,
+    launchPlan: row.launch_plan as LaunchPlan | null,
+    performance: row.performance as VideoPerformance | null,
     scheduledDate: row.scheduled_date,
     publishedUrl: row.published_url || undefined,
     lastUpdated: row.last_updated,
@@ -85,14 +85,14 @@ const projectToProjectUpdate = (updates: Partial<Project>): ProjectUpdate => {
     if (updates.platform !== undefined) dbUpdates.platform = updates.platform;
     if (updates.status !== undefined) dbUpdates.status = updates.status;
     if (updates.title !== undefined) dbUpdates.title = updates.title;
-    if (updates.script !== undefined) dbUpdates.script = updates.script as unknown as Json;
-    if (updates.analysis !== undefined) dbUpdates.analysis = updates.analysis as unknown as Json;
-    if (updates.competitorAnalysis !== undefined) dbUpdates.competitor_analysis = updates.competitorAnalysis as unknown as Json;
+    if (updates.script !== undefined) dbUpdates.script = updates.script;
+    if (updates.analysis !== undefined) dbUpdates.analysis = updates.analysis;
+    if (updates.competitorAnalysis !== undefined) dbUpdates.competitor_analysis = updates.competitorAnalysis;
     if (updates.moodboard !== undefined) dbUpdates.moodboard = updates.moodboard;
-    if (updates.assets !== undefined) dbUpdates.assets = updates.assets as unknown as Json;
-    if (updates.soundDesign !== undefined) dbUpdates.sound_design = updates.soundDesign as unknown as Json;
-    if (updates.launchPlan !== undefined) dbUpdates.launch_plan = updates.launchPlan as unknown as Json;
-    if (updates.performance !== undefined) dbUpdates.performance = updates.performance as unknown as Json;
+    if (updates.assets !== undefined) dbUpdates.assets = updates.assets;
+    if (updates.soundDesign !== undefined) dbUpdates.sound_design = updates.soundDesign;
+    if (updates.launchPlan !== undefined) dbUpdates.launch_plan = updates.launchPlan;
+    if (updates.performance !== undefined) dbUpdates.performance = updates.performance;
     if (updates.scheduledDate !== undefined) dbUpdates.scheduled_date = updates.scheduledDate;
     if (updates.publishedUrl !== undefined) dbUpdates.published_url = updates.publishedUrl;
     // lastUpdated is managed by a database trigger, client should not set it.
@@ -225,14 +225,14 @@ export const createProject = async (projectData: Omit<Project, 'id'|'lastUpdated
         platform: projectData.platform,
         status: projectData.status,
         title: projectData.title,
-        script: projectData.script as unknown as Json,
-        analysis: projectData.analysis as unknown as Json,
-        competitor_analysis: projectData.competitorAnalysis as unknown as Json,
+        script: projectData.script,
+        analysis: projectData.analysis,
+        competitor_analysis: projectData.competitorAnalysis,
         moodboard: projectData.moodboard,
-        assets: projectData.assets as unknown as Json,
-        sound_design: projectData.soundDesign as unknown as Json,
-        launch_plan: projectData.launchPlan as unknown as Json,
-        performance: projectData.performance as unknown as Json,
+        assets: projectData.assets,
+        sound_design: projectData.soundDesign,
+        launch_plan: projectData.launchPlan,
+        performance: projectData.performance,
         scheduled_date: projectData.scheduledDate,
         published_url: projectData.publishedUrl,
         workflow_step: projectData.workflowStep,
