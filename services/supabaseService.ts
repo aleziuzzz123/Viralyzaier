@@ -70,7 +70,7 @@ const projectRowToProject = (row: ProjectRow): Project => ({
     publishedUrl: row.published_url || undefined,
     lastUpdated: row.last_updated,
     workflowStep: row.workflow_step as WorkflowStep,
-    voiceId: row.voiceover_voice_id || undefined,
+    voiceoverVoiceId: row.voiceover_voice_id || undefined,
     last_performance_check: row.last_performance_check || undefined,
 });
 
