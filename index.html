@@ -9,17 +9,12 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script>
-      // This is the definitive fix for environment variables in this no-build setup.
-      // Vercel Environment Variables are NOT exposed to the frontend automatically without a build step.
-      // Please replace the placeholder values with your actual keys from Vercel.
+      // This script exposes client-safe environment variables from Vercel.
+      // All other API keys (Gemini, RunwayML, Stripe, etc.) are handled securely by backend Supabase Edge Functions.
       window.__env = {
         VITE_SUPABASE_URL: "https://wpgrfukcnpcoyruymxdd.supabase.co",
         VITE_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndwZ3JmdWtjbnBjb3lydXlteGRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3MzQ5MjgsImV4cCI6MjA2OTMxMDkyOH0.-b5KHzKWk2N3VEY_K5CzYZfszRRL6GY-MivOVUAL1Z4",
-        VITE_GEMINI_API_KEY: "", // This key is now a backend secret and must not be set here.
-        VITE_RUNWAYML_API_SECRET: "YOUR_RUNWAYML_API_SECRET_HERE",
-        VITE_ELEVENLABS_API_KEY: "YOUR_ELEVENLABS_API_KEY_HERE",
-        VITE_GOOGLE_CLIENT_ID: "YOUR_GOOGLE_CLIENT_ID_HERE",
-        VITE_YOUTUBE_API_KEY: "YOUR_YOUTUBE_API_KEY_HERE",
+        VITE_GOOGLE_CLIENT_ID: "YOUR_GOOGLE_CLIENT_ID_HERE", // Used for YouTube OAuth flow.
       };
     </script>
     <style>
