@@ -5,7 +5,6 @@ import * as supabaseService from '../services/supabaseService';
 import { supabase } from '../services/supabaseClient'; // Import client directly
 import { type AuthSession } from '@supabase/supabase-js';
 import { createCheckoutSession, PLANS } from '../services/paymentService';
-import { fetchVideoPerformance } from '../services/youtubeService';
 import UpgradeModal from '../components/UpgradeModal';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { translations, Language, TranslationKey } from '../translations';
@@ -278,7 +277,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         
         isProcessingAction.current = true;
         try {
-            const result = await supabaseService.invokeEdgeFunction('consume-credits', { amount_to_consume: amount });
+            const result = await supabaseService.invokeEdgeFunction('consume-credits', { body: { amount_to_consume: amount } });
 
             if (result.success) {
                 setUser(prev => prev ? { ...prev, aiCredits: result.newCredits } : null);
@@ -298,7 +297,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         } catch (e) {
             const errorMessage = getErrorMessage(e);
              if (errorMessage.includes('Function is not configured') || errorMessage.includes('secrets')) {
-                setBackendError({ title: t('backend_error.title'), message: errorMessage });
+                setBackendError({ title: "Backend Configuration Error", message: errorMessage });
             } else {
                 addToast(errorMessage, 'error');
             }
@@ -319,7 +318,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         }
     };
     
-    const handleCreateProjectFromBlueprint = async (blueprint: Blueprint, selectedTitle: string, status: ProjectStatus = 'Idea') => {
+    const handleCreateProjectFromBlueprint = async (blueprint: Blueprint, selectedTitle: string) => {
         if (isProcessingAction.current) {
             addToast("Please wait for the current operation to complete.", 'info');
             return;
@@ -335,9 +334,8 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         let newProject: Project | null = null;
         isProcessingAction.current = true;
         try {
-            // Step 1: Create a placeholder project to get a stable ID
             const initialProjectData: Omit<Project, 'id' | 'lastUpdated'> = {
-                name: selectedTitle, status, platform: blueprint.platform,
+                name: selectedTitle, status: 'Idea', platform: blueprint.platform,
                 topic: blueprint.strategicSummary, title: selectedTitle, script: blueprint.script,
                 moodboard: [], workflowStep: 2, analysis: null, competitorAnalysis: null, 
                 scheduledDate: null, assets: {}, soundDesign: null, launchPlan: null, 
@@ -348,7 +346,6 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             setProjects(prev => [newProject!, ...prev]);
             setActiveProjectId(newProject.id);
 
-            // Step 2: Upload moodboard images to a structured path using the new project ID
             const moodboardUrls = await Promise.all(
                 blueprint.moodboard.map(async (base64Img, index) => {
                     const blob = await supabaseService.dataUrlToBlob(base64Img);
@@ -357,14 +354,12 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
                 })
             );
 
-            // Step 3: Update the project with the final moodboard URLs
             const updatedProject = await supabaseService.updateProject(newProject.id, { moodboard: moodboardUrls });
             setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
             addToast(t('toast.project_created_blueprint'), 'success');
         } catch (error) {
             console.error("Error creating project from blueprint:", error);
             addToast(`${t('toast.failed_update_project')}: ${getErrorMessage(error)}`, "error");
-            // Cleanup: If project was created but uploads failed, delete the orphaned project
             if (newProject) {
                 await supabaseService.deleteProject(newProject.id);
                 setProjects(prev => prev.filter(p => p.id !== newProject!.id));
