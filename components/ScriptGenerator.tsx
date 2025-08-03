@@ -1,10 +1,12 @@
 
 
-import React, { useState, useEffect, useMemo } from 'react';
+
+
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Project, Script, Platform, ScriptOptimization, PlanId } from '../types';
 import { generateOptimizedScript } from '../services/geminiService';
-import { SparklesIcon, LightBulbIcon, CtaIcon, PencilIcon, MagicWandIcon } from './Icons';
-import { useAppContext } from '../contexts/AppContext';
+import { SparklesIcon, LightBulbIcon, CtaIcon, PencilIcon, MagicWandIcon, CheckBadgeIcon } from './Icons';
+import { useAppContext, getErrorMessage } from '../contexts/AppContext';
 import { PLANS } from '../services/paymentService';
 import ViralityGauge from './ViralityGauge';
 
@@ -15,7 +17,7 @@ const ScriptGenerator: React.FC<{
     onProceed: () => void;
     platform: Platform;
 }> = ({ project, onScriptGenerated, onProceed, platform }) => {
-    const { user, consumeCredits, addToast, t } = useAppContext();
+    const { user, consumeCredits, addToast, t, lockAndExecute } = useAppContext();
 
     type Tab = 'generate' | 'optimize';
     const [activeTab, setActiveTab] = useState<Tab>('generate');
@@ -95,43 +97,53 @@ const ScriptGenerator: React.FC<{
             setTimeout(() => {
                 setHighlightedTarget(null);
                 setCurrentScore(finalScore); // Ensure it lands on the final score
+                setStatus('done');
             }, totalDuration);
         }
     }, [status, optimizationResult]);
+
 
     const formatTime = (seconds: number) => {
         if (seconds < 60) return t('script_optimizer.length_unit_seconds', { s: seconds });
         return t('script_optimizer.length_unit_minutes', { m: Math.round(seconds / 60) });
     };
 
-    const handleStartOptimization = async () => {
-        let hasError = false;
+    const handleStartOptimization = () => {
         if (activeTab === 'generate' && !topic.trim()) {
             setError(t('script_optimizer.error_topic_missing'));
-            hasError = true;
+            return;
         }
         if (activeTab === 'optimize' && !pastedScript.trim()) {
             setError(t('script_optimizer.error_script_missing'));
-            hasError = true;
+            return;
         }
-        if (hasError) return;
 
-        if (!await consumeCredits(creditsNeeded)) return;
-
-        setStatus('processing');
-        setError(null);
-
-        try {
-            const result = await generateOptimizedScript(
-                platform,
-                scriptLength,
-                activeTab === 'generate' ? { topic } : { userScript: pastedScript }
-            );
-            setOptimizationResult(result);
-        } catch (e) {
-            setError(e instanceof Error ? e.message : t('script_optimizer.error_generation'));
-            setStatus('idle');
-        }
+        lockAndExecute(async () => {
+            setStatus('processing');
+            setError(null);
+            setOptimizationResult(null);
+            
+            try {
+                if (!await consumeCredits(creditsNeeded)) {
+                    setStatus('idle'); // Reset if credits fail
+                    return;
+                }
+                const result = await generateOptimizedScript(
+                    platform,
+                    scriptLength,
+                    activeTab === 'generate' ? { topic } : { userScript: pastedScript }
+                );
+                if (result) {
+                    setOptimizationResult(result);
+                    // The useEffect will handle transitioning status to 'done' after animation
+                } else {
+                    throw new Error("Failed to generate script.");
+                }
+            } catch (err) {
+                // The wrapper will show the toast. We just need to reset the UI state.
+                setStatus('idle');
+            }
+        });
     };
 
     const handleAcceptScript = () => {
@@ -164,9 +176,9 @@ const ScriptGenerator: React.FC<{
                             <input id="length" type="range" min="10" max={userPlanLimit} step="10" value={scriptLength} onChange={e => setScriptLength(Number(e.target.value))} className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500" />
                             {userPlanLimit < 3600 && <p className="text-xs text-gray-500 mt-2">{t('script_optimizer.plan_limit_reached', { limit: formatTime(userPlanLimit) })}</p>}
                         </div>
-                        <button onClick={handleStartOptimization} className="w-full inline-flex items-center justify-center px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-full transition-all duration-300 ease-in-out transform hover:scale-105 shadow-lg">
+                        <button onClick={handleStartOptimization} disabled={status === 'processing'} className="w-full inline-flex items-center justify-center px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-full transition-all duration-300 ease-in-out transform hover:scale-105 shadow-lg disabled:bg-gray-600 disabled:cursor-wait">
                             <SparklesIcon className="w-6 h-6 mr-3" />
-                            {t('script_optimizer.generate_button', { credits: creditsNeeded })}
+                            {status === 'processing' ? t('script_optimizer.processing_title') : t('script_optimizer.generate_button', { credits: creditsNeeded })}
                         </button>
                     </div>
                 )}
@@ -174,23 +186,23 @@ const ScriptGenerator: React.FC<{
                     <div className="space-y-6 animate-fade-in">
                          <div>
                             <label htmlFor="pastedScript" className="block text-lg font-semibold text-white mb-2">{t('script_optimizer.paste_label')}</label>
-                            <textarea id="pastedScript" value={pastedScript} onChange={e => setPastedScript(e.target.value)} rows={10} placeholder={t('script_optimizer.paste_placeholder')} className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                            <textarea id="pastedScript" value={pastedScript} onChange={e => setPastedScript(e.target.value)} rows={10} placeholder={t('script_optimizer.paste_placeholder')} className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                         </div>
-                        <button onClick={handleStartOptimization} className="w-full inline-flex items-center justify-center px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-full transition-all duration-300 ease-in-out transform hover:scale-105 shadow-lg">
+                        <button onClick={handleStartOptimization} disabled={status === 'processing'} className="w-full inline-flex items-center justify-center px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-full transition-all duration-300 ease-in-out transform hover:scale-105 shadow-lg disabled:bg-gray-600 disabled:cursor-wait">
                             <MagicWandIcon className="w-6 h-6 mr-3" />
-                            {t('script_optimizer.optimize_button', { credits: creditsNeeded })}
+                            {status === 'processing' ? t('script_optimizer.processing_title') : t('script_optimizer.optimize_button', { credits: creditsNeeded })}
                         </button>
                     </div>
                 )}
             </div>
-            {error && <p className="text-red-400 text-center mt-4">{error}</p>}
+             {error && <p className="text-red-400 text-center mt-4">{error}</p>}
         </div>
     );
 
     const renderProcessingState = () => (
-        <div className="animate-fade-in-up space-y-8">
-            <header className="text-center">
-                <h1 className="text-3xl font-bold text-white">{t('script_optimizer.processing_title')}</h1>
+        <div className="max-w-4xl mx-auto space-y-8 text-center animate-fade-in">
+            <header>
+                <h1 className="text-4xl font-bold text-white">{t('script_optimizer.processing_title')}</h1>
                 <p className="mt-2 text-lg text-gray-400">{t('script_optimizer.processing_subtitle')}</p>
             </header>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
@@ -201,10 +213,10 @@ const ScriptGenerator: React.FC<{
                     </div>
                     <div>
                         <h3 className="text-xl font-bold text-white mb-4">{t('script_optimizer.analysis_log')}</h3>
-                        <ul className="space-y-3">
+                        <ul className="space-y-3 h-36">
                             {log.map((item, i) => (
-                                <li key={i} className="flex items-center text-sm text-gray-300 animate-fade-in-up" style={{animationDelay: `${i*100}ms`}}>
-                                    <SparklesIcon className="w-4 h-4 mr-3 text-indigo-400 flex-shrink-0" />
+                                <li key={i} className="flex items-center text-sm text-gray-300 animate-fade-in-up">
+                                    <CheckBadgeIcon className="w-5 h-5 mr-3 text-green-400 flex-shrink-0" />
                                     {item}
                                 </li>
                             ))}
@@ -212,105 +224,51 @@ const ScriptGenerator: React.FC<{
                     </div>
                 </div>
                 <div className="lg:col-span-2 bg-gray-900/50 p-6 rounded-2xl border border-gray-700 min-h-[50vh]">
-                    <div className="space-y-4">
-                        <div className={`p-4 rounded-lg transition-all duration-300 ${highlightedTarget === 'hooks' ? 'bg-indigo-900/50 ring-2 ring-indigo-500' : 'bg-gray-800'}`}>
-                            <h4 className="font-bold text-white mb-2">{t('script_generator.hooks_title')}</h4>
-                            <p className="text-sm text-gray-400">{optimizationResult?.finalScript.hooks[0] || '...'}</p>
-                        </div>
-                        <div className={`p-4 rounded-lg transition-all duration-300 ${highlightedTarget?.startsWith('scene') ? 'bg-indigo-900/50 ring-2 ring-indigo-500' : 'bg-gray-800'}`}>
-                            <h4 className="font-bold text-white mb-2">{t('script_generator.script_title')}</h4>
-                            <p className="text-sm text-gray-400">{optimizationResult?.finalScript.scenes[0].visual || '...'}</p>
-                        </div>
-                        <div className={`p-4 rounded-lg transition-all duration-300 ${highlightedTarget === 'cta' ? 'bg-indigo-900/50 ring-2 ring-indigo-500' : 'bg-gray-800'}`}>
-                            <h4 className="font-bold text-white mb-2">{t('script_generator.cta_title')}</h4>
-                            <p className="text-sm text-gray-400">{optimizationResult?.finalScript.cta || '...'}</p>
-                        </div>
-                    </div>
+                     {/* Placeholder for script preview during processing */}
                 </div>
             </div>
         </div>
     );
     
-    const renderDoneState = () => (
-        <div className="animate-fade-in-up space-y-8">
+    const renderDoneState = () => optimizationResult && (
+        <div className="max-w-4xl mx-auto space-y-8 animate-fade-in">
             <header className="text-center">
-                <h1 className="text-3xl font-bold text-white">{t('script_optimizer.final_script_title')}</h1>
-                <p className="mt-2 text-lg text-gray-400">Your script is now optimized and ready to go!</p>
-            </header>
-
-            <div className="flex flex-col items-center bg-gray-800/50 p-6 rounded-2xl border border-gray-700 max-w-sm mx-auto">
-                <h3 className="text-xl font-bold text-white mb-4">{t('script_optimizer.virality_score_final')}</h3>
-                {optimizationResult && <ViralityGauge score={optimizationResult.finalScore} size="sm" />}
-            </div>
-            
-            {optimizationResult?.finalScript && (
-                 <div className="space-y-8">
-                    <div>
-                        <h3 className="flex items-center text-xl font-bold text-white mb-4"><LightBulbIcon className="w-6 h-6 mr-3 text-yellow-300"/>{t('script_generator.hooks_title')}</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {optimizationResult.finalScript.hooks.map((hook, i) => (
-                                <div key={i} className="bg-gray-800/50 p-4 rounded-lg border border-gray-700 text-gray-300">
-                                    "{hook}"
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div>
-                        <h3 className="text-xl font-bold text-white mb-4">{t('script_generator.script_title')}</h3>
-                        <div className="overflow-x-auto bg-gray-800/50 p-1 rounded-lg border border-gray-700">
-                            <table className="w-full text-left">
-                                <thead className="bg-gray-900/50 text-xs text-gray-300 uppercase">
-                                    <tr>
-                                        <th className="p-3">{t('script_generator.table_time')}</th>
-                                        <th className="p-3">{t('script_generator.table_visual')}</th>
-                                        <th className="p-3">{t('script_generator.table_voiceover')}</th>
-                                        <th className="p-3">{t('script_generator.table_on_screen_text')}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {optimizationResult.finalScript.scenes.map((scene, i) => (
-                                        <tr key={i} className="border-t border-gray-700">
-                                            <td className="p-3 font-mono text-sm text-indigo-400">{scene.timecode}</td>
-                                            <td className="p-3 text-sm text-gray-300">{scene.visual}</td>
-                                            <td className="p-3 text-sm text-gray-300">{scene.voiceover}</td>
-                                            <td className="p-3 font-bold text-sm text-amber-300">{scene.onScreenText}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    
-                    <div>
-                        <h3 className="text-xl font-bold text-white mb-4">{t('script_generator.cta_title')}</h3>
-                        <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700 text-gray-200 font-semibold italic">
-                            "{optimizationResult.finalScript.cta}"
-                        </div>
-                    </div>
-
-                     <div className="mt-8 text-center">
-                        <button onClick={handleAcceptScript} className="inline-flex items-center justify-center px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-full transition-all duration-300 ease-in-out transform hover:scale-105 shadow-lg">
-                            {t('script_generator.proceed_button')}
-                            <CtaIcon className="w-5 h-5 ml-3" />
-                        </button>
-                    </div>
+                <h1 className="text-4xl font-bold text-white">{t('script_optimizer.final_script_title')}</h1>
+                <div className="flex justify-center items-center gap-4 mt-2">
+                    <span className="text-lg text-gray-400">{t('script_optimizer.virality_score_final')}:</span>
+                    <span className="text-3xl font-black text-green-400">{optimizationResult.finalScore}%</span>
                 </div>
-            )}
+            </header>
+             <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700 space-y-4">
+                <h3 className="text-xl font-bold text-white">Hooks</h3>
+                <ul className="list-disc list-inside text-gray-300 space-y-1">
+                    {optimizationResult.finalScript.hooks.map((hook, i) => <li key={i}>{hook}</li>)}
+                </ul>
+                <h3 className="text-xl font-bold text-white pt-4 border-t border-gray-700">Scenes</h3>
+                <div className="space-y-2 text-sm text-gray-400 max-h-60 overflow-y-auto pr-2">
+                     {optimizationResult.finalScript.scenes.map((scene, i) => (
+                        <p key={i}><strong className="text-indigo-400">{scene.timecode}:</strong> {scene.voiceover}</p>
+                    ))}
+                </div>
+                <h3 className="text-xl font-bold text-white pt-4 border-t border-gray-700">Call to Action</h3>
+                <p className="italic text-gray-300">"{optimizationResult.finalScript.cta}"</p>
+            </div>
+             <div className="text-center">
+                <button onClick={handleAcceptScript} className="inline-flex items-center justify-center px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-full transition-all duration-300 ease-in-out transform hover:scale-105 shadow-lg">
+                    <CtaIcon className="w-6 h-6 mr-3" />
+                    Accept Script & Proceed to Assets
+                </button>
+            </div>
         </div>
     );
-    
-    if (status === 'idle') return renderIdleState();
-    if (status === 'processing') {
-        // Show processing screen, but if results are ready, start transitioning to done
-        if (optimizationResult && log.length === optimizationResult.analysisLog.length) {
-            setTimeout(() => setStatus('done'), 1000);
-        }
+
+    if (status === 'processing' || (status === 'done' && !optimizationResult)) {
         return renderProcessingState();
     }
-    if (status === 'done') return renderDoneState();
-
-    return null; // Should not happen
+    if (status === 'done' && optimizationResult) {
+        return renderDoneState();
+    }
+    return renderIdleState();
 };
 
 export default ScriptGenerator;
