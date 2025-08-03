@@ -61,7 +61,7 @@ const AssetStudio: React.FC<AssetStudioProps> = ({ project, onProceed }) => {
             const videoPromise = creditsForVideo > 0 ? generateVideoClip(scene.visual, project.platform) : Promise.resolve(null);
             if (creditsForVideo > 0) setLoadingStates(prev => ({...prev, [sceneIndex]: {...prev[sceneIndex], message: t('asset_studio.loading_video') } }));
             
-            const audioPromise = creditsForAudio > 0 ? generateVoiceover(scene.voiceover, project.voiceId) : Promise.resolve(null);
+            const audioPromise = creditsForAudio > 0 ? generateVoiceover(scene.voiceover, project.voiceoverVoiceId) : Promise.resolve(null);
 
             const [videoBlob, audioBlob] = await Promise.all([videoPromise, audioPromise]);
 
@@ -125,7 +125,7 @@ const AssetStudio: React.FC<AssetStudioProps> = ({ project, onProceed }) => {
                 const hasAudio = !!scene.voiceover.trim() && !existingAssets?.audio;
 
                 const videoBlob = hasVideo ? await generateVideoClip(scene.visual, project.platform) : null;
-                const audioBlob = hasAudio ? await generateVoiceover(scene.voiceover, project.voiceId) : null;
+                const audioBlob = hasAudio ? await generateVoiceover(scene.voiceover, project.voiceoverVoiceId) : null;
 
                 const videoUrl = videoBlob ? await uploadFile(videoBlob, `${user.id}/${project.id}/scene_${index + 1}_video.mp4`) : existingAssets?.brollVideo;
                 const audioUrl = audioBlob ? await uploadFile(audioBlob, `${user.id}/${project.id}/scene_${index + 1}_audio.mp3`) : existingAssets?.audio;
@@ -241,8 +241,8 @@ const AssetStudio: React.FC<AssetStudioProps> = ({ project, onProceed }) => {
                     </label>
                     <select 
                         id="voice-select" 
-                        value={project.voiceId || ''} 
-                        onChange={e => handleUpdateProject({ id: project.id, voiceId: e.target.value })}
+                        value={project.voiceoverVoiceId || ''} 
+                        onChange={e => handleUpdateProject({ id: project.id, voiceoverVoiceId: e.target.value })}
                         className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
                         {availableVoices.map(voice => (

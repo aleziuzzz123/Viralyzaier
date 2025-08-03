@@ -17,15 +17,16 @@ const ChannelHub: React.FC<ChannelHubProps> = () => {
 
     const handleConnectChannel = () => {
         if (!user) return;
-        const googleClientId = (import.meta as any).env.VITE_GOOGLE_CLIENT_ID;
-        const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL;
+        const env = (window as any).__env || {};
+        const googleClientId = env.VITE_GOOGLE_CLIENT_ID;
+        const supabaseUrl = env.VITE_SUPABASE_URL;
 
-        if (!googleClientId) {
-            setError("VITE_GOOGLE_CLIENT_ID is not configured. Please check your Vercel Environment Variables.");
+        if (!googleClientId || googleClientId.includes('YOUR_')) {
+            setError("VITE_GOOGLE_CLIENT_ID is not configured. Please check your index.html file.");
             return;
         }
         if (!supabaseUrl) {
-            setError("VITE_SUPABASE_URL is not configured. Please check your Vercel Environment Variables.");
+            setError("VITE_SUPABASE_URL is not configured. Please check your index.html file.");
             return;
         }
         
