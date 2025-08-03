@@ -32,23 +32,48 @@ export const generateVoiceover = async (text: string, voiceId: string = 'pNInz6o
     return response;
 };
 
+const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+
 /**
  * Generates a video clip by calling a secure Supabase Edge Function.
- * The function proxies the request to RunwayML, handling polling and security.
+ * The client now handles polling for the result from RunwayML.
  */
 export const generateVideoClip = async (prompt: string, platform: Platform): Promise<Blob> => {
     const aspectRatio = platform === 'youtube' ? '16_9' : '9_16';
 
-    const result = await invokeEdgeFunction('runwayml-proxy', { prompt, aspectRatio });
+    // Step 1: Initiate the generation and get a task UUID
+    const startResult = await invokeEdgeFunction('runwayml-proxy', { prompt, aspectRatio });
+    if (!startResult.uuid) {
+        throw new Error("Failed to start video generation: Did not receive a task UUID.");
+    }
+    const { uuid } = startResult;
 
-    if (!result.videoUrl) {
-        throw new Error("Failed to generate video clip: Did not receive a video URL from the server.");
+    // Step 2: Poll the status endpoint until the video is ready
+    const maxAttempts = 25; // Poll for up to ~2 minutes
+    const pollInterval = 5000; // 5 seconds
+
+    for (let i = 0; i < maxAttempts; i++) {
+        await delay(pollInterval);
+        
+        const statusResult = await invokeEdgeFunction('runwayml-proxy', { uuid });
+
+        if (statusResult.status === 'SUCCEEDED') {
+            if (!statusResult.videoUrl) {
+                throw new Error("Video generation succeeded but no URL was provided.");
+            }
+            // Step 3: Download the video from the URL and return it as a blob
+            const videoResponse = await fetch(statusResult.videoUrl);
+            if (!videoResponse.ok) {
+                throw new Error(`Failed to download the generated video from ${statusResult.videoUrl}`);
+            }
+            return await videoResponse.blob();
+        }
+
+        if (statusResult.status === 'FAILED') {
+            throw new Error(`RunwayML generation failed: ${statusResult.error || 'Unknown error'}`);
+        }
+        // If status is 'PENDING', 'RUNNING', etc., the loop will continue
     }
 
-    // Fetch the video from the URL returned by the proxy and return it as a blob.
-    const videoResponse = await fetch(result.videoUrl);
-    if (!videoResponse.ok) {
-        throw new Error(`Failed to download the generated video from ${result.videoUrl}`);
-    }
-    return await videoResponse.blob();
+    throw new Error("Video generation timed out. The task is still running, but the application has stopped waiting.");
 };

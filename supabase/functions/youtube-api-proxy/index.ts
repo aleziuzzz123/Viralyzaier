@@ -95,7 +95,24 @@ serve(async (req: Request) => {
     }
     
     // 4. Make the proxy request to the YouTube API
-    const { endpoint, params, isAnalytics } = await req.json();
+    const bodyText = await req.text();
+    if (!bodyText) {
+        return new Response(JSON.stringify({ error: 'Request body is empty.' }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400,
+        });
+    }
+    let parsedBody;
+    try {
+        parsedBody = JSON.parse(bodyText);
+    } catch (e) {
+        return new Response(JSON.stringify({ error: `Invalid JSON in request body: ${e.message}` }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400,
+        });
+    }
+    const { endpoint, params, isAnalytics } = parsedBody;
+
     const apiBaseUrl = isAnalytics 
         ? 'https://youtubeanalytics.googleapis.com/v2' 
         : 'https://www.googleapis.com/youtube/v3';

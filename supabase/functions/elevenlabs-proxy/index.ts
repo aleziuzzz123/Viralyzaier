@@ -39,8 +39,25 @@ serve(async (req: Request) => {
       throw new Error('Authentication failed.');
     }
 
-    // Process the request body.
-    const { text, voiceId } = await req.json();
+    // Process the request body more robustly.
+    const bodyText = await req.text();
+    if (!bodyText) {
+        return new Response(JSON.stringify({ error: 'Request body is empty.' }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400,
+        });
+    }
+    let parsedBody;
+    try {
+        parsedBody = JSON.parse(bodyText);
+    } catch (e) {
+        return new Response(JSON.stringify({ error: `Invalid JSON in request body: ${e.message}` }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400,
+        });
+    }
+    const { text, voiceId } = parsedBody;
+
     if (!text || !voiceId) {
       throw new Error("Request body must include 'text' and 'voiceId'.");
     }

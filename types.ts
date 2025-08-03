@@ -225,156 +225,203 @@ export interface Opportunity {
 
 
 // --- SUPABASE TYPE DEFINITIONS ---
-export type Json = any;
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
 
 export type Database = {
   public: {
     Tables: {
-      profiles: {
+      notifications: {
         Row: {
+          created_at: string
           id: string
-          email: string
-          subscription: Json
-          ai_credits: number
-          channel_audit: Json | null
-          stripe_customer_id?: string | null
-          content_pillars?: string[] | null
-          cloned_voices?: Json | null
+          is_read: boolean
+          message: string
+          project_id: string | null
+          user_id: string
         }
         Insert: {
-            id: string;
-            email: string;
-            subscription?: Json;
-            ai_credits?: number;
-            channel_audit?: Json | null;
-            stripe_customer_id?: string | null;
-            content_pillars?: string[] | null;
-            cloned_voices?: Json | null;
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message: string
+          project_id?: string | null
+          user_id: string
         }
         Update: {
-            email?: string;
-            subscription?: Json;
-            ai_credits?: number;
-            channel_audit?: Json | null;
-            stripe_customer_id?: string | null;
-            content_pillars?: string[] | null;
-            cloned_voices?: Json | null;
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          project_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          ai_credits: number
+          channel_audit: Json | null
+          cloned_voices: Json | null
+          content_pillars: string[] | null
+          email: string
+          id: string
+          stripe_customer_id: string | null
+          subscription: Json
+        }
+        Insert: {
+          ai_credits?: number
+          channel_audit?: Json | null
+          cloned_voices?: Json | null
+          content_pillars?: string[] | null
+          email: string
+          id: string
+          stripe_customer_id?: string | null
+          subscription?: Json
+        }
+        Update: {
+          ai_credits?: number
+          channel_audit?: Json | null
+          cloned_voices?: Json | null
+          content_pillars?: string[] | null
+          email?: string
+          id?: string
+          stripe_customer_id?: string | null
+          subscription?: Json
         }
         Relationships: []
       }
       projects: {
         Row: {
+          analysis: Json | null
+          assets: Json | null
+          competitor_analysis: Json | null
           id: string
-          user_id: string
+          last_performance_check: string | null
+          last_updated: string
+          launch_plan: Json | null
+          moodboard: string[] | null
           name: string
-          topic: string
+          performance: Json | null
           platform: string
+          published_url: string | null
+          scheduled_date: string | null
+          script: Json | null
+          sound_design: Json | null
           status: string
           title: string | null
-          script: Json | null
-          analysis: Json | null
-          competitor_analysis: Json | null
-          moodboard: string[] | null
-          assets: Json | null
-          sound_design: Json | null
-          launch_plan: Json | null
-          performance: Json | null
-          scheduled_date: string | null
-          published_url: string | null
-          last_updated: string
-          workflow_step: number
+          topic: string
+          user_id: string
           voiceover_voice_id: string | null
-          last_performance_check: string | null
+          workflow_step: number
         }
         Insert: {
-            id?: string;
-            user_id: string;
-            name: string;
-            topic: string;
-            platform: string;
-            status: string;
-            title?: string | null;
-            script?: Json | null;
-            analysis?: Json | null;
-            competitor_analysis?: Json | null;
-            moodboard?: string[] | null;
-            assets?: Json | null;
-            sound_design?: Json | null;
-            launch_plan?: Json | null;
-            performance?: Json | null;
-            scheduled_date?: string | null;
-            published_url?: string | null;
-            workflow_step: number;
-            voiceover_voice_id?: string | null;
-            last_performance_check?: string | null;
+          analysis?: Json | null
+          assets?: Json | null
+          competitor_analysis?: Json | null
+          id?: string
+          last_performance_check?: string | null
+          last_updated?: string
+          launch_plan?: Json | null
+          moodboard?: string[] | null
+          name: string
+          performance?: Json | null
+          platform: string
+          published_url?: string | null
+          scheduled_date?: string | null
+          script?: Json | null
+          sound_design?: Json | null
+          status: string
+          title?: string | null
+          topic: string
+          user_id: string
+          voiceover_voice_id?: string | null
+          workflow_step: number
         }
         Update: {
-            name?: string;
-            topic?: string;
-            platform?: string;
-            status?: string;
-            title?: string | null;
-            script?: Json | null;
-            analysis?: Json | null;
-            competitor_analysis?: Json | null;
-            moodboard?: string[] | null;
-            assets?: Json | null;
-            sound_design?: Json | null;
-            launch_plan?: Json | null;
-            performance?: Json | null;
-            scheduled_date?: string | null;
-            published_url?: string | null;
-            workflow_step?: number;
-            voiceover_voice_id?: string | null;
-            last_performance_check?: string | null;
+          analysis?: Json | null
+          assets?: Json | null
+          competitor_analysis?: Json | null
+          id?: string
+          last_performance_check?: string | null
+          last_updated?: string
+          launch_plan?: Json | null
+          moodboard?: string[] | null
+          name?: string
+          performance?: Json | null
+          platform?: string
+          published_url?: string | null
+          scheduled_date?: string | null
+          script?: Json | null
+          sound_design?: Json | null
+          status?: string
+          title?: string | null
+          topic?: string
+          user_id?: string
+          voiceover_voice_id?: string | null
+          workflow_step?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "projects_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_youtube_tokens: {
         Row: {
-          user_id: string
           access_token: string
-          refresh_token: string
           expires_at: string
+          refresh_token: string
           scope: string
+          user_id: string
         }
         Insert: {
-          user_id: string
           access_token: string
-          refresh_token: string
           expires_at: string
+          refresh_token: string
           scope: string
+          user_id: string
         }
         Update: {
-          access_token?: string;
-          refresh_token?: string;
-          expires_at?: string;
-          scope?: string;
+          access_token?: string
+          expires_at?: string
+          refresh_token?: string
+          scope?: string
+          user_id?: string
         }
-        Relationships: []
-      }
-      notifications: {
-        Row: {
-          id: string
-          user_id: string
-          project_id: string | null
-          message: string
-          is_read: boolean
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          project_id?: string | null
-          message: string
-          is_read?: boolean
-        }
-        Update: {
-          project_id?: string | null;
-          message?: string;
-          is_read?: boolean;
-        }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_youtube_tokens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -390,4 +437,4 @@ export type Database = {
       [_ in never]: never
     }
   }
-};
+}

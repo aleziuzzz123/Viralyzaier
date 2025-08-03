@@ -52,10 +52,11 @@ serve(async (req: Request) => {
       });
     }
     
-    // 2. Process the request body.
+    // 2. Process the request body using req.json() for robustness.
     const { amount_to_consume } = await req.json();
+
     if (typeof amount_to_consume !== 'number' || amount_to_consume <= 0) {
-        return new Response(JSON.stringify({ error: 'Invalid consumption amount.' }), {
+        return new Response(JSON.stringify({ error: 'Invalid or missing consumption amount.' }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 400,
         });
@@ -98,10 +99,14 @@ serve(async (req: Request) => {
     });
 
   } catch (error) {
-    console.error('Consume Credits Function Error:', error.message);
-    return new Response(JSON.stringify({ error: error.message }), {
+    const isParsingError = error instanceof SyntaxError || (error.message && error.message.includes('Unexpected end of JSON input'));
+    const status = isParsingError ? 400 : 500;
+    const message = isParsingError ? "Request body is empty or malformed." : error.message;
+
+    console.error('Consume Credits Function Error:', message);
+    return new Response(JSON.stringify({ error: message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
+      status: status,
     });
   }
 });

@@ -35,22 +35,22 @@ type NotificationRow = Database['public']['Tables']['notifications']['Row'];
 const profileRowToUser = (row: ProfileRow, youtubeConnected: boolean): User => ({
     id: row.id,
     email: row.email,
-    subscription: row.subscription as Subscription,
+    subscription: row.subscription as unknown as Subscription,
     aiCredits: row.ai_credits,
-    channelAudit: row.channel_audit as ChannelAudit | null,
+    channelAudit: row.channel_audit as unknown as ChannelAudit | null,
     youtubeConnected,
     content_pillars: row.content_pillars || [],
-    cloned_voices: (row.cloned_voices as ClonedVoice[] | null) || [],
+    cloned_voices: (row.cloned_voices as unknown as ClonedVoice[] | null) || [],
 });
 
 const userToProfileUpdate = (updates: Partial<User>): ProfileUpdate => {
     const dbUpdates: ProfileUpdate = {};
     if (updates.aiCredits !== undefined) dbUpdates.ai_credits = updates.aiCredits;
-    if (updates.channelAudit !== undefined) dbUpdates.channel_audit = updates.channelAudit;
+    if (updates.channelAudit !== undefined) dbUpdates.channel_audit = updates.channelAudit as unknown as Json;
     if (updates.email !== undefined) dbUpdates.email = updates.email;
-    if (updates.subscription !== undefined) dbUpdates.subscription = updates.subscription;
+    if (updates.subscription !== undefined) dbUpdates.subscription = updates.subscription as unknown as Json;
     if (updates.content_pillars !== undefined) dbUpdates.content_pillars = updates.content_pillars;
-    if (updates.cloned_voices !== undefined) dbUpdates.cloned_voices = updates.cloned_voices;
+    if (updates.cloned_voices !== undefined) dbUpdates.cloned_voices = updates.cloned_voices as unknown as Json;
     return dbUpdates;
 };
 
@@ -61,14 +61,14 @@ const projectRowToProject = (row: ProjectRow): Project => ({
     platform: row.platform as Platform,
     status: row.status as ProjectStatus,
     title: row.title,
-    script: row.script as Script | null,
-    analysis: row.analysis as Analysis | null,
-    competitorAnalysis: row.competitor_analysis as CompetitorAnalysisResult | null,
+    script: row.script as unknown as Script | null,
+    analysis: row.analysis as unknown as Analysis | null,
+    competitorAnalysis: row.competitor_analysis as unknown as CompetitorAnalysisResult | null,
     moodboard: row.moodboard,
-    assets: (row.assets as { [key: string]: SceneAssets } | null) || {},
-    soundDesign: row.sound_design as SoundDesign | null,
-    launchPlan: row.launch_plan as LaunchPlan | null,
-    performance: row.performance as VideoPerformance | null,
+    assets: (row.assets as unknown as { [key: string]: SceneAssets } | null) || {},
+    soundDesign: row.sound_design as unknown as SoundDesign | null,
+    launchPlan: row.launch_plan as unknown as LaunchPlan | null,
+    performance: row.performance as unknown as VideoPerformance | null,
     scheduledDate: row.scheduled_date,
     publishedUrl: row.published_url || undefined,
     lastUpdated: row.last_updated,
@@ -85,14 +85,14 @@ const projectToProjectUpdate = (updates: Partial<Project>): ProjectUpdate => {
     if (updates.platform !== undefined) dbUpdates.platform = updates.platform;
     if (updates.status !== undefined) dbUpdates.status = updates.status;
     if (updates.title !== undefined) dbUpdates.title = updates.title;
-    if (updates.script !== undefined) dbUpdates.script = updates.script;
-    if (updates.analysis !== undefined) dbUpdates.analysis = updates.analysis;
-    if (updates.competitorAnalysis !== undefined) dbUpdates.competitor_analysis = updates.competitorAnalysis;
+    if (updates.script !== undefined) dbUpdates.script = updates.script as unknown as Json;
+    if (updates.analysis !== undefined) dbUpdates.analysis = updates.analysis as unknown as Json;
+    if (updates.competitorAnalysis !== undefined) dbUpdates.competitor_analysis = updates.competitorAnalysis as unknown as Json;
     if (updates.moodboard !== undefined) dbUpdates.moodboard = updates.moodboard;
-    if (updates.assets !== undefined) dbUpdates.assets = updates.assets;
-    if (updates.soundDesign !== undefined) dbUpdates.sound_design = updates.soundDesign;
-    if (updates.launchPlan !== undefined) dbUpdates.launch_plan = updates.launchPlan;
-    if (updates.performance !== undefined) dbUpdates.performance = updates.performance;
+    if (updates.assets !== undefined) dbUpdates.assets = updates.assets as unknown as Json;
+    if (updates.soundDesign !== undefined) dbUpdates.sound_design = updates.soundDesign as unknown as Json;
+    if (updates.launchPlan !== undefined) dbUpdates.launch_plan = updates.launchPlan as unknown as Json;
+    if (updates.performance !== undefined) dbUpdates.performance = updates.performance as unknown as Json;
     if (updates.scheduledDate !== undefined) dbUpdates.scheduled_date = updates.scheduledDate;
     if (updates.publishedUrl !== undefined) dbUpdates.published_url = updates.publishedUrl;
     // lastUpdated is managed by a database trigger, client should not set it.
@@ -225,19 +225,19 @@ export const createProject = async (projectData: Omit<Project, 'id'|'lastUpdated
         platform: projectData.platform,
         status: projectData.status,
         title: projectData.title,
-        script: projectData.script,
-        analysis: projectData.analysis,
-        competitor_analysis: projectData.competitorAnalysis,
+        script: projectData.script as unknown as Json | null,
+        analysis: projectData.analysis as unknown as Json | null,
+        competitor_analysis: projectData.competitorAnalysis as unknown as Json | null,
         moodboard: projectData.moodboard,
-        assets: projectData.assets,
-        sound_design: projectData.soundDesign,
-        launch_plan: projectData.launchPlan,
-        performance: projectData.performance,
+        assets: projectData.assets as unknown as Json | null,
+        sound_design: projectData.soundDesign as unknown as Json | null,
+        launch_plan: projectData.launchPlan as unknown as Json | null,
+        performance: projectData.performance as unknown as Json | null,
         scheduled_date: projectData.scheduledDate,
-        published_url: projectData.publishedUrl,
+        published_url: projectData.publishedUrl || null,
         workflow_step: projectData.workflowStep,
-        voiceover_voice_id: projectData.voiceoverVoiceId,
-        last_performance_check: projectData.last_performance_check,
+        voiceover_voice_id: projectData.voiceoverVoiceId || null,
+        last_performance_check: projectData.last_performance_check || null,
     };
     
     const { data, error } = await supabase
@@ -290,6 +290,7 @@ export const dataUrlToBlob = async (dataUrl: string): Promise<Blob> => {
 
 
 // --- Edge Functions ---
+
 export const invokeEdgeFunction = async (name: string, body: object, responseType: 'json' | 'blob' = 'json') => {
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !session) {
@@ -297,35 +298,37 @@ export const invokeEdgeFunction = async (name: string, body: object, responseTyp
     }
 
     const headers: HeadersInit = {
-        'Content-Type': body instanceof FormData ? 'multipart/form-data' : 'application/json',
         'Authorization': `Bearer ${session.access_token}`,
     };
-    // Let the browser set the Content-Type for FormData
+    
+    let requestBody: BodyInit | null = null;
     if (body instanceof FormData) {
-        delete headers['Content-Type'];
+        requestBody = body;
+    } else {
+        // Only set Content-Type for JSON bodies
+        headers['Content-Type'] = 'application/json';
+        requestBody = JSON.stringify(body);
     }
 
     const response = await supabase.functions.invoke(name, {
-        body: body instanceof FormData ? body : JSON.stringify(body),
+        body: requestBody,
         headers,
     });
     
     if (response.error) {
-        // Attempt to parse the underlying error for better messages
         try {
+            // Attempt to parse a more specific error message from the function's response.
             const errorBody = JSON.parse(response.error.context.responseText);
             throw new Error(errorBody.error || response.error.message);
         } catch (e) {
+            // Fallback to the default Supabase error.
             throw response.error;
         }
     }
     
-    if (responseType === 'blob') {
-        return response.data; // Assuming the function returns a blob directly
-    }
-
     return response.data;
 };
+
 
 // --- Notifications ---
 export const getNotifications = async (userId: string): Promise<Notification[]> => {
