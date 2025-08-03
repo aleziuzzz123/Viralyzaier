@@ -15,7 +15,7 @@ const platformIcons: { [key in Platform]: React.FC<{className?: string}> } = {
 };
 
 const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
-    const { user, consumeCredits, addToast, handleCreateProjectFromBlueprint, t, prefilledBlueprintPrompt, setPrefilledBlueprintPrompt } = useAppContext();
+    const { user, consumeCredits, handleCreateProjectFromBlueprint, t, prefilledBlueprintPrompt, setPrefilledBlueprintPrompt, addToast, lockAndExecute } = useAppContext();
     const [topicOrUrl, setTopicOrUrl] = useState('');
     const [platform, setPlatform] = useState<Platform | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -26,13 +26,12 @@ const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; 
     useEffect(() => {
         if (isOpen && prefilledBlueprintPrompt) {
             setTopicOrUrl(prefilledBlueprintPrompt);
-            setPrefilledBlueprintPrompt(null); // Consume the pre-filled prompt
+            setPrefilledBlueprintPrompt(null);
             addToast("Prompt pre-filled from performance insights!", 'success');
         }
     }, [isOpen, prefilledBlueprintPrompt, setPrefilledBlueprintPrompt, addToast]);
 
-
-    const handleGenerate = async () => {
+    const handleGenerate = () => lockAndExecute(async () => {
         if (!platform) {
             setError(t('blueprint_modal.error_platform'));
             return;
@@ -48,9 +47,10 @@ const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; 
         setSelectedTitle(null);
 
         try {
-            if (!await consumeCredits(5)) {
-                // consumeCredits handles its own error/modal display.
-                return; // Abort the operation.
+            const canProceed = await consumeCredits(5);
+            if (!canProceed) {
+                // consumeCredits handles its own toasts, so we just exit.
+                return;
             }
             
             const blueprintResult = await generateVideoBlueprint(topicOrUrl, platform);
@@ -65,7 +65,7 @@ const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; 
         } finally {
             setIsLoading(false);
         }
-    };
+    });
     
     const handleUseChannelData = () => {
         if (user?.channelAudit) {
@@ -76,14 +76,14 @@ const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; 
         }
     };
 
-    const handleAccept = () => {
+    const handleAccept = () => lockAndExecute(async () => {
         if (blueprint && selectedTitle) {
-            handleCreateProjectFromBlueprint(blueprint, selectedTitle);
+            await handleCreateProjectFromBlueprint(blueprint, selectedTitle);
             handleClose();
         } else {
             addToast(t('toast.select_title_first'), 'error');
         }
-    };
+    });
 
     const handleClose = () => {
         setBlueprint(null);
@@ -91,6 +91,7 @@ const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; 
         setError(null);
         setSelectedTitle(null);
         setPlatform(null);
+        setIsLoading(false);
         onClose();
     };
 
@@ -150,10 +151,10 @@ const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; 
                             </div>
                             <button
                                 onClick={handleGenerate}
-                                disabled={!platform || !topicOrUrl || isLoading}
+                                disabled={isLoading}
                                 className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed"
                             >
-                                {t('blueprint_modal.generate_button')}
+                                {isLoading ? t('blueprint_modal.loading') : t('blueprint_modal.generate_button')}
                             </button>
                             {error && <p className="text-red-400 mt-2">{error}</p>}
                         </div>
@@ -212,7 +213,7 @@ const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; 
                     <div className="pt-6 text-center flex-shrink-0">
                         <button
                             onClick={handleAccept}
-                            disabled={!selectedTitle}
+                            disabled={!selectedTitle || isLoading}
                             className="w-full max-w-sm inline-flex items-center justify-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-full transition-all duration-300 ease-in-out transform hover:scale-105 shadow-lg disabled:bg-gray-500 disabled:cursor-not-allowed"
                         >
                             {t('blueprint_modal.accept_button')}
@@ -232,10 +233,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelectProject }) => {
     const { projects, user, dismissedTutorials, addToast, t, isInitialLoading } = useAppContext();
     const [isBlueprintModalOpen, setIsBlueprintModalOpen] = useState(false);
     
-    // Smart onboarding for new users
     useEffect(() => {
-        // This effect will run once when the user and projects are loaded.
-        // If there's a user but no projects, we assume it's a new user experience.
         const hasSeenOnboarding = localStorage.getItem('hasSeenOnboarding');
         if (user && projects.length === 0 && !isInitialLoading && !hasSeenOnboarding) {
           setIsBlueprintModalOpen(true);

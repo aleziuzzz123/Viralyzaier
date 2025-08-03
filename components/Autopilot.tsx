@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { generateAutopilotBacklog } from '../services/geminiService';
 import * as supabase from '../services/supabaseService';
@@ -6,7 +6,7 @@ import { SparklesIcon, RocketLaunchIcon, PlusIcon, TrashIcon } from './Icons';
 import { Project } from '../types';
 
 const Autopilot: React.FC = () => {
-    const { user, setUser, consumeCredits, requirePermission, addToast, t, addProjects, setActiveProjectId } = useAppContext();
+    const { user, setUser, consumeCredits, requirePermission, addToast, t, addProjects, setActiveProjectId, lockAndExecute } = useAppContext();
     const [pillars, setPillars] = useState<string[]>(user?.content_pillars || []);
     const [newPillar, setNewPillar] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -36,16 +36,22 @@ const Autopilot: React.FC = () => {
         }
     };
 
-    const handleGenerateBacklog = async () => {
+    const handleGenerateBacklog = () => lockAndExecute(async () => {
         if (!user || !user.channelAudit || !requirePermission('viralyzaier')) return;
         if (pillars.length === 0) {
             addToast("Please add at least one content pillar.", "error");
             return;
         }
-        if (!await consumeCredits(25)) return;
-
+        
         setIsLoading(true);
+        
         try {
+            if (!await consumeCredits(25)) {
+                // Manually reset loading if credits fail, as finally block won't be reached in the same way.
+                setIsLoading(false);
+                return;
+            }
+            
             const newBlueprints = await generateAutopilotBacklog('youtube', pillars, user.channelAudit);
             
             const createdProjects: Project[] = [];
@@ -68,7 +74,7 @@ const Autopilot: React.FC = () => {
                 const moodboardUrls = await Promise.all(
                     bp.moodboard.map(async (base64Img, index) => {
                         const blob = await supabase.dataUrlToBlob(base64Img);
-                        const path = `${user.id}/${newProject.id}/moodboard_${index}.jpg`;
+                        const path = `${user!.id}/${newProject.id}/moodboard_${index}.jpg`;
                         return supabase.uploadFile(blob, path);
                     })
                 );
@@ -88,7 +94,7 @@ const Autopilot: React.FC = () => {
         } finally {
             setIsLoading(false);
         }
-    };
+    });
 
     if (!user?.channelAudit) {
         return (
