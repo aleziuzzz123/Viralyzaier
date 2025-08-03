@@ -94,7 +94,7 @@ const projectToProjectUpdate = (updates: Partial<Project>): ProjectUpdate => {
     if (updates.publishedUrl !== undefined) dbUpdates.published_url = updates.publishedUrl;
     if (updates.lastUpdated !== undefined) dbUpdates.last_updated = updates.lastUpdated;
     if (updates.workflowStep !== undefined) dbUpdates.workflow_step = updates.workflowStep;
-    if (updates.voiceoverVoiceId !== undefined) dbUpdates.voiceover_voice_id = updates.voiceoverVoiceId;
+    if (updates.voiceId !== undefined) dbUpdates.voiceover_voice_id = updates.voiceId;
     if (updates.last_performance_check !== undefined) dbUpdates.last_performance_check = updates.last_performance_check;
     return dbUpdates;
 }
