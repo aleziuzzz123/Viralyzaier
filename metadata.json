@@ -1,0 +1,8 @@
+{
+  "name": "Viralyzaier: Your AI Video Growth Engine.",
+  "description": "Viralyzaier is your end-to-end AI partner for creating viral videos. Go from idea to launch-ready hit with a strategic workflow that covers scriptwriting, asset generation, performance analysis, and data-driven growth.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "prompt": ""
+}
