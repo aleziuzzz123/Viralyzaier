@@ -47,10 +47,10 @@ const userToProfileUpdate = (updates: Partial<User>): ProfileUpdate => {
     const dbUpdates: ProfileUpdate = {};
     if (updates.aiCredits !== undefined) dbUpdates.ai_credits = updates.aiCredits;
     if (updates.channelAudit !== undefined) dbUpdates.channel_audit = updates.channelAudit as unknown as Json;
+    if (updates.cloned_voices !== undefined) dbUpdates.cloned_voices = updates.cloned_voices as unknown as Json;
+    if (updates.content_pillars !== undefined) dbUpdates.content_pillars = updates.content_pillars;
     if (updates.email !== undefined) dbUpdates.email = updates.email;
     if (updates.subscription !== undefined) dbUpdates.subscription = updates.subscription as unknown as Json;
-    if (updates.content_pillars !== undefined) dbUpdates.content_pillars = updates.content_pillars;
-    if (updates.cloned_voices !== undefined) dbUpdates.cloned_voices = updates.cloned_voices as unknown as Json;
     return dbUpdates;
 };
 
@@ -214,7 +214,7 @@ export const getProjectsForUser = async (userId: string): Promise<Project[]> => 
         .order('last_updated', { ascending: false });
 
     if (error) throw error;
-    return ((data as unknown as ProjectRow[]) || []).map(projectRowToProject);
+    return (data || []).map(projectRowToProject);
 };
 
 export const createProject = async (projectData: Omit<Project, 'id'|'lastUpdated'>, userId: string): Promise<Project> => {
@@ -242,13 +242,13 @@ export const createProject = async (projectData: Omit<Project, 'id'|'lastUpdated
     
     const { data, error } = await supabase
         .from('projects')
-        .insert(projectToInsert)
+        .insert([projectToInsert])
         .select('*')
         .single();
         
     if (error) throw error;
     if (!data) throw new Error("Project data not returned after creation.");
-    return projectRowToProject(data as unknown as ProjectRow);
+    return projectRowToProject(data);
 };
 
 export const updateProject = async (projectId: string, updates: Partial<Project>): Promise<Project> => {
@@ -263,7 +263,7 @@ export const updateProject = async (projectId: string, updates: Partial<Project>
         
     if (error) throw error;
     if (!data) throw new Error("Project data not returned after update.");
-    return projectRowToProject(data as unknown as ProjectRow);
+    return projectRowToProject(data);
 };
 
 export const deleteProject = async (projectId: string): Promise<void> => {
@@ -291,7 +291,7 @@ export const dataUrlToBlob = async (dataUrl: string): Promise<Blob> => {
 
 // --- Edge Functions ---
 
-export const invokeEdgeFunction = async (name: string, body: object, responseType: 'json' | 'blob' = 'json') => {
+export const invokeEdgeFunction = async (name: string, body: object | FormData, responseType: 'json' | 'blob' = 'json') => {
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !session) {
         throw new Error(sessionError?.message || 'User is not authenticated.');
@@ -339,7 +339,7 @@ export const getNotifications = async (userId: string): Promise<Notification[]> 
         .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return ((data as unknown as NotificationRow[]) || []).map(notificationRowToNotification);
+    return (data || []).map(notificationRowToNotification);
 };
 
 export const markNotificationAsRead = async (notificationId: string): Promise<void> => {

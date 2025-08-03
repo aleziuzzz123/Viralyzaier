@@ -1,10 +1,11 @@
-import React, { createContext, useState, useEffect, useCallback, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useEffect, useCallback, useContext, ReactNode, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Project, User, PlanId, Blueprint, Toast, Platform, Opportunity, ContentGapSuggestion, PerformanceReview, Notification, ProjectStatus, Database } from '../types';
 import * as supabaseService from '../services/supabaseService';
-import { supabase } from '../services/supabaseClient';
+import { supabase } from '../services/supabaseClient'; // Import client directly
 import { type AuthSession } from '@supabase/supabase-js';
 import { createCheckoutSession, PLANS } from '../services/paymentService';
+import { fetchVideoPerformance } from '../services/youtubeService';
 import UpgradeModal from '../components/UpgradeModal';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { translations, Language, TranslationKey } from '../translations';
@@ -67,10 +68,12 @@ interface ConfirmationState {
     onConfirm: () => void;
 }
 
+// A robust utility to extract a readable message from any error type.
 export const getErrorMessage = (error: unknown): string => {
     if (typeof error === 'string') return error;
     if (error && typeof error === 'object') {
         if ('message' in error && typeof error.message === 'string') {
+            // This handles standard Errors and Supabase errors
             let message = error.message;
             if ('details' in error && typeof error.details === 'string' && error.details) {
                 message += ` (${error.details})`;
@@ -80,10 +83,13 @@ export const getErrorMessage = (error: unknown): string => {
             }
             return message;
         }
+        // Fallback for other object types to prevent "[object Object]"
         try {
             const str = JSON.stringify(error);
             if (str !== '{}') return str;
-        } catch {}
+        } catch {
+            // Fallback if stringify fails
+        }
         return 'An unknown object error occurred. Check the console for details.';
     }
     return 'An unknown error occurred.';
@@ -113,6 +119,8 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     const [backendError, setBackendError] = useState<{ title: string; message: string } | null>(null);
     const clearBackendError = () => setBackendError(null);
     
+    const isProcessingAction = useRef(false); // Global lock for all major AI operations
+
     const [language, setLanguageState] = useState<Language>(() => {
         const savedLang = localStorage.getItem('viralyzaier-lang');
         const browserLang = navigator.language.split('-')[0];
@@ -148,6 +156,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       setToasts(t => [...t, newToast]);
     }, []);
     
+    // --- AUTH & DATA LOADING ---
     useEffect(() => {
         supabaseService.getSession().then(({ session }) => setSession(session))
         .catch(err => {
@@ -199,6 +208,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         }
     }, [session, addToast, t]);
     
+     // Real-time notifications subscription
     useEffect(() => {
         if (!session?.user) return;
 
@@ -225,24 +235,25 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         };
     }, [session, addToast, t]);
     
+    // Immediate feedback after Stripe or OAuth redirect
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.has('payment_success')) {
             addToast('Payment successful! Your plan has been upgraded.', 'success');
-            window.history.replaceState({}, document.title, window.location.pathname);
+            window.history.replaceState({}, document.title, window.location.pathname); // Clean URL
         }
         if (urlParams.has('payment_canceled')) {
             addToast('Payment was canceled. You can try again from the pricing page.', 'info');
-            window.history.replaceState({}, document.title, window.location.pathname);
+            window.history.replaceState({}, document.title, window.location.pathname); // Clean URL
         }
          if (urlParams.has('youtube_connected')) {
             addToast('YouTube channel connected successfully!', 'success');
-            if(user) supabaseService.getUserProfile(user.id).then(setUser);
-            window.history.replaceState({}, document.title, window.location.pathname);
+            if(user) supabaseService.getUserProfile(user.id).then(setUser); // Refresh user profile
+            window.history.replaceState({}, document.title, window.location.pathname); // Clean URL
         }
         if (urlParams.has('youtube_error')) {
             addToast(`Failed to connect YouTube channel: ${urlParams.get('youtube_error')}`, 'error');
-            window.history.replaceState({}, document.title, window.location.pathname);
+            window.history.replaceState({}, document.title, window.location.pathname); // Clean URL
         }
     }, [addToast, user]);
     
@@ -259,10 +270,15 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     };
 
     const consumeCredits = useCallback(async (amount: number): Promise<boolean> => {
+        if (isProcessingAction.current) {
+            addToast("Please wait for the current operation to complete.", 'info');
+            return false;
+        }
         if (!user) return false;
         
+        isProcessingAction.current = true;
         try {
-            const result = await supabaseService.invokeEdgeFunction('consume-credits', { body: { amount_to_consume: amount } });
+            const result = await supabaseService.invokeEdgeFunction('consume-credits', { amount_to_consume: amount });
 
             if (result.success) {
                 setUser(prev => prev ? { ...prev, aiCredits: result.newCredits } : null);
@@ -282,11 +298,13 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         } catch (e) {
             const errorMessage = getErrorMessage(e);
              if (errorMessage.includes('Function is not configured') || errorMessage.includes('secrets')) {
-                setBackendError({ title: "Backend Configuration Error", message: errorMessage });
+                setBackendError({ title: t('backend_error.title'), message: errorMessage });
             } else {
                 addToast(errorMessage, 'error');
             }
             return false;
+        } finally {
+            isProcessingAction.current = false;
         }
     }, [user, addToast, t]);
 
@@ -301,55 +319,59 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         }
     };
     
-    const handleCreateProjectFromBlueprint = async (blueprint: Blueprint, selectedTitle: string) => {
+    const handleCreateProjectFromBlueprint = async (blueprint: Blueprint, selectedTitle: string, status: ProjectStatus = 'Idea') => {
+        if (isProcessingAction.current) {
+            addToast("Please wait for the current operation to complete.", 'info');
+            return;
+        }
         if (!user) return;
-    
-        const isValidBlueprint = blueprint?.strategicSummary?.trim().length > 10 && 
-                                 blueprint.suggestedTitles?.length > 0 &&
-                                 blueprint.script?.hooks?.length > 0 &&
-                                 blueprint.script?.scenes?.length > 0 &&
-                                 !!blueprint.script?.cta &&
-                                 blueprint.moodboard?.length > 0;
-    
+
+        const isValidBlueprint = blueprint?.strategicSummary?.trim().length > 10 && blueprint.suggestedTitles?.length > 0 && blueprint.script?.scenes?.length > 0 && blueprint.moodboard?.length > 0;
         if (!isValidBlueprint) {
             addToast("The AI returned an incomplete plan. Please try generating the blueprint again.", "error");
             return;
         }
-    
+
+        let newProject: Project | null = null;
+        isProcessingAction.current = true;
         try {
+            // Step 1: Create a placeholder project to get a stable ID
+            const initialProjectData: Omit<Project, 'id' | 'lastUpdated'> = {
+                name: selectedTitle, status, platform: blueprint.platform,
+                topic: blueprint.strategicSummary, title: selectedTitle, script: blueprint.script,
+                moodboard: [], workflowStep: 2, analysis: null, competitorAnalysis: null, 
+                scheduledDate: null, assets: {}, soundDesign: null, launchPlan: null, 
+                performance: null, publishedUrl: undefined,
+            };
+
+            newProject = await supabaseService.createProject(initialProjectData, user.id);
+            setProjects(prev => [newProject!, ...prev]);
+            setActiveProjectId(newProject.id);
+
+            // Step 2: Upload moodboard images to a structured path using the new project ID
             const moodboardUrls = await Promise.all(
                 blueprint.moodboard.map(async (base64Img, index) => {
                     const blob = await supabaseService.dataUrlToBlob(base64Img);
-                    const path = `${user.id}/project_${Date.now()}_${index}/moodboard.jpg`;
+                    const path = `${user.id}/${newProject!.id}/moodboard_${index}.jpg`;
                     return supabaseService.uploadFile(blob, path);
                 })
             );
-    
-            const newProjectData: Omit<Project, 'id' | 'lastUpdated'> = {
-                name: selectedTitle,
-                status: 'Idea',
-                platform: blueprint.platform,
-                topic: blueprint.strategicSummary,
-                title: selectedTitle,
-                script: blueprint.script,
-                moodboard: moodboardUrls,
-                workflowStep: 2,
-                analysis: null,
-                competitorAnalysis: null,
-                scheduledDate: null,
-                assets: {},
-                soundDesign: null,
-                launchPlan: null,
-                performance: null,
-            };
-    
-            const newProject = await supabaseService.createProject(newProjectData, user.id);
-            setProjects(prev => [newProject, ...prev]);
-            setActiveProjectId(newProject.id);
+
+            // Step 3: Update the project with the final moodboard URLs
+            const updatedProject = await supabaseService.updateProject(newProject.id, { moodboard: moodboardUrls });
+            setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
             addToast(t('toast.project_created_blueprint'), 'success');
         } catch (error) {
             console.error("Error creating project from blueprint:", error);
             addToast(`${t('toast.failed_update_project')}: ${getErrorMessage(error)}`, "error");
+            // Cleanup: If project was created but uploads failed, delete the orphaned project
+            if (newProject) {
+                await supabaseService.deleteProject(newProject.id);
+                setProjects(prev => prev.filter(p => p.id !== newProject!.id));
+                setActiveProjectId(null);
+            }
+        } finally {
+            isProcessingAction.current = false;
         }
     };
     
@@ -364,7 +386,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             name: suggestion.idea, status: 'Idea', platform: platform, topic: suggestion.reason,
             title: title, workflowStep: 1, script: null, analysis: null,
             competitorAnalysis: null, scheduledDate: null, moodboard: null, assets: {},
-            soundDesign: null, launchPlan: null, performance: null
+            soundDesign: null, launchPlan: null, performance: null, publishedUrl: undefined,
         };
         const newProject = await supabaseService.createProject(newProjectData, user.id);
         setProjects(prev => [newProject, ...prev]);
@@ -375,6 +397,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     const handleCreateProjectFromInsights = (review: PerformanceReview, originalProject: Project) => {
         const insightsPrompt = `Based on a previous video titled "${originalProject.title}", here's what we learned. What worked: ${review.whatWorked.join(', ')}. What to improve: ${review.whatToImprove.join(', ')}. Generate a new video idea based on this feedback for the ${originalProject.platform} platform.`;
         setPrefilledBlueprintPrompt(insightsPrompt);
+        // Navigate to dashboard which will trigger the blueprint modal
         setActiveProjectId(null);
         addToast("Blueprint prompt pre-filled with performance insights!", "success");
     };
@@ -402,6 +425,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       const userPlanIndex = PLANS.findIndex(p => p.id === user.subscription.planId);
       const requiredPlanIndex = PLANS.findIndex(p => p.id === requiredPlan);
 
+      // Check for active subscription or if it's a canceled plan that hasn't expired yet
       const hasActiveSubscription = user.subscription.status === 'active' || (user.subscription.status === 'canceled' && user.subscription.endDate && user.subscription.endDate * 1000 > Date.now());
 
       if (hasActiveSubscription && userPlanIndex >= requiredPlanIndex) {
@@ -425,7 +449,10 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
 
         try {
             if (planId === 'free') {
+                // Here you would typically call your backend to cancel the Stripe subscription
+                // For now, we simulate a downgrade.
                 addToast("Downgrading to Free is handled through your Stripe customer portal.", "info");
+
             } else {
                 const { checkoutUrl } = await createCheckoutSession(planId);
                 window.location.href = checkoutUrl;
@@ -476,7 +503,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         handleSubscriptionChange, handleUpdateProject, handleCreateProjectFromBlueprint,
         handleCreateProjectFromIdea, handleDeleteProject, requestConfirmation, setUpgradeModalOpen,
         setActiveProjectId, setUser, setPrefilledBlueprintPrompt, handleCreateProjectFromInsights,
-        addProjects,
+        addProjects
     };
     
     return (
