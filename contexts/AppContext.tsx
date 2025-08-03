@@ -281,7 +281,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         if (!user) return false;
         
         try {
-            const result = await supabaseService.invokeEdgeFunction('consume-credits', { amount_to_consume: amount });
+            const result = await supabase.invokeEdgeFunction('consume-credits', { body: { amount_to_consume: amount } });
 
             if (result.success) {
                 setUser(prev => prev ? { ...prev, aiCredits: result.newCredits } : null);
