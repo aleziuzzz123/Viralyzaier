@@ -20,8 +20,6 @@ interface AppContextType {
     upgradeReason: { title: string; description: string };
     confirmation: ConfirmationState;
     language: Language;
-    runwayMlApiKeyError: boolean;
-    elevenLabsApiKeyError: boolean;
     prefilledBlueprintPrompt: string | null;
     notifications: Notification[];
     isInitialLoading: boolean;
@@ -107,8 +105,6 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     const [isInitialLoading, setIsInitialLoading] = useState(true);
     
     const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
-    const [runwayMlApiKeyError, setRunwayMlApiKeyError] = useState(false);
-    const [elevenLabsApiKeyError, setElevenLabsApiKeyError] = useState(false);
     
     const [isUpgradeModalOpen, setUpgradeModalOpen] = useState(false);
     const [upgradeReason, setUpgradeReason] = useState<{title: string, description: string}>({title: '', description: ''});
@@ -134,12 +130,6 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         }
         return 'en';
     });
-
-    useEffect(() => {
-        const env = (window as any).__env || {};
-        setRunwayMlApiKeyError(!env.VITE_RUNWAYML_API_SECRET || env.VITE_RUNWAYML_API_SECRET.includes('YOUR_'));
-        setElevenLabsApiKeyError(!env.VITE_ELEVENLABS_API_KEY || env.VITE_ELEVENLABS_API_KEY.includes('YOUR_'));
-    }, []);
 
     const setLanguage = (lang: Language) => {
         localStorage.setItem('viralyzaier-lang', lang);
@@ -281,7 +271,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         if (!user) return false;
         
         try {
-            const result = await supabase.invokeEdgeFunction('consume-credits', { amount_to_consume: amount });
+            const result = await supabaseService.invokeEdgeFunction('consume-credits', { amount_to_consume: amount });
 
             if (result.success) {
                 setUser(prev => prev ? { ...prev, aiCredits: result.newCredits } : null);
@@ -489,7 +479,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     const value: AppContextType = {
         session, user, projects, toasts, dismissedTutorials,
         isUpgradeModalOpen, upgradeReason, confirmation, activeProjectId,
-        language, setLanguage, t, runwayMlApiKeyError, elevenLabsApiKeyError, prefilledBlueprintPrompt,
+        language, setLanguage, t, prefilledBlueprintPrompt,
         notifications, markNotificationAsRead, markAllNotificationsAsRead,
         isInitialLoading, isScheduleModalOpen, projectToSchedule,
         openScheduleModal, closeScheduleModal, backendError, clearBackendError,
