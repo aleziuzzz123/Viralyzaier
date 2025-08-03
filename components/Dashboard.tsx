@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Project, Blueprint, Platform } from '../types';
 import { FilePlusIcon, SparklesIcon, LightBulbIcon, YouTubeIcon, TikTokIcon, InstagramIcon } from './Icons';
@@ -17,7 +15,7 @@ const platformIcons: { [key in Platform]: React.FC<{className?: string}> } = {
 };
 
 const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
-    const { user, consumeCredits, addToast, handleCreateProjectFromBlueprint, t, prefilledBlueprintPrompt, setPrefilledBlueprintPrompt, lockAndExecute } = useAppContext();
+    const { user, consumeCredits, addToast, handleCreateProjectFromBlueprint, t, prefilledBlueprintPrompt, setPrefilledBlueprintPrompt } = useAppContext();
     const [topicOrUrl, setTopicOrUrl] = useState('');
     const [platform, setPlatform] = useState<Platform | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -34,7 +32,7 @@ const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; 
     }, [isOpen, prefilledBlueprintPrompt, setPrefilledBlueprintPrompt, addToast]);
 
 
-    const handleGenerate = () => {
+    const handleGenerate = async () => {
         if (!platform) {
             setError(t('blueprint_modal.error_platform'));
             return;
@@ -44,29 +42,29 @@ const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; 
             return;
         }
         
-        lockAndExecute(async () => {
-            setIsLoading(true);
-            setError(null);
-            setBlueprint(null);
-            setSelectedTitle(null);
+        setIsLoading(true);
+        setError(null);
+        setBlueprint(null);
+        setSelectedTitle(null);
 
-            try {
-                if (!await consumeCredits(5)) {
-                    // consumeCredits handles its own error/modal display.
-                    return; // Abort the operation.
-                }
-                
-                const blueprintResult = await generateVideoBlueprint(topicOrUrl, platform);
-                
-                if (blueprintResult) {
-                    setBlueprint(blueprintResult);
-                } else {
-                    throw new Error("Failed to generate blueprint. The AI may have returned an invalid response.");
-                }
-            } finally {
-                setIsLoading(false);
+        try {
+            if (!await consumeCredits(5)) {
+                // consumeCredits handles its own error/modal display.
+                return; // Abort the operation.
             }
-        });
+            
+            const blueprintResult = await generateVideoBlueprint(topicOrUrl, platform);
+            
+            if (blueprintResult) {
+                setBlueprint(blueprintResult);
+            } else {
+                throw new Error("Failed to generate blueprint. The AI may have returned an invalid response.");
+            }
+        } catch (err) {
+            addToast(getErrorMessage(err), 'error');
+        } finally {
+            setIsLoading(false);
+        }
     };
     
     const handleUseChannelData = () => {

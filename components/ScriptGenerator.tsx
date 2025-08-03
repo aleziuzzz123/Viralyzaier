@@ -1,7 +1,3 @@
-
-
-
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Project, Script, Platform, ScriptOptimization, PlanId } from '../types';
 import { generateOptimizedScript } from '../services/geminiService';
@@ -17,7 +13,7 @@ const ScriptGenerator: React.FC<{
     onProceed: () => void;
     platform: Platform;
 }> = ({ project, onScriptGenerated, onProceed, platform }) => {
-    const { user, consumeCredits, addToast, t, lockAndExecute } = useAppContext();
+    const { user, consumeCredits, addToast, t } = useAppContext();
 
     type Tab = 'generate' | 'optimize';
     const [activeTab, setActiveTab] = useState<Tab>('generate');
@@ -108,7 +104,7 @@ const ScriptGenerator: React.FC<{
         return t('script_optimizer.length_unit_minutes', { m: Math.round(seconds / 60) });
     };
 
-    const handleStartOptimization = () => {
+    const handleStartOptimization = async () => {
         if (activeTab === 'generate' && !topic.trim()) {
             setError(t('script_optimizer.error_topic_missing'));
             return;
@@ -118,32 +114,30 @@ const ScriptGenerator: React.FC<{
             return;
         }
 
-        lockAndExecute(async () => {
-            setStatus('processing');
-            setError(null);
-            setOptimizationResult(null);
-            
-            try {
-                if (!await consumeCredits(creditsNeeded)) {
-                    setStatus('idle'); // Reset if credits fail
-                    return;
-                }
-                const result = await generateOptimizedScript(
-                    platform,
-                    scriptLength,
-                    activeTab === 'generate' ? { topic } : { userScript: pastedScript }
-                );
-                if (result) {
-                    setOptimizationResult(result);
-                    // The useEffect will handle transitioning status to 'done' after animation
-                } else {
-                    throw new Error("Failed to generate script.");
-                }
-            } catch (err) {
-                // The wrapper will show the toast. We just need to reset the UI state.
+        setStatus('processing');
+        setError(null);
+        setOptimizationResult(null);
+        
+        try {
+            if (!await consumeCredits(creditsNeeded)) {
                 setStatus('idle');
+                return;
             }
-        });
+            const result = await generateOptimizedScript(
+                platform,
+                scriptLength,
+                activeTab === 'generate' ? { topic } : { userScript: pastedScript }
+            );
+            if (result) {
+                setOptimizationResult(result);
+                // The useEffect will handle transitioning status to 'done' after animation
+            } else {
+                throw new Error("Failed to generate script.");
+            }
+        } catch (err) {
+            addToast(getErrorMessage(err), 'error');
+            setStatus('idle');
+        }
     };
 
     const handleAcceptScript = () => {
