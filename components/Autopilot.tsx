@@ -59,7 +59,7 @@ const Autopilot: React.FC = () => {
                     })
                 );
 
-                const newProjectData: Omit<Project, 'id' | 'lastUpdated'> = {
+                const newProjectData: Omit<Project, 'id' | 'lastUpdated' | 'user_id'> = {
                     name: title, status: 'Autopilot', platform: bp.platform,
                     topic: bp.strategicSummary, title: title, script: bp.script,
                     moodboard: moodboardUrls, workflowStep: 2, analysis: null,
