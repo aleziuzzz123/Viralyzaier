@@ -2,10 +2,9 @@ import React, { createContext, useState, useEffect, useCallback, useContext, Rea
 import { createPortal } from 'react-dom';
 import { Project, User, PlanId, Blueprint, Toast, Platform, Opportunity, ContentGapSuggestion, PerformanceReview, Notification, ProjectStatus, Database } from '../types';
 import * as supabaseService from '../services/supabaseService';
-import { supabase } from '../services/supabaseClient'; // Import client directly
+import { supabase } from '../services/supabaseClient';
 import { type AuthSession } from '@supabase/supabase-js';
 import { createCheckoutSession, PLANS } from '../services/paymentService';
-import { fetchVideoPerformance } from '../services/youtubeService';
 import UpgradeModal from '../components/UpgradeModal';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { translations, Language, TranslationKey } from '../translations';
@@ -68,12 +67,10 @@ interface ConfirmationState {
     onConfirm: () => void;
 }
 
-// A robust utility to extract a readable message from any error type.
 export const getErrorMessage = (error: unknown): string => {
     if (typeof error === 'string') return error;
     if (error && typeof error === 'object') {
         if ('message' in error && typeof error.message === 'string') {
-            // This handles standard Errors and Supabase errors
             let message = error.message;
             if ('details' in error && typeof error.details === 'string' && error.details) {
                 message += ` (${error.details})`;
@@ -83,13 +80,10 @@ export const getErrorMessage = (error: unknown): string => {
             }
             return message;
         }
-        // Fallback for other object types to prevent "[object Object]"
         try {
             const str = JSON.stringify(error);
             if (str !== '{}') return str;
-        } catch {
-            // Fallback if stringify fails
-        }
+        } catch {}
         return 'An unknown object error occurred. Check the console for details.';
     }
     return 'An unknown error occurred.';
@@ -154,7 +148,6 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       setToasts(t => [...t, newToast]);
     }, []);
     
-    // --- AUTH & DATA LOADING ---
     useEffect(() => {
         supabaseService.getSession().then(({ session }) => setSession(session))
         .catch(err => {
@@ -206,7 +199,6 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         }
     }, [session, addToast, t]);
     
-     // Real-time notifications subscription
     useEffect(() => {
         if (!session?.user) return;
 
@@ -233,25 +225,24 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         };
     }, [session, addToast, t]);
     
-    // Immediate feedback after Stripe or OAuth redirect
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.has('payment_success')) {
             addToast('Payment successful! Your plan has been upgraded.', 'success');
-            window.history.replaceState({}, document.title, window.location.pathname); // Clean URL
+            window.history.replaceState({}, document.title, window.location.pathname);
         }
         if (urlParams.has('payment_canceled')) {
             addToast('Payment was canceled. You can try again from the pricing page.', 'info');
-            window.history.replaceState({}, document.title, window.location.pathname); // Clean URL
+            window.history.replaceState({}, document.title, window.location.pathname);
         }
          if (urlParams.has('youtube_connected')) {
             addToast('YouTube channel connected successfully!', 'success');
-            if(user) supabaseService.getUserProfile(user.id).then(setUser); // Refresh user profile
-            window.history.replaceState({}, document.title, window.location.pathname); // Clean URL
+            if(user) supabaseService.getUserProfile(user.id).then(setUser);
+            window.history.replaceState({}, document.title, window.location.pathname);
         }
         if (urlParams.has('youtube_error')) {
             addToast(`Failed to connect YouTube channel: ${urlParams.get('youtube_error')}`, 'error');
-            window.history.replaceState({}, document.title, window.location.pathname); // Clean URL
+            window.history.replaceState({}, document.title, window.location.pathname);
         }
     }, [addToast, user]);
     
@@ -384,7 +375,6 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     const handleCreateProjectFromInsights = (review: PerformanceReview, originalProject: Project) => {
         const insightsPrompt = `Based on a previous video titled "${originalProject.title}", here's what we learned. What worked: ${review.whatWorked.join(', ')}. What to improve: ${review.whatToImprove.join(', ')}. Generate a new video idea based on this feedback for the ${originalProject.platform} platform.`;
         setPrefilledBlueprintPrompt(insightsPrompt);
-        // Navigate to dashboard which will trigger the blueprint modal
         setActiveProjectId(null);
         addToast("Blueprint prompt pre-filled with performance insights!", "success");
     };
@@ -412,7 +402,6 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       const userPlanIndex = PLANS.findIndex(p => p.id === user.subscription.planId);
       const requiredPlanIndex = PLANS.findIndex(p => p.id === requiredPlan);
 
-      // Check for active subscription or if it's a canceled plan that hasn't expired yet
       const hasActiveSubscription = user.subscription.status === 'active' || (user.subscription.status === 'canceled' && user.subscription.endDate && user.subscription.endDate * 1000 > Date.now());
 
       if (hasActiveSubscription && userPlanIndex >= requiredPlanIndex) {
@@ -436,10 +425,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
 
         try {
             if (planId === 'free') {
-                // Here you would typically call your backend to cancel the Stripe subscription
-                // For now, we simulate a downgrade.
                 addToast("Downgrading to Free is handled through your Stripe customer portal.", "info");
-
             } else {
                 const { checkoutUrl } = await createCheckoutSession(planId);
                 window.location.href = checkoutUrl;
