@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback } from 'react';
 import { Project, CompetitorAnalysisResult } from '../types';
 import { analyzeCompetitorVideo } from '../services/geminiService';
@@ -11,7 +12,7 @@ interface CompetitorAnalysisProps {
 }
 
 const CompetitorAnalysis: React.FC<CompetitorAnalysisProps> = ({ project, onApplyTitle }) => {
-    const { apiKeyError, consumeCredits, handleUpdateProject, t } = useAppContext();
+    const { consumeCredits, handleUpdateProject, t } = useAppContext();
     const [url, setUrl] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -21,10 +22,6 @@ const CompetitorAnalysis: React.FC<CompetitorAnalysisProps> = ({ project, onAppl
     const handleAnalyze = useCallback(async () => {
         if (!url) {
             setError(t('competitor_analysis.error_url_missing'));
-            return;
-        }
-        if (apiKeyError) {
-            setError(t('title_optimizer.error_api_key'));
             return;
         }
         if (!await consumeCredits(5)) return; // Increased cost
@@ -43,7 +40,7 @@ const CompetitorAnalysis: React.FC<CompetitorAnalysisProps> = ({ project, onAppl
         } finally {
             setIsLoading(false);
         }
-    }, [url, apiKeyError, project.id, handleUpdateProject, consumeCredits, t]);
+    }, [url, project.id, handleUpdateProject, consumeCredits, t]);
 
     const handleApplyTitle = (title: string) => {
         onApplyTitle(title);

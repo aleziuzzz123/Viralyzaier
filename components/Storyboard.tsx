@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Project, SoundDesign } from '../types';
 import { generateSoundDesign } from '../services/geminiService';
@@ -18,7 +19,7 @@ const parseTimecode = (timecode: string): { start: number, end: number, duration
 };
 
 const Storyboard: React.FC<StoryboardProps> = ({ project, onProceed }) => {
-    const { apiKeyError, consumeCredits, handleUpdateProject, t } = useAppContext();
+    const { consumeCredits, handleUpdateProject, t } = useAppContext();
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [selectedVibe, setSelectedVibe] = useState('Uplifting');
@@ -76,10 +77,6 @@ const Storyboard: React.FC<StoryboardProps> = ({ project, onProceed }) => {
     const handleGenerateSoundDesign = async () => {
         if (!project.script) {
             setError(t('storyboard.error_script_missing'));
-            return;
-        }
-        if (apiKeyError) {
-            setError(t('storyboard.error_api_key'));
             return;
         }
         if (!await consumeCredits(1)) return;

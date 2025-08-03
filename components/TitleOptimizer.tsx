@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { analyzeTitles } from '../services/geminiService';
 import { TitleAnalysis, Platform } from '../types';
@@ -20,7 +21,7 @@ const scoreColor = (score: number) => {
 };
 
 const TitleOptimizer: React.FC<TitleOptimizerProps> = ({ onTitleSelect, onBack, platform }) => {
-  const { apiKeyError, consumeCredits, projects, activeProjectId, t } = useAppContext();
+  const { consumeCredits, projects, activeProjectId, t } = useAppContext();
   const project = projects.find(p => p.id === activeProjectId);
   const initialTopic = project?.topic || '';
 
@@ -67,10 +68,6 @@ const TitleOptimizer: React.FC<TitleOptimizerProps> = ({ onTitleSelect, onBack, 
       setError(t('title_optimizer.error_text_missing', {index: index + 1}));
       return;
     }
-    if (apiKeyError) {
-      setError(t('title_optimizer.error_api_key'));
-      return;
-    }
     if (!await consumeCredits(1)) return;
 
     setIsLoading(prev => ({...prev, [index]: true}));
@@ -85,7 +82,7 @@ const TitleOptimizer: React.FC<TitleOptimizerProps> = ({ onTitleSelect, onBack, 
     } finally {
       setIsLoading(prev => ({...prev, [index]: false}));
     }
-  }, [topic, titles, apiKeyError, consumeCredits, platform, t]);
+  }, [topic, titles, consumeCredits, platform, t]);
   
   return (
     <div className="w-full flex flex-col items-center">

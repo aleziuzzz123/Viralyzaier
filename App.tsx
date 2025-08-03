@@ -7,7 +7,7 @@ import ContentCalendar from './components/ContentCalendar';
 import PricingPage from './components/PricingPage';
 import UserMenu from './components/UserMenu';
 import Homepage from './components/Homepage';
-import { DashboardIcon, CalendarIcon, GithubIcon, SparklesIcon, CheckCircleIcon, XCircleIcon, InfoIcon, ChartPieIcon, PhotoIcon, BellIcon, CogIcon, RocketLaunchIcon } from './components/Icons';
+import { DashboardIcon, CalendarIcon, GithubIcon, SparklesIcon, CheckCircleIcon, XCircleIcon, InfoIcon, ChartPieIcon, PhotoIcon, BellIcon, CogIcon, RocketLaunchIcon, WarningIcon } from './components/Icons';
 import ChannelHub from './components/ChannelHub';
 import AssetLibrary from './components/AssetLibrary';
 import { AppProvider, useAppContext } from './contexts/AppContext';
@@ -19,6 +19,62 @@ import ScheduleModal from './components/ScheduleModal';
 
 
 type View = 'dashboard' | 'project' | 'calendar' | 'pricing' | 'channel' | 'assetLibrary' | 'autopilot' | 'settings';
+
+const BackendErrorModal: React.FC = () => {
+    const { backendError, clearBackendError, t } = useAppContext();
+
+    if (!backendError) return null;
+    
+    return (
+         <div 
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100]" 
+            onClick={clearBackendError}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="backend-error-modal-title"
+        >
+            <div 
+                className="bg-gray-800 border border-red-500/50 rounded-2xl shadow-2xl w-full max-w-2xl m-4 p-8 text-center transform transition-all"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <button onClick={clearBackendError} className="absolute top-4 right-4 text-gray-500 hover:text-white">
+                    <XCircleIcon className="w-8 h-8"/>
+                </button>
+                <div className="mx-auto bg-red-900/50 border border-red-500/50 p-3 rounded-full w-fit mb-6">
+                   <WarningIcon className="w-10 h-10 text-red-400" />
+                </div>
+                <h2 id="backend-error-modal-title" className="text-2xl font-bold text-white mb-3">{backendError.title}</h2>
+                <p className="text-gray-300 mb-6">
+                    {t('backend_error.description')}
+                </p>
+                <div className="mt-4 text-left bg-gray-900 p-4 rounded-md">
+                    <p className="text-sm text-gray-400 font-semibold">{t('backend_error.server_error_details')}</p>
+                    <p className="mt-4 text-sm text-red-300 font-mono bg-red-900/50 p-2 rounded">
+                        {backendError.message}
+                    </p>
+                    <div className="mt-4 text-sm text-amber-300 bg-amber-900/50 p-3 rounded-lg">
+                        <p className="font-bold">{t('backend_error.how_to_fix_title')}</p>
+                        <p className="mt-2 text-amber-200">
+                           {t('backend_error.how_to_fix_intro')}
+                        </p>
+                        <ul className="list-disc list-inside mt-2 text-amber-200 text-xs space-y-1">
+                            <li>{t('backend_error.how_to_fix_step1')}</li>
+                            <li>{t('backend_error.how_to_fix_step2')}</li>
+                            <li>{t('backend_error.how_to_fix_step3')}</li>
+                            <li>{t('backend_error.how_to_fix_step4')}</li>
+                        </ul>
+                    </div>
+                </div>
+                <button
+                    onClick={clearBackendError}
+                    className="w-full max-w-xs mx-auto mt-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg transition-all"
+                >
+                    {t('backend_error.close_button')}
+                </button>
+            </div>
+        </div>
+    );
+};
 
 const ToastComponent: React.FC<{ toast: Toast, onDismiss: (id: number) => void }> = ({ toast, onDismiss }) => {
     useEffect(() => {
@@ -153,6 +209,8 @@ const MainApp = () => {
             </main>
             
             <ScheduleModal />
+            
+            <BackendErrorModal />
     
             {createPortal(toasts.map(toast => <ToastComponent key={toast.id} toast={toast} onDismiss={dismissToast} />), document.getElementById('toast-container')!)}
         </div>

@@ -11,7 +11,7 @@ import { useAppContext } from '../contexts/AppContext';
 interface ChannelHubProps {}
 
 const ChannelHub: React.FC<ChannelHubProps> = () => {
-    const { user, setUser, handleCreateProjectFromIdea, apiKeyError, consumeCredits, requirePermission, addToast, t } = useAppContext();
+    const { user, setUser, handleCreateProjectFromIdea, consumeCredits, requirePermission, addToast, t } = useAppContext();
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -41,10 +41,6 @@ const ChannelHub: React.FC<ChannelHubProps> = () => {
 
     const handleAnalyzeChannel = async () => {
         if (!user || !requirePermission('viralyzaier') || !user.youtubeConnected) return;
-        if (apiKeyError) {
-            setError(t('blueprint_modal.error_api_key'));
-            return;
-        }
         if (!await consumeCredits(10)) return; 
 
         setIsLoading(true);

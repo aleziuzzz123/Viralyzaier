@@ -11,7 +11,7 @@ interface LaunchpadProps {
 }
 
 const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
-    const { apiKeyError, user, consumeCredits, addToast, handleUpdateProject, t } = useAppContext();
+    const { user, consumeCredits, addToast, handleUpdateProject, t } = useAppContext();
     const [loading, setLoading] = useState<{ seo?: boolean, thumbnails?: boolean, promotion?: boolean }>({});
     const [error, setError] = useState<string | null>(null);
 
@@ -35,7 +35,6 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
 
     const handleGenerateSeo = async () => {
         if (!project.script || !project.title) return;
-        if (apiKeyError) { setError(t('blueprint_modal.error_api_key')); return; }
         if (!await consumeCredits(1)) return;
         setLoading({ seo: true });
         try {
@@ -51,7 +50,6 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
     
     const handleGenerateThumbnails = async () => {
         if (!project.title || !user) return;
-        if (apiKeyError) { setError(t('blueprint_modal.error_api_key')); return; }
         if (!await consumeCredits(4)) return; // Generate 2 images for 4 credits
         setLoading({ thumbnails: true });
         try {
@@ -67,7 +65,6 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
 
     const handleGeneratePromotion = async () => {
         if (!project.title) return;
-        if (apiKeyError) { setError(t('blueprint_modal.error_api_key')); return; }
         if (!await consumeCredits(1)) return;
         setLoading({ promotion: true });
         try {

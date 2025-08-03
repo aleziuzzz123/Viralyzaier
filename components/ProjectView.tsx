@@ -162,7 +162,7 @@ const extractFrames = (videoFile: File): Promise<string[]> => {
 
 const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
     const { 
-        handleUpdateProject, handleDeleteProject, apiKeyError, consumeCredits, 
+        handleUpdateProject, handleDeleteProject, consumeCredits, 
         dismissedTutorials, addToast, t
     } = useAppContext();
     
@@ -278,10 +278,6 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
           setAnalysisError(t('project_view.analysis.error_file_missing'));
           return;
         }
-        if (apiKeyError) {
-          setAnalysisError(t('project_view.analysis.error_api_key'));
-          return;
-        }
         if (!await consumeCredits(5)) return; // Multimodal analysis is more expensive
         
         setAnalysisIsLoading(true);
@@ -299,7 +295,7 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
         } finally {
             setAnalysisIsLoading(false);
         }
-    }, [videoFile, apiKeyError, project, consumeCredits, handleAnalysisComplete, project.title, project.platform, t]);
+    }, [videoFile, project, consumeCredits, handleAnalysisComplete, project.title, project.platform, t]);
 
     const handleAnalysisReset = () => {
         handleUpdateProject({id: project.id, analysis: null});

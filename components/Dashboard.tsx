@@ -17,7 +17,7 @@ const platformIcons: { [key in Platform]: React.FC<{className?: string}> } = {
 };
 
 const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
-    const { user, apiKeyError, consumeCredits, addToast, handleCreateProjectFromBlueprint, t, prefilledBlueprintPrompt, setPrefilledBlueprintPrompt } = useAppContext();
+    const { user, consumeCredits, addToast, handleCreateProjectFromBlueprint, t, prefilledBlueprintPrompt, setPrefilledBlueprintPrompt } = useAppContext();
     const [topicOrUrl, setTopicOrUrl] = useState('');
     const [platform, setPlatform] = useState<Platform | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -41,10 +41,6 @@ const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; 
         }
         if (!topicOrUrl.trim()) {
             setError(t('blueprint_modal.error_topic'));
-            return;
-        }
-        if (apiKeyError) {
-            setError(t('blueprint_modal.error_api_key'));
             return;
         }
         if (!await consumeCredits(5)) return;
