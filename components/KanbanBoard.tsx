@@ -1,5 +1,3 @@
-
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Project, ProjectStatus, Platform } from '../types';
 import { YouTubeIcon, TikTokIcon, InstagramIcon, PlusIcon, PencilIcon, RocketLaunchIcon } from './Icons';
@@ -60,7 +58,7 @@ const ProjectCard: React.FC<{
             className="bg-gray-800 rounded-lg border border-gray-700 hover:border-indigo-500 cursor-pointer transition-all duration-200 shadow-md hover:shadow-indigo-500/10 mb-4 overflow-hidden"
         >
             {project.moodboard && project.moodboard.length > 0 && (
-                <div className="aspect-video w-full" onClick={onViewProject}>
+                <div className="aspect-video w-full bg-gray-900" onClick={onViewProject}>
                     <img src={project.moodboard[0]} alt={`${project.name} moodboard`} className="w-full h-full object-cover" />
                 </div>
             )}

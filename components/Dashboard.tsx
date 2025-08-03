@@ -1,13 +1,13 @@
 
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Project, Blueprint, Platform } from '../types';
 import { FilePlusIcon, SparklesIcon, LightBulbIcon, YouTubeIcon, TikTokIcon, InstagramIcon } from './Icons';
 import { generateVideoBlueprint } from '../services/geminiService';
 import TutorialCallout from './TutorialCallout';
 import KanbanBoard from './KanbanBoard';
 import { PLANS } from '../services/paymentService';
-import { useAppContext } from '../contexts/AppContext';
+import { useAppContext, getErrorMessage } from '../contexts/AppContext';
 import Loader from './Loader';
 
 const platformIcons: { [key in Platform]: React.FC<{className?: string}> } = {
@@ -17,7 +17,7 @@ const platformIcons: { [key in Platform]: React.FC<{className?: string}> } = {
 };
 
 const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
-    const { user, consumeCredits, addToast, handleCreateProjectFromBlueprint, t, prefilledBlueprintPrompt, setPrefilledBlueprintPrompt } = useAppContext();
+    const { user, consumeCredits, addToast, handleCreateProjectFromBlueprint, t, prefilledBlueprintPrompt, setPrefilledBlueprintPrompt, lockAndExecute } = useAppContext();
     const [topicOrUrl, setTopicOrUrl] = useState('');
     const [platform, setPlatform] = useState<Platform | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -34,7 +34,7 @@ const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; 
     }, [isOpen, prefilledBlueprintPrompt, setPrefilledBlueprintPrompt, addToast]);
 
 
-    const handleGenerate = async () => {
+    const handleGenerate = () => {
         if (!platform) {
             setError(t('blueprint_modal.error_platform'));
             return;
@@ -43,20 +43,30 @@ const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; 
             setError(t('blueprint_modal.error_topic'));
             return;
         }
-        if (!await consumeCredits(5)) return;
+        
+        lockAndExecute(async () => {
+            setIsLoading(true);
+            setError(null);
+            setBlueprint(null);
+            setSelectedTitle(null);
 
-        setIsLoading(true);
-        setError(null);
-        setBlueprint(null);
-        setSelectedTitle(null);
-        try {
-            const result = await generateVideoBlueprint(topicOrUrl, platform);
-            setBlueprint(result);
-        } catch (e) {
-            setError(e instanceof Error ? e.message : "An unknown error occurred.");
-        } finally {
-            setIsLoading(false);
-        }
+            try {
+                if (!await consumeCredits(5)) {
+                    // consumeCredits handles its own error/modal display.
+                    return; // Abort the operation.
+                }
+                
+                const blueprintResult = await generateVideoBlueprint(topicOrUrl, platform);
+                
+                if (blueprintResult) {
+                    setBlueprint(blueprintResult);
+                } else {
+                    throw new Error("Failed to generate blueprint. The AI may have returned an invalid response.");
+                }
+            } finally {
+                setIsLoading(false);
+            }
+        });
     };
     
     const handleUseChannelData = () => {
@@ -90,26 +100,26 @@ const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; 
     
     return (
         <div 
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in-up" 
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start pt-12 md:pt-20 justify-center z-50 animate-fade-in-up" 
             style={{ animationDuration: '0.3s' }} 
             onClick={handleClose}
             role="dialog"
             aria-modal="true"
             aria-labelledby="blueprint-modal-title"
         >
-            <div className="bg-gray-800 border border-indigo-500/50 rounded-2xl shadow-2xl w-full max-w-3xl m-4 transform transition-all p-8 text-center max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-                <header className="mb-6 flex-shrink-0">
+            <div className="bg-gray-800 border border-indigo-500/50 rounded-2xl shadow-2xl w-full max-w-3xl m-4 transform transition-all p-6 text-center max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                <header className="mb-4 flex-shrink-0">
                     <h2 id="blueprint-modal-title" className="text-3xl font-bold text-white mb-2 flex items-center justify-center">
                         <LightBulbIcon className="w-8 h-8 mr-3 text-yellow-300"/> {t('blueprint_modal.title')}
                     </h2>
                     <p className="text-gray-400">{t('blueprint_modal.subtitle')}</p>
                 </header>
                 
-                <div className="overflow-y-auto pr-4 -mr-4 space-y-6 flex-grow">
+                <div className="overflow-y-auto pr-4 -mr-4 space-y-4 flex-grow">
                     {!blueprint && !isLoading && (
-                         <div className="space-y-6">
+                         <div className="space-y-4">
                              <div>
-                                <h3 className="text-lg font-semibold text-white mb-3 text-left">{t('blueprint_modal.step1')}</h3>
+                                <h3 className="text-lg font-semibold text-white mb-2 text-left">{t('blueprint_modal.step1')}</h3>
                                 <div className="grid grid-cols-3 gap-4">
                                     {(['youtube', 'tiktok', 'instagram'] as Platform[]).map(p => (
                                         <button key={p} onClick={() => setPlatform(p)} className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-colors ${platform === p ? 'bg-indigo-900/50 border-indigo-500' : 'bg-gray-700/50 border-transparent hover:border-indigo-600'}`}>
@@ -120,7 +130,7 @@ const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; 
                                 </div>
                             </div>
                             <div>
-                                <div className="flex justify-between items-center mb-3">
+                                <div className="flex justify-between items-center mb-2">
                                     <h3 className="text-lg font-semibold text-white text-left">{t('blueprint_modal.step2')}</h3>
                                     {user?.channelAudit && (
                                         <button 
@@ -136,13 +146,13 @@ const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; 
                                     value={topicOrUrl}
                                     onChange={e => setTopicOrUrl(e.target.value)}
                                     placeholder={t('blueprint_modal.topic_placeholder')}
-                                    rows={3}
+                                    rows={2}
                                     className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                 />
                             </div>
                             <button
                                 onClick={handleGenerate}
-                                disabled={!platform || !topicOrUrl}
+                                disabled={!platform || !topicOrUrl || isLoading}
                                 className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed"
                             >
                                 {t('blueprint_modal.generate_button')}

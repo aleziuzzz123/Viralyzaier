@@ -48,30 +48,37 @@ const Autopilot: React.FC = () => {
         try {
             const newBlueprints = await generateAutopilotBacklog('youtube', pillars, user.channelAudit);
             
-            const creationPromises = newBlueprints.map(async (bp) => {
+            const createdProjects: Project[] = [];
+            // Process each blueprint sequentially to create a stable project ID before uploading assets.
+            for (const bp of newBlueprints) {
                 const title = bp.suggestedTitles[0] || 'AI Generated Idea';
                 
+                // 1. Create a placeholder project to get an ID.
+                const initialProjectData: Omit<Project, 'id' | 'lastUpdated'> = {
+                    name: title, status: 'Autopilot', platform: bp.platform,
+                    topic: bp.strategicSummary, title: title, script: bp.script,
+                    moodboard: [], // Moodboard is initially empty
+                    workflowStep: 2, analysis: null, competitorAnalysis: null, 
+                    scheduledDate: null, assets: {}, soundDesign: null, 
+                    launchPlan: null, performance: null, publishedUrl: undefined,
+                };
+                const newProject = await supabase.createProject(initialProjectData, user.id);
+
+                // 2. Upload moodboard images to a structured path using the new project ID.
                 const moodboardUrls = await Promise.all(
                     bp.moodboard.map(async (base64Img, index) => {
                         const blob = await supabase.dataUrlToBlob(base64Img);
-                        const path = `${user.id}/project_${Date.now()}_${Math.random()}/moodboard_${index}.jpg`;
+                        const path = `${user.id}/${newProject.id}/moodboard_${index}.jpg`;
                         return supabase.uploadFile(blob, path);
                     })
                 );
 
-                const newProjectData: Omit<Project, 'id' | 'lastUpdated'> = {
-                    name: title, status: 'Autopilot', platform: bp.platform,
-                    topic: bp.strategicSummary, title: title, script: bp.script,
-                    moodboard: moodboardUrls, workflowStep: 2, analysis: null,
-                    competitorAnalysis: null, scheduledDate: null, assets: {}, soundDesign: null,
-                    launchPlan: null, performance: null, publishedUrl: undefined,
-                };
-                return supabase.createProject(newProjectData, user.id);
-            });
-
-            const createdProjects = await Promise.all(creationPromises);
-            addProjects(createdProjects);
+                // 3. Update the project with the final moodboard URLs.
+                const finalProject = await supabase.updateProject(newProject.id, { moodboard: moodboardUrls });
+                createdProjects.push(finalProject);
+            }
             
+            addProjects(createdProjects);
             addToast("Content backlog generated! Your new ideas are on the dashboard.", 'success');
             setActiveProjectId(null);
 
