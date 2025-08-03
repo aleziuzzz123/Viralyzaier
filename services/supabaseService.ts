@@ -1,5 +1,6 @@
+
+
 import { supabase } from './supabaseClient';
-export { supabase }; // Export the supabase client for use in other parts of the app like context
 import { 
     Project, 
     User, 
@@ -194,7 +195,9 @@ export const updateUserProfile = async (userId: string, updates: Partial<User>):
         .single();
 
     if (error) throw error;
-    if (!data) throw new Error("User profile not found after update.");
+
+    const profileRow = data as ProfileRow | null;
+    if (!profileRow) throw new Error("User profile not found after update.");
     
     // We need to re-fetch the youtube connected status as this local update doesn't know about it.
     const currentProfile = await getUserProfile(userId);
@@ -214,7 +217,7 @@ export const getProjectsForUser = async (userId: string): Promise<Project[]> => 
         .order('last_updated', { ascending: false });
 
     if (error) throw error;
-    return (data || []).map(projectRowToProject);
+    return (data || []).map(p => projectRowToProject(p));
 };
 
 export const createProject = async (projectData: Omit<Project, 'id'|'lastUpdated'>, userId: string): Promise<Project> => {
@@ -242,13 +245,14 @@ export const createProject = async (projectData: Omit<Project, 'id'|'lastUpdated
     
     const { data, error } = await supabase
         .from('projects')
-        .insert([projectToInsert])
+        .insert(projectToInsert)
         .select('*')
         .single();
         
     if (error) throw error;
-    if (!data) throw new Error("Project data not returned after creation.");
-    return projectRowToProject(data);
+    const projectRow = data as ProjectRow | null;
+    if (!projectRow) throw new Error("Project data not returned after creation.");
+    return projectRowToProject(projectRow);
 };
 
 export const updateProject = async (projectId: string, updates: Partial<Project>): Promise<Project> => {
@@ -262,8 +266,9 @@ export const updateProject = async (projectId: string, updates: Partial<Project>
         .single();
         
     if (error) throw error;
-    if (!data) throw new Error("Project data not returned after update.");
-    return projectRowToProject(data);
+    const projectRow = data as ProjectRow | null;
+    if (!projectRow) throw new Error("Project data not returned after update.");
+    return projectRowToProject(projectRow);
 };
 
 export const deleteProject = async (projectId: string): Promise<void> => {
@@ -301,17 +306,10 @@ export const invokeEdgeFunction = async (name: string, body: object | FormData, 
         'Authorization': `Bearer ${session.access_token}`,
     };
     
-    let requestBody: BodyInit | null = null;
-    if (body instanceof FormData) {
-        requestBody = body;
-    } else {
-        // Only set Content-Type for JSON bodies
-        headers['Content-Type'] = 'application/json';
-        requestBody = JSON.stringify(body);
-    }
-
+    // Let the Supabase client library handle JSON stringification and Content-Type header for objects,
+    // and correctly handle FormData as well. This is more robust.
     const response = await supabase.functions.invoke(name, {
-        body: requestBody,
+        body,
         headers,
     });
     
@@ -339,7 +337,7 @@ export const getNotifications = async (userId: string): Promise<Notification[]> 
         .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return (data || []).map(notificationRowToNotification);
+    return (data || []).map(n => notificationRowToNotification(n));
 };
 
 export const markNotificationAsRead = async (notificationId: string): Promise<void> => {

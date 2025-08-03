@@ -5,6 +5,7 @@ import * as supabaseService from '../services/supabaseService';
 import { supabase } from '../services/supabaseClient'; // Import client directly
 import { type AuthSession } from '@supabase/supabase-js';
 import { createCheckoutSession, PLANS } from '../services/paymentService';
+import { fetchVideoPerformance } from '../services/youtubeService';
 import UpgradeModal from '../components/UpgradeModal';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { translations, Language, TranslationKey } from '../translations';
@@ -38,7 +39,7 @@ interface AppContextType {
     handleSubscriptionChange: (planId: PlanId) => Promise<void>;
 
     handleUpdateProject: (updatedProjectData: Partial<Project> & { id: string }) => Promise<Project | null>;
-    handleCreateProjectFromBlueprint: (blueprint: Blueprint, selectedTitle: string) => Promise<void>;
+    handleCreateProjectFromBlueprint: (blueprint: Blueprint, selectedTitle: string) => Promise<Project | null>;
     handleCreateProjectFromIdea: (suggestion: Opportunity | ContentGapSuggestion, platform: Platform) => Promise<void>;
     handleCreateProjectFromInsights: (review: PerformanceReview, originalProject: Project) => void;
     handleDeleteProject: (projectId: string) => void;
@@ -58,6 +59,7 @@ interface AppContextType {
     openScheduleModal: (projectId: string) => void;
     closeScheduleModal: () => void;
     clearBackendError: () => void;
+    lockAndExecute: (asyncOperation: () => Promise<any>) => Promise<void>;
 }
 
 interface ConfirmationState {
@@ -118,7 +120,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     const [backendError, setBackendError] = useState<{ title: string; message: string } | null>(null);
     const clearBackendError = () => setBackendError(null);
     
-    const isProcessingAction = useRef(false); // Global lock for all major AI operations
+    const isOperationLocked = useRef(false); // Global lock for all major AI operations
 
     const [language, setLanguageState] = useState<Language>(() => {
         const savedLang = localStorage.getItem('viralyzaier-lang');
@@ -267,17 +269,32 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             addToast(t('toast.logged_out'));
         });
     };
+    
+    const lockAndExecute = async (asyncOperation: () => Promise<any>): Promise<void> => {
+        if (isOperationLocked.current) {
+            addToast("Please wait for the current operation to complete.", 'info');
+            return;
+        }
+        isOperationLocked.current = true;
+        try {
+            await asyncOperation();
+        } catch (e) {
+            // Errors should be handled within the operation itself and show a toast.
+            // This is a fallback log.
+            console.error("An error occurred during a locked operation:", e);
+        } finally {
+            isOperationLocked.current = false;
+        }
+    };
 
     const consumeCredits = useCallback(async (amount: number): Promise<boolean> => {
-        if (isProcessingAction.current) {
-            addToast("Please wait for the current operation to complete.", 'info');
+        if (!user) {
+            addToast("You must be logged in to perform this action.", "error");
             return false;
         }
-        if (!user) return false;
         
-        isProcessingAction.current = true;
         try {
-            const result = await supabaseService.invokeEdgeFunction('consume-credits', { body: { amount_to_consume: amount } });
+            const result = await supabaseService.invokeEdgeFunction('consume-credits', { amount_to_consume: amount });
 
             if (result.success) {
                 setUser(prev => prev ? { ...prev, aiCredits: result.newCredits } : null);
@@ -290,20 +307,18 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
                     });
                     setUpgradeModalOpen(true);
                 } else {
-                    addToast(result.message || 'An unknown error occurred.', 'error');
+                    addToast(result.message || 'An unknown error occurred while consuming credits.', 'error');
                 }
                 return false;
             }
         } catch (e) {
             const errorMessage = getErrorMessage(e);
              if (errorMessage.includes('Function is not configured') || errorMessage.includes('secrets')) {
-                setBackendError({ title: "Backend Configuration Error", message: errorMessage });
+                setBackendError({ title: t('backend_error.title'), message: errorMessage });
             } else {
-                addToast(errorMessage, 'error');
+                addToast(`Credit consumption failed: ${errorMessage}`, 'error');
             }
             return false;
-        } finally {
-            isProcessingAction.current = false;
         }
     }, [user, addToast, t]);
 
@@ -318,24 +333,19 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         }
     };
     
-    const handleCreateProjectFromBlueprint = async (blueprint: Blueprint, selectedTitle: string) => {
-        if (isProcessingAction.current) {
-            addToast("Please wait for the current operation to complete.", 'info');
-            return;
-        }
-        if (!user) return;
+    const handleCreateProjectFromBlueprint = async (blueprint: Blueprint, selectedTitle: string, status: ProjectStatus = 'Idea'): Promise<Project | null> => {
+        if (!user) return null;
 
         const isValidBlueprint = blueprint?.strategicSummary?.trim().length > 10 && blueprint.suggestedTitles?.length > 0 && blueprint.script?.scenes?.length > 0 && blueprint.moodboard?.length > 0;
         if (!isValidBlueprint) {
             addToast("The AI returned an incomplete plan. Please try generating the blueprint again.", "error");
-            return;
+            return null;
         }
 
         let newProject: Project | null = null;
-        isProcessingAction.current = true;
         try {
             const initialProjectData: Omit<Project, 'id' | 'lastUpdated'> = {
-                name: selectedTitle, status: 'Idea', platform: blueprint.platform,
+                name: selectedTitle, status, platform: blueprint.platform,
                 topic: blueprint.strategicSummary, title: selectedTitle, script: blueprint.script,
                 moodboard: [], workflowStep: 2, analysis: null, competitorAnalysis: null, 
                 scheduledDate: null, assets: {}, soundDesign: null, launchPlan: null, 
@@ -353,10 +363,12 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
                     return supabaseService.uploadFile(blob, path);
                 })
             );
-
+            
             const updatedProject = await supabaseService.updateProject(newProject.id, { moodboard: moodboardUrls });
             setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
             addToast(t('toast.project_created_blueprint'), 'success');
+            return updatedProject;
+
         } catch (error) {
             console.error("Error creating project from blueprint:", error);
             addToast(`${t('toast.failed_update_project')}: ${getErrorMessage(error)}`, "error");
@@ -365,8 +377,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
                 setProjects(prev => prev.filter(p => p.id !== newProject!.id));
                 setActiveProjectId(null);
             }
-        } finally {
-            isProcessingAction.current = false;
+            return null;
         }
     };
     
@@ -392,7 +403,6 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     const handleCreateProjectFromInsights = (review: PerformanceReview, originalProject: Project) => {
         const insightsPrompt = `Based on a previous video titled "${originalProject.title}", here's what we learned. What worked: ${review.whatWorked.join(', ')}. What to improve: ${review.whatToImprove.join(', ')}. Generate a new video idea based on this feedback for the ${originalProject.platform} platform.`;
         setPrefilledBlueprintPrompt(insightsPrompt);
-        // Navigate to dashboard which will trigger the blueprint modal
         setActiveProjectId(null);
         addToast("Blueprint prompt pre-filled with performance insights!", "success");
     };
@@ -419,8 +429,6 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       if (!user) return false;
       const userPlanIndex = PLANS.findIndex(p => p.id === user.subscription.planId);
       const requiredPlanIndex = PLANS.findIndex(p => p.id === requiredPlan);
-
-      // Check for active subscription or if it's a canceled plan that hasn't expired yet
       const hasActiveSubscription = user.subscription.status === 'active' || (user.subscription.status === 'canceled' && user.subscription.endDate && user.subscription.endDate * 1000 > Date.now());
 
       if (hasActiveSubscription && userPlanIndex >= requiredPlanIndex) {
@@ -444,10 +452,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
 
         try {
             if (planId === 'free') {
-                // Here you would typically call your backend to cancel the Stripe subscription
-                // For now, we simulate a downgrade.
                 addToast("Downgrading to Free is handled through your Stripe customer portal.", "info");
-
             } else {
                 const { checkoutUrl } = await createCheckoutSession(planId);
                 window.location.href = checkoutUrl;
@@ -498,7 +503,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         handleSubscriptionChange, handleUpdateProject, handleCreateProjectFromBlueprint,
         handleCreateProjectFromIdea, handleDeleteProject, requestConfirmation, setUpgradeModalOpen,
         setActiveProjectId, setUser, setPrefilledBlueprintPrompt, handleCreateProjectFromInsights,
-        addProjects
+        addProjects, lockAndExecute
     };
     
     return (
@@ -517,5 +522,3 @@ export const useAppContext = (): AppContextType => {
     }
     return context;
 };
-
-
