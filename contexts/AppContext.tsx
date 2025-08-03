@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useCallback, useContext, ReactNode, useRef } from 'react';
+import React, { createContext, useState, useEffect, useCallback, useContext, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Project, User, PlanId, Blueprint, Toast, Platform, Opportunity, ContentGapSuggestion, PerformanceReview, Notification, ProjectStatus, Database } from '../types';
 import * as supabaseService from '../services/supabaseService';
@@ -271,7 +271,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         if (!user) return false;
         
         try {
-            const result = await supabaseService.invokeEdgeFunction('consume-credits', { amount_to_consume: amount });
+            const result = await supabaseService.invokeEdgeFunction('consume-credits', { body: { amount_to_consume: amount } });
 
             if (result.success) {
                 setUser(prev => prev ? { ...prev, aiCredits: result.newCredits } : null);
@@ -291,7 +291,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         } catch (e) {
             const errorMessage = getErrorMessage(e);
              if (errorMessage.includes('Function is not configured') || errorMessage.includes('secrets')) {
-                setBackendError({ title: t('backend_error.title'), message: errorMessage });
+                setBackendError({ title: "Backend Configuration Error", message: errorMessage });
             } else {
                 addToast(errorMessage, 'error');
             }
@@ -310,7 +310,202 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         }
     };
     
-    const handleCreateProjectFromBlueprint = async (blueprint: Blueprint, selectedTitle: string, status: ProjectStatus = 'Idea') => {
+    const handleCreateProjectFromBlueprint = async (blueprint: Blueprint, selectedTitle: string) => {
         if (!user) return;
+    
+        const isValidBlueprint = blueprint?.strategicSummary?.trim().length > 10 && 
+                                 blueprint.suggestedTitles?.length > 0 &&
+                                 blueprint.script?.hooks?.length > 0 &&
+                                 blueprint.script?.scenes?.length > 0 &&
+                                 !!blueprint.script?.cta &&
+                                 blueprint.moodboard?.length > 0;
+    
+        if (!isValidBlueprint) {
+            addToast("The AI returned an incomplete plan. Please try generating the blueprint again.", "error");
+            return;
+        }
+    
+        try {
+            const moodboardUrls = await Promise.all(
+                blueprint.moodboard.map(async (base64Img, index) => {
+                    const blob = await supabaseService.dataUrlToBlob(base64Img);
+                    const path = `${user.id}/project_${Date.now()}_${index}/moodboard.jpg`;
+                    return supabaseService.uploadFile(blob, path);
+                })
+            );
+    
+            const newProjectData: Omit<Project, 'id' | 'lastUpdated'> = {
+                name: selectedTitle,
+                status: 'Idea',
+                platform: blueprint.platform,
+                topic: blueprint.strategicSummary,
+                title: selectedTitle,
+                script: blueprint.script,
+                moodboard: moodboardUrls,
+                workflowStep: 2,
+                analysis: null,
+                competitorAnalysis: null,
+                scheduledDate: null,
+                assets: {},
+                soundDesign: null,
+                launchPlan: null,
+                performance: null,
+            };
+    
+            const newProject = await supabaseService.createProject(newProjectData, user.id);
+            setProjects(prev => [newProject, ...prev]);
+            setActiveProjectId(newProject.id);
+            addToast(t('toast.project_created_blueprint'), 'success');
+        } catch (error) {
+            console.error("Error creating project from blueprint:", error);
+            addToast(`${t('toast.failed_update_project')}: ${getErrorMessage(error)}`, "error");
+        }
+    };
+    
+    const addProjects = (newProjects: Project[]) => {
+        setProjects(prev => [...newProjects, ...prev]);
+    };
 
-        const isValidBlueprint = blueprint?.strategicSummary?.trim().length > 10 && blueprint.suggestedTitles?.length > 0
+    const handleCreateProjectFromIdea = async (suggestion: Opportunity | ContentGapSuggestion, platform: Platform) => {
+         if (!user) return;
+        const title = 'suggestedTitle' in suggestion ? suggestion.suggestedTitle : (suggestion.potentialTitles[0] || suggestion.idea);
+        const newProjectData: Omit<Project, 'id'|'lastUpdated'> = {
+            name: suggestion.idea, status: 'Idea', platform: platform, topic: suggestion.reason,
+            title: title, workflowStep: 1, script: null, analysis: null,
+            competitorAnalysis: null, scheduledDate: null, moodboard: null, assets: {},
+            soundDesign: null, launchPlan: null, performance: null
+        };
+        const newProject = await supabaseService.createProject(newProjectData, user.id);
+        setProjects(prev => [newProject, ...prev]);
+        setActiveProjectId(newProject.id);
+        addToast(t('toast.project_created_idea'), 'success');
+    };
+
+    const handleCreateProjectFromInsights = (review: PerformanceReview, originalProject: Project) => {
+        const insightsPrompt = `Based on a previous video titled "${originalProject.title}", here's what we learned. What worked: ${review.whatWorked.join(', ')}. What to improve: ${review.whatToImprove.join(', ')}. Generate a new video idea based on this feedback for the ${originalProject.platform} platform.`;
+        setPrefilledBlueprintPrompt(insightsPrompt);
+        // Navigate to dashboard which will trigger the blueprint modal
+        setActiveProjectId(null);
+        addToast("Blueprint prompt pre-filled with performance insights!", "success");
+    };
+  
+    const handleDeleteProject = (projectId: string) => {
+        requestConfirmation(t('confirmation_modal.delete_project_title'), t('confirmation_modal.delete_project_message'), async () => {
+            try {
+                await supabaseService.deleteProject(projectId);
+                addToast(t('toast.project_deleted'), 'success');
+                setProjects(prev => prev.filter(p => p.id !== projectId));
+                if (activeProjectId === projectId) {
+                    setActiveProjectId(null);
+                }
+            } catch (error) {
+                addToast(`${t('toast.failed_delete_project')}: ${getErrorMessage(error)}`, 'error');
+            }
+        });
+    };
+    
+    const dismissTutorial = (id: string) => { const newDismissed = [...dismissedTutorials, id]; setDismissedTutorials(newDismissed); localStorage.setItem('viralyzaier-tutorials', JSON.stringify(newDismissed)); };
+    const dismissToast = (id: number) => { setToasts(t => t.filter(toast => toast.id !== id)); };
+    
+    const requirePermission = useCallback((requiredPlan: PlanId): boolean => {
+      if (!user) return false;
+      const userPlanIndex = PLANS.findIndex(p => p.id === user.subscription.planId);
+      const requiredPlanIndex = PLANS.findIndex(p => p.id === requiredPlan);
+
+      // Check for active subscription or if it's a canceled plan that hasn't expired yet
+      const hasActiveSubscription = user.subscription.status === 'active' || (user.subscription.status === 'canceled' && user.subscription.endDate && user.subscription.endDate * 1000 > Date.now());
+
+      if (hasActiveSubscription && userPlanIndex >= requiredPlanIndex) {
+        return true;
+      }
+
+      setUpgradeReason({
+        title: t('upgrade_modal.default_title'),
+        description: t('upgrade_modal.default_description')
+      });
+      setUpgradeModalOpen(true);
+      return false;
+    }, [user, t]);
+    
+    const handleSubscriptionChange = async (planId: PlanId) => {
+        if (!user) return;
+        if (user.subscription.planId === planId && user.subscription.status === 'active') {
+            addToast(t('toast.already_on_plan'), 'info');
+            return;
+        }
+
+        try {
+            if (planId === 'free') {
+                // Here you would typically call your backend to cancel the Stripe subscription
+                // For now, we simulate a downgrade.
+                addToast("Downgrading to Free is handled through your Stripe customer portal.", "info");
+
+            } else {
+                const { checkoutUrl } = await createCheckoutSession(planId);
+                window.location.href = checkoutUrl;
+            }
+        } catch (error) {
+            const errorMessage = getErrorMessage(error);
+            addToast(t('toast.subscription_failed', { error: errorMessage }), 'error');
+        }
+    };
+    
+    const markNotificationAsRead = useCallback(async (notificationId: string) => {
+        try {
+            await supabaseService.markNotificationAsRead(notificationId);
+            setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n));
+        } catch (error) {
+            addToast(`Failed to mark notification as read: ${getErrorMessage(error)}`, "error");
+        }
+    }, [addToast]);
+
+    const markAllNotificationsAsRead = useCallback(async () => {
+        if (!user) return;
+        try {
+            await supabaseService.markAllNotificationsAsRead(user.id);
+            setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+        } catch (error) {
+            addToast(`Failed to mark all notifications as read: ${getErrorMessage(error)}`, "error");
+        }
+    }, [user, addToast]);
+
+    const openScheduleModal = (projectId: string) => {
+        setProjectToSchedule(projectId);
+        setScheduleModalOpen(true);
+    };
+
+    const closeScheduleModal = () => {
+        setProjectToSchedule(null);
+        setScheduleModalOpen(false);
+    };
+
+    const value: AppContextType = {
+        session, user, projects, toasts, dismissedTutorials,
+        isUpgradeModalOpen, upgradeReason, confirmation, activeProjectId,
+        language, setLanguage, t, prefilledBlueprintPrompt,
+        notifications, markNotificationAsRead, markAllNotificationsAsRead,
+        isInitialLoading, isScheduleModalOpen, projectToSchedule,
+        openScheduleModal, closeScheduleModal, backendError, clearBackendError,
+        addToast, dismissToast, dismissTutorial, handleLogout, consumeCredits, requirePermission,
+        handleSubscriptionChange, handleUpdateProject, handleCreateProjectFromBlueprint,
+        handleCreateProjectFromIdea, handleDeleteProject, requestConfirmation, setUpgradeModalOpen,
+        setActiveProjectId, setUser, setPrefilledBlueprintPrompt, handleCreateProjectFromInsights,
+        addProjects,
+    };
+    
+    return (
+        <AppContext.Provider value={value}>
+            {children}
+            <UpgradeModal />
+            {createPortal(<ConfirmationModal isOpen={confirmation.isOpen} onClose={handleCancelConfirmation} onConfirm={handleConfirmation} title={confirmation.title}>{confirmation.message}</ConfirmationModal>, document.getElementById('modal-root')!)}
+        </AppContext.Provider>
+    );
+};
+
+export const useAppContext = (): AppContextType => {
+    const context = useContext(AppContext);
+    if (context === undefined) {
+        throw new Error('useAppContext must be used within an AppProvider');
+    }
+    return context;
+};
