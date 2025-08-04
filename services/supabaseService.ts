@@ -1,3 +1,4 @@
+
 import { supabase } from './supabaseClient';
 import { 
     Project, 
@@ -21,17 +22,8 @@ import {
 } from '../types';
 import { type AuthSession, type AuthChangeEvent, type FunctionInvokeOptions } from '@supabase/supabase-js';
 
-// Type aliases for easier access to generated types
-type ProfileRow = Database['public']['Tables']['profiles']['Row'];
-type ProfileUpdate = Database['public']['Tables']['profiles']['Update'];
-type ProjectRow = Database['public']['Tables']['projects']['Row'];
-type ProjectInsert = Database['public']['Tables']['projects']['Insert'];
-type ProjectUpdate = Database['public']['Tables']['projects']['Update'];
-type NotificationRow = Database['public']['Tables']['notifications']['Row'];
-
-
 // --- Mappers ---
-const profileRowToUser = (row: ProfileRow, youtubeConnected: boolean): User => ({
+const profileRowToUser = (row: Database['public']['Tables']['profiles']['Row'], youtubeConnected: boolean): User => ({
     id: row.id,
     email: row.email,
     subscription: row.subscription as unknown as Subscription,
@@ -42,8 +34,8 @@ const profileRowToUser = (row: ProfileRow, youtubeConnected: boolean): User => (
     cloned_voices: (row.cloned_voices as unknown as ClonedVoice[] | null) || [],
 });
 
-const userToProfileUpdate = (updates: Partial<User>): ProfileUpdate => {
-    const dbUpdates: ProfileUpdate = {};
+const userToProfileUpdate = (updates: Partial<User>): Database['public']['Tables']['profiles']['Update'] => {
+    const dbUpdates: Database['public']['Tables']['profiles']['Update'] = {};
     if (updates.aiCredits !== undefined) dbUpdates.ai_credits = updates.aiCredits;
     if (updates.channelAudit !== undefined) dbUpdates.channel_audit = updates.channelAudit as unknown as Json;
     if (updates.cloned_voices !== undefined) dbUpdates.cloned_voices = updates.cloned_voices as unknown as Json;
@@ -52,7 +44,7 @@ const userToProfileUpdate = (updates: Partial<User>): ProfileUpdate => {
     return dbUpdates;
 };
 
-const projectRowToProject = (row: ProjectRow): Project => ({
+const projectRowToProject = (row: Database['public']['Tables']['projects']['Row']): Project => ({
     id: row.id,
     name: row.name,
     topic: row.topic,
@@ -75,9 +67,9 @@ const projectRowToProject = (row: ProjectRow): Project => ({
     last_performance_check: row.last_performance_check || undefined,
 });
 
-const projectToProjectUpdate = (updates: Partial<Project>): ProjectUpdate => {
+const projectToProjectUpdate = (updates: Partial<Project>): Database['public']['Tables']['projects']['Update'] => {
     // This explicit mapping is safer and prevents accidental inclusion of fields not in ProjectUpdate
-    const dbUpdates: ProjectUpdate = {};
+    const dbUpdates: Database['public']['Tables']['projects']['Update'] = {};
     if (updates.name !== undefined) dbUpdates.name = updates.name;
     if (updates.topic !== undefined) dbUpdates.topic = updates.topic;
     if (updates.platform !== undefined) dbUpdates.platform = updates.platform;
@@ -100,7 +92,7 @@ const projectToProjectUpdate = (updates: Partial<Project>): ProjectUpdate => {
     return dbUpdates;
 }
 
-export const notificationRowToNotification = (row: NotificationRow): Notification => ({
+export const notificationRowToNotification = (row: Database['public']['Tables']['notifications']['Row']): Notification => ({
   id: row.id,
   user_id: row.user_id,
   project_id: row.project_id || undefined,
@@ -212,11 +204,11 @@ export const getProjectsForUser = async (userId: string): Promise<Project[]> => 
         .order('last_updated', { ascending: false });
 
     if (error) throw error;
-    return (data || []).map(p => projectRowToProject(p as ProjectRow));
+    return (data || []).map(p => projectRowToProject(p));
 };
 
 export const createProject = async (projectData: Omit<Project, 'id'|'lastUpdated'>, userId: string): Promise<Project> => {
-    const projectToInsert: ProjectInsert = {
+    const projectToInsert: Database['public']['Tables']['projects']['Insert'] = {
         user_id: userId,
         name: projectData.name,
         topic: projectData.topic,
@@ -240,7 +232,7 @@ export const createProject = async (projectData: Omit<Project, 'id'|'lastUpdated
     
     const { data, error } = await supabase
         .from('projects')
-        .insert([projectToInsert])
+        .insert(projectToInsert)
         .select('id, name, topic, platform, status, title, script, analysis, competitor_analysis, moodboard, assets, sound_design, launch_plan, performance, scheduled_date, published_url, last_updated, workflow_step, voiceover_voice_id, last_performance_check, user_id')
         .single();
         
@@ -356,7 +348,7 @@ export const getNotifications = async (userId: string): Promise<Notification[]> 
         .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return (data || []).map(n => notificationRowToNotification(n as NotificationRow));
+    return (data || []).map(n => notificationRowToNotification(n));
 };
 
 export const markNotificationAsRead = async (notificationId: string): Promise<void> => {
