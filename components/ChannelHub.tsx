@@ -1,5 +1,3 @@
-
-
 import React, { useState } from 'react';
 import { Opportunity, Platform } from '../types';
 import { fetchChannelVideos } from '../services/youtubeService';
@@ -150,7 +148,7 @@ const ChannelHub: React.FC<ChannelHubProps> = () => {
                                    <p className="text-xs text-gray-500 font-medium">{t('channel_hub.opportunity_title_label')}</p>
                                    <p className="text-sm text-gray-300 italic">"{opp.suggestedTitle}"</p>
                                    <button 
-                                      onClick={() => handleCreateProjectFromIdea(opp, 'youtube')} // Defaulting to YouTube for now
+                                      onClick={() => handleCreateProjectFromIdea(opp, 'youtube_long')}
                                       className="w-full mt-4 text-center py-2 text-sm font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors"
                                     >
                                        {t('channel_hub.opportunity_button')}

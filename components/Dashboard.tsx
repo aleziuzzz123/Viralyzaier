@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Project, Blueprint, Platform } from '../types';
-import { FilePlusIcon, SparklesIcon, LightBulbIcon, YouTubeIcon, TikTokIcon, InstagramIcon } from './Icons';
+import { FilePlusIcon, SparklesIcon, LightBulbIcon, YouTubeIcon, TikTokIcon, InstagramIcon, CheckCircleIcon } from './Icons';
 import { generateVideoBlueprint } from '../services/geminiService';
 import TutorialCallout from './TutorialCallout';
 import KanbanBoard from './KanbanBoard';
@@ -8,10 +8,11 @@ import { PLANS } from '../services/paymentService';
 import { useAppContext, getErrorMessage } from '../contexts/AppContext';
 import Loader from './Loader';
 
-const platformIcons: { [key in Platform]: React.FC<{className?: string}> } = {
-    youtube: YouTubeIcon,
-    tiktok: TikTokIcon,
-    instagram: InstagramIcon,
+const platformConfig: { [key in Platform]: { icon: React.FC<{className?: string}>, nameKey: string, descKey: string } } = {
+    youtube_long: { icon: YouTubeIcon, nameKey: 'platform.youtube_long', descKey: 'platform.youtube_long_desc' },
+    youtube_short: { icon: YouTubeIcon, nameKey: 'platform.youtube_short', descKey: 'platform.youtube_short_desc' },
+    tiktok: { icon: TikTokIcon, nameKey: 'platform.tiktok', descKey: 'platform.tiktok_desc' },
+    instagram: { icon: InstagramIcon, nameKey: 'platform.instagram', descKey: 'platform.instagram_desc' },
 };
 
 const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
@@ -22,6 +23,7 @@ const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; 
     const [error, setError] = useState<string | null>(null);
     const [blueprint, setBlueprint] = useState<Blueprint | null>(null);
     const [selectedTitle, setSelectedTitle] = useState<string | null>(null);
+    const [progressLogs, setProgressLogs] = useState<string[]>([]);
     
     useEffect(() => {
         if (isOpen && prefilledBlueprintPrompt) {
@@ -30,6 +32,13 @@ const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; 
             addToast("Prompt pre-filled from performance insights!", 'success');
         }
     }, [isOpen, prefilledBlueprintPrompt, setPrefilledBlueprintPrompt, addToast]);
+    
+    useEffect(() => {
+        // This effect robustly handles the transition from loading to showing results.
+        if (blueprint) {
+            setIsLoading(false);
+        }
+    }, [blueprint]);
 
     const handleGenerate = () => lockAndExecute(async () => {
         if (!platform) {
@@ -45,25 +54,30 @@ const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; 
         setError(null);
         setBlueprint(null);
         setSelectedTitle(null);
+        setProgressLogs([]);
 
         try {
             const canProceed = await consumeCredits(5);
             if (!canProceed) {
-                // consumeCredits handles its own toasts, so we just exit.
+                setIsLoading(false);
                 return;
             }
             
-            const blueprintResult = await generateVideoBlueprint(topicOrUrl, platform);
+            const onProgressCallback = (message: string) => {
+                setProgressLogs(prev => [...prev, message]);
+            };
+            
+            const blueprintResult = await generateVideoBlueprint(topicOrUrl, platform, onProgressCallback);
             
             if (blueprintResult) {
-                setBlueprint(blueprintResult);
+                setBlueprint(blueprintResult); // This will trigger the useEffect to set isLoading to false
             } else {
                 throw new Error("Failed to generate blueprint. The AI may have returned an invalid response.");
             }
         } catch (err) {
             addToast(getErrorMessage(err), 'error');
-        } finally {
-            setIsLoading(false);
+            setBlueprint(null);
+            setIsLoading(false); // Also ensure loading is false on error
         }
     });
     
@@ -92,10 +106,129 @@ const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; 
         setSelectedTitle(null);
         setPlatform(null);
         setIsLoading(false);
+        setProgressLogs([]);
         onClose();
     };
 
     if (!isOpen) return null;
+    
+    const renderContent = () => {
+        if (isLoading) {
+            return (
+                <div className="flex flex-col items-center justify-center space-y-4 text-center mt-8 px-4">
+                    <h3 className="text-xl font-bold text-white">{t('blueprint_modal.loading')}</h3>
+                    <p className="text-sm text-gray-500 mb-4">{t('blueprint_modal.loading_subtitle')}</p>
+                    <div className="w-full bg-gray-900/50 p-4 rounded-lg text-left h-48 overflow-y-auto">
+                        <ul className="space-y-2">
+                            {progressLogs.map((log, index) => (
+                                <li key={index} className="flex items-center text-sm text-gray-300 animate-fade-in-up">
+                                    {index < progressLogs.length - 1 ? (
+                                        <CheckCircleIcon className="w-5 h-5 mr-3 text-green-400 flex-shrink-0" />
+                                    ) : (
+                                        <SparklesIcon className="w-5 h-5 mr-3 text-indigo-400 flex-shrink-0 animate-pulse" />
+                                    )}
+                                    <span>{log}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                </div>
+            );
+        }
+
+        if (blueprint) {
+            return (
+                <div className="space-y-6 text-left">
+                   <div>
+                       <h3 className="text-lg font-bold text-white mb-2">{t('blueprint_modal.strategic_summary')}</h3>
+                       <p className="text-gray-300 italic">"{blueprint.strategicSummary}"</p>
+                   </div>
+                   <div>
+                       <h3 className="text-lg font-bold text-white mb-2">{t('blueprint_modal.choose_title')}</h3>
+                       <ul className="space-y-2">
+                           {blueprint.suggestedTitles.map((title, i) => (
+                               <li key={i}>
+                                   <button 
+                                       onClick={() => setSelectedTitle(title)}
+                                       className={`w-full text-left p-3 rounded-lg transition-all border-2 ${selectedTitle === title ? 'bg-indigo-900/50 border-indigo-500' : 'bg-gray-700/50 border-transparent hover:border-indigo-600'}`}
+                                   >
+                                       <p className="text-gray-200 font-medium">{title}</p>
+                                   </button>
+                               </li>
+                           ))}
+                       </ul>
+                   </div>
+                   <div>
+                       <h3 className="text-lg font-bold text-white mb-2">{t('blueprint_modal.moodboard')}</h3>
+                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                           {blueprint.moodboard.map((imgSrc, i) => (
+                               <img key={i} src={imgSrc} alt={`Mood board image ${i + 1}`} className="w-full h-auto rounded-lg object-cover shadow-lg" />
+                           ))}
+                       </div>
+                   </div>
+                   <div>
+                       <h3 className="text-lg font-bold text-white mb-2">{t('blueprint_modal.full_script')}</h3>
+                       <div className="bg-gray-900/50 p-4 rounded-lg text-sm text-gray-400 max-h-48 overflow-y-auto">
+                           <p><span className="font-bold text-gray-300">{t('blueprint_modal.hook')}</span> {blueprint.script.hooks[0]}</p>
+                           <p className="mt-2"><span className="font-bold text-gray-300">{t('blueprint_modal.scene1')}</span> {blueprint.script.scenes[0].voiceover}</p>
+                           <p className="mt-2"><span className="font-bold text-gray-300">{t('blueprint_modal.cta')}</span> {blueprint.script.cta}</p>
+                       </div>
+                   </div>
+               </div>
+           );
+        }
+
+        return (
+            <div className="space-y-4">
+                <div>
+                   <h3 className="text-lg font-semibold text-white mb-2 text-left">{t('blueprint_modal.step1')}</h3>
+                   <div className="grid grid-cols-2 gap-4">
+                       {(['youtube_long', 'youtube_short', 'tiktok', 'instagram'] as Platform[]).map(p => {
+                            const config = platformConfig[p];
+                            return (
+                               <button key={p} onClick={() => setPlatform(p)} className={`text-left p-4 rounded-lg border-2 transition-colors ${platform === p ? 'bg-indigo-900/50 border-indigo-500' : 'bg-gray-700/50 border-transparent hover:border-indigo-600'}`}>
+                                   <div className="flex items-center gap-3">
+                                       {React.createElement(config.icon, { className: "w-8 h-8" })}
+                                       <span className="font-bold text-white">{t(config.nameKey as any)}</span>
+                                   </div>
+                                   <p className="text-xs text-gray-400 mt-2">{t(config.descKey as any)}</p>
+                               </button>
+                            )
+                       })}
+                   </div>
+               </div>
+               <div>
+                   <div className="flex justify-between items-center mb-2">
+                       <h3 className="text-lg font-semibold text-white text-left">{t('blueprint_modal.step2')}</h3>
+                       {user?.channelAudit && (
+                           <button 
+                               onClick={handleUseChannelData}
+                               className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 flex items-center"
+                           >
+                               <SparklesIcon className="w-4 h-4 mr-1.5"/>
+                               {t('blueprint_modal.use_channel_data')}
+                           </button>
+                       )}
+                   </div>
+                   <textarea
+                       value={topicOrUrl}
+                       onChange={e => setTopicOrUrl(e.target.value)}
+                       placeholder={t('blueprint_modal.topic_placeholder')}
+                       rows={2}
+                       className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                   />
+               </div>
+               <button
+                   onClick={handleGenerate}
+                   disabled={isLoading}
+                   className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed"
+               >
+                   {isLoading ? t('blueprint_modal.loading') : t('blueprint_modal.generate_button')}
+               </button>
+               {error && <p className="text-red-400 mt-2">{error}</p>}
+           </div>
+        );
+    }
     
     return (
         <div 
@@ -115,98 +248,7 @@ const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; 
                 </header>
                 
                 <div className="overflow-y-auto pr-4 -mr-4 space-y-4 flex-grow">
-                    {!blueprint && !isLoading && (
-                         <div className="space-y-4">
-                             <div>
-                                <h3 className="text-lg font-semibold text-white mb-2 text-left">{t('blueprint_modal.step1')}</h3>
-                                <div className="grid grid-cols-3 gap-4">
-                                    {(['youtube', 'tiktok', 'instagram'] as Platform[]).map(p => (
-                                        <button key={p} onClick={() => setPlatform(p)} className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-colors ${platform === p ? 'bg-indigo-900/50 border-indigo-500' : 'bg-gray-700/50 border-transparent hover:border-indigo-600'}`}>
-                                            {React.createElement(platformIcons[p], { className: "w-10 h-10 mb-2" })}
-                                            <span className="font-semibold capitalize">{p}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                            <div>
-                                <div className="flex justify-between items-center mb-2">
-                                    <h3 className="text-lg font-semibold text-white text-left">{t('blueprint_modal.step2')}</h3>
-                                    {user?.channelAudit && (
-                                        <button 
-                                            onClick={handleUseChannelData}
-                                            className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 flex items-center"
-                                        >
-                                            <SparklesIcon className="w-4 h-4 mr-1.5"/>
-                                            {t('blueprint_modal.use_channel_data')}
-                                        </button>
-                                    )}
-                                </div>
-                                <textarea
-                                    value={topicOrUrl}
-                                    onChange={e => setTopicOrUrl(e.target.value)}
-                                    placeholder={t('blueprint_modal.topic_placeholder')}
-                                    rows={2}
-                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                />
-                            </div>
-                            <button
-                                onClick={handleGenerate}
-                                disabled={isLoading}
-                                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed"
-                            >
-                                {isLoading ? t('blueprint_modal.loading') : t('blueprint_modal.generate_button')}
-                            </button>
-                            {error && <p className="text-red-400 mt-2">{error}</p>}
-                        </div>
-                    )}
-                    
-                    {isLoading && (
-                         <div className="flex flex-col items-center justify-center space-y-4 text-center mt-8">
-                            <SparklesIcon className="w-12 h-12 text-indigo-400 animate-pulse"/>
-                            <p className="text-lg text-gray-200 font-semibold">{t('blueprint_modal.loading')}</p>
-                            <p className="text-sm text-gray-500">{t('blueprint_modal.loading_subtitle')}</p>
-                        </div>
-                    )}
-
-                    {blueprint && (
-                         <div className="space-y-6 text-left">
-                            <div>
-                                <h3 className="text-lg font-bold text-white mb-2">{t('blueprint_modal.strategic_summary')}</h3>
-                                <p className="text-gray-300 italic">"{blueprint.strategicSummary}"</p>
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-bold text-white mb-2">{t('blueprint_modal.choose_title')}</h3>
-                                <ul className="space-y-2">
-                                    {blueprint.suggestedTitles.map((title, i) => (
-                                        <li key={i}>
-                                            <button 
-                                                onClick={() => setSelectedTitle(title)}
-                                                className={`w-full text-left p-3 rounded-lg transition-all border-2 ${selectedTitle === title ? 'bg-indigo-900/50 border-indigo-500' : 'bg-gray-700/50 border-transparent hover:border-indigo-600'}`}
-                                            >
-                                                <p className="text-gray-200 font-medium">{title}</p>
-                                            </button>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-bold text-white mb-2">{t('blueprint_modal.moodboard')}</h3>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                    {blueprint.moodboard.map((imgSrc, i) => (
-                                        <img key={i} src={imgSrc} alt={`Mood board image ${i + 1}`} className="w-full h-auto rounded-lg object-cover shadow-lg" />
-                                    ))}
-                                </div>
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-bold text-white mb-2">{t('blueprint_modal.full_script')}</h3>
-                                <div className="bg-gray-900/50 p-4 rounded-lg text-sm text-gray-400 max-h-48 overflow-y-auto">
-                                    <p><span className="font-bold text-gray-300">{t('blueprint_modal.hook')}</span> {blueprint.script.hooks[0]}</p>
-                                    <p className="mt-2"><span className="font-bold text-gray-300">{t('blueprint_modal.scene1')}</span> {blueprint.script.scenes[0].voiceover}</p>
-                                    <p className="mt-2"><span className="font-bold text-gray-300">{t('blueprint_modal.cta')}</span> {blueprint.script.cta}</p>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                    {renderContent()}
                 </div>
                 
                 {blueprint && (

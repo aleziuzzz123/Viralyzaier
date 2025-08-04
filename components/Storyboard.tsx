@@ -13,8 +13,8 @@ interface StoryboardProps {
 
 const parseTimecode = (timecode: string): { start: number, end: number, duration: number } => {
     const parts = timecode.replace('s', '').split('-');
-    const start = parseInt(parts[0], 10) || 0;
-    const end = parseInt(parts[1], 10) || start + 1;
+    const start = parseFloat(parts[0]) || 0;
+    const end = parseFloat(parts[1]) || start + 1;
     return { start, end, duration: end - start };
 };
 
@@ -27,7 +27,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ project, onProceed }) => {
     // Animatic Player State
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
-    const [currentVisual, setCurrentVisual] = useState<string | null>(null);
+    const [currentVisual, setCurrentVisual] = useState<{ url: string | null; type: 'video' | 'image' }>({ url: null, type: 'video'});
     const audioRef = useRef<HTMLAudioElement | null>(null);
     
     useEffect(() => {
@@ -50,10 +50,13 @@ const Storyboard: React.FC<StoryboardProps> = ({ project, onProceed }) => {
                 return;
             }
 
-            // Display visual - prefer b-roll video, fallback to moodboard image
+            // Display visual - prefer b-roll video, fallback to animated image
             const sceneAssets = project.assets[currentSceneIndex];
-            const visualToShow = sceneAssets?.brollVideo || project.moodboard?.[0] || null;
-            setCurrentVisual(visualToShow);
+            const generationType = sceneAssets?.generationType || 'video';
+            const visualUrl = generationType === 'animated_image' ? sceneAssets?.brollImage : sceneAssets?.brollVideo;
+            
+            setCurrentVisual({ url: visualUrl || project.moodboard?.[0] || null, type: generationType === 'animated_image' ? 'image' : 'video' });
+
 
             // Play voiceover from generated asset
             if (audioRef.current) {
@@ -100,7 +103,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ project, onProceed }) => {
                 audioRef.current.pause();
             }
             setCurrentSceneIndex(0);
-            setCurrentVisual(null);
+            setCurrentVisual({ url: null, type: 'video' });
         } else {
             setCurrentSceneIndex(0);
             setIsPlaying(true);
@@ -123,6 +126,10 @@ const Storyboard: React.FC<StoryboardProps> = ({ project, onProceed }) => {
         { value: 'Funny', label: t('storyboard.vibe_funny') },
         { value: 'Mysterious', label: t('storyboard.vibe_mysterious') },
     ];
+
+    const currentSceneDuration = project.script && project.script.scenes[currentSceneIndex] 
+        ? parseTimecode(project.script.scenes[currentSceneIndex].timecode).duration 
+        : 5;
 
     return (
         <div className="space-y-8 animate-fade-in-up">
@@ -172,16 +179,25 @@ const Storyboard: React.FC<StoryboardProps> = ({ project, onProceed }) => {
                 <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700 flex flex-col">
                     <h3 className="text-2xl font-bold text-white mb-4">{t('storyboard.animatic_title')}</h3>
                      <div className="aspect-video w-full bg-black rounded-lg mb-4 flex items-center justify-center relative overflow-hidden">
-                        {currentVisual ? (
-                            <video 
-                                key={currentVisual} 
-                                src={currentVisual} 
-                                className="w-full h-full object-contain animate-fade-in" 
-                                autoPlay 
-                                loop 
-                                muted 
-                                playsInline
-                            />
+                        {currentVisual.url ? (
+                            currentVisual.type === 'image' ? (
+                                <img 
+                                    key={currentVisual.url}
+                                    src={currentVisual.url}
+                                    className="w-full h-full object-cover"
+                                    style={{ animation: `ken-burns ${currentSceneDuration}s ease-in-out forwards` }}
+                                />
+                            ) : (
+                                <video 
+                                    key={currentVisual.url} 
+                                    src={currentVisual.url} 
+                                    className="w-full h-full object-contain animate-fade-in" 
+                                    autoPlay 
+                                    loop 
+                                    muted 
+                                    playsInline
+                                />
+                            )
                         ) : (
                             <div className="text-center text-gray-500">
                                 <MusicNoteIcon className="w-16 h-16 mx-auto" />

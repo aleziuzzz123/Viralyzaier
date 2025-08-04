@@ -4,7 +4,8 @@ import { YouTubeIcon, TikTokIcon, InstagramIcon, PlusIcon, PencilIcon, RocketLau
 import { useAppContext } from '../contexts/AppContext';
 
 const platformIcons: { [key in Platform]: React.FC<{className?: string}> } = {
-    youtube: YouTubeIcon,
+    youtube_long: YouTubeIcon,
+    youtube_short: YouTubeIcon,
     tiktok: TikTokIcon,
     instagram: InstagramIcon,
 };
@@ -21,10 +22,25 @@ const ProjectCard: React.FC<{
     project: Project;
     onViewProject: () => void;
 }> = ({ project, onViewProject }) => {
-    const { handleUpdateProject, addToast, t } = useAppContext();
+    const { user, handleUpdateProject, addToast, t } = useAppContext();
     const [isEditingUrl, setIsEditingUrl] = useState(false);
     const [url, setUrl] = useState(project.publishedUrl || '');
+    const [imageUrl, setImageUrl] = useState<string | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        // Robust image URL handling to prevent broken images from race conditions
+        if (project.moodboard && project.moodboard.length > 0) {
+            setImageUrl(project.moodboard[0]);
+        } else if (user?.id && project.id) {
+            // Fallback for Autopilot projects where moodboard might not be in state yet
+            // This constructs a predictable URL, assuming the first moodboard image is always moodboard_0.jpg
+            const predictedUrl = `${(window as any).__env.VITE_SUPABASE_URL}/storage/v1/object/public/assets/${user.id}/${project.id}/moodboard_0.jpg`;
+            setImageUrl(predictedUrl);
+        } else {
+            setImageUrl(null);
+        }
+    }, [project.moodboard, project.id, user?.id]);
 
     const handleUrlSave = () => {
         const trimmedUrl = url.trim();
@@ -51,22 +67,27 @@ const ProjectCard: React.FC<{
         setIsEditingUrl(true);
     };
 
+    const PlatformIcon = platformIcons[project.platform];
+
     return (
         <div
             draggable
             onDragStart={(e) => e.dataTransfer.setData('projectId', project.id)}
             className="bg-gray-800 rounded-lg border border-gray-700 hover:border-indigo-500 cursor-pointer transition-all duration-200 shadow-md hover:shadow-indigo-500/10 mb-4 overflow-hidden"
         >
-            {project.moodboard && project.moodboard.length > 0 && (
+            {imageUrl && (
                 <div className="aspect-video w-full bg-gray-900" onClick={onViewProject}>
-                    <img src={project.moodboard[0]} alt={`${project.name} moodboard`} className="w-full h-full object-cover" />
+                    <img src={imageUrl} alt={`${project.name} moodboard`} className="w-full h-full object-cover" />
                 </div>
             )}
             <div className="p-4">
                 <div onClick={onViewProject}>
                     <div className="flex items-start justify-between">
                         <h4 className="font-bold text-gray-200 truncate pr-2 flex-1">{project.name}</h4>
-                        {React.createElement(platformIcons[project.platform], { className: "w-5 h-5 text-gray-500 flex-shrink-0" })}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            {project.platform === 'youtube_short' && <span className="text-xs font-bold text-white bg-red-600 px-2 py-0.5 rounded-md">Short</span>}
+                            <PlatformIcon className="w-5 h-5 text-gray-500" />
+                        </div>
                     </div>
                     <p className="text-sm text-gray-400 truncate mt-1">{project.topic || t('kanban.no_topic')}</p>
                      {project.status === 'Autopilot' && (

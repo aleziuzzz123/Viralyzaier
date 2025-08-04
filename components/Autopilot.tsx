@@ -52,7 +52,7 @@ const Autopilot: React.FC = () => {
                 return;
             }
             
-            const newBlueprints = await generateAutopilotBacklog('youtube', pillars, user.channelAudit);
+            const newBlueprints = await generateAutopilotBacklog('youtube_long', pillars, user.channelAudit);
             
             const createdProjects: Project[] = [];
             // Process each blueprint sequentially to create a stable project ID before uploading assets.

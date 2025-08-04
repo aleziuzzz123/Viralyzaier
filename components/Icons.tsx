@@ -208,6 +208,13 @@ export const StopIcon: React.FC<IconProps> = ({ className }) => (
     </svg>
 );
 
+export const StopCircleIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 9.563h6v4.874H9V9.563z" />
+    </svg>
+);
+
 export const TargetIcon: React.FC<IconProps> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.82m5.84-2.56a6 6 0 01-1.27 8.17m-4.57-8.17v4.82a6 6 0 01-5.84-7.38m-1.27-8.17a6 6 0 0111.38 0M12 21a9 9 0 110-18 9 9 0 010 18z" />

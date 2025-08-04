@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { Project, Analysis, Script as ScriptType, WorkflowStep, Platform } from '../types';
 import { TitleIcon, ScriptIcon, SparklesIcon, TrashIcon, PhotoIcon, CtaIcon, LockClosedIcon, CheckIcon, YouTubeIcon, TikTokIcon, InstagramIcon, MusicNoteIcon, RocketLaunchIcon, TrendIcon, TargetIcon, CheckBadgeIcon, LightBulbIcon } from './Icons';
@@ -22,7 +20,8 @@ interface ProjectViewProps {
 }
 
 const platformIcons: { [key in Platform]: React.FC<{className?: string}> } = {
-    youtube: YouTubeIcon,
+    youtube_long: YouTubeIcon,
+    youtube_short: YouTubeIcon,
     tiktok: TikTokIcon,
     instagram: InstagramIcon,
 };
@@ -418,14 +417,20 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
         }
     }
 
+    const PlatformIcon = platformIcons[project.platform];
+    const platformName = t(`platform.${project.platform.replace('_', '_name')}` as any);
+
     return (
         <div className="animate-fade-in-up">
             <header className="flex justify-between items-start mb-6">
-                <div className="flex items-center gap-4 flex-1 min-w-0">
-                    {React.createElement(platformIcons[project.platform], { className: "w-10 h-10 text-gray-500" })}
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
                         <input type="text" value={projectName} onChange={handleNameChange} onBlur={handleNameBlur} onKeyPress={(e) => e.key === 'Enter' && e.currentTarget.blur()} className="text-4xl font-black text-white bg-transparent border-none focus:outline-none focus:ring-0 p-0 truncate" />
                         {isNameSaved && <div className="animate-fade-in text-green-400 flex items-center gap-1 text-sm"><CheckBadgeIcon className="w-6 h-6"/> Saved!</div>}
+                    </div>
+                     <div className="mt-2 flex items-center gap-3 text-gray-400">
+                        <PlatformIcon className="w-6 h-6" />
+                        <span className="font-semibold">{platformName}</span>
                     </div>
                 </div>
                 <button onClick={() => handleDeleteProject(project.id)} className="p-2 text-gray-500 hover:text-red-400 transition-colors flex-shrink-0">
