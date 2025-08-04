@@ -25,22 +25,7 @@ const ProjectCard: React.FC<{
     const { user, handleUpdateProject, addToast, t } = useAppContext();
     const [isEditingUrl, setIsEditingUrl] = useState(false);
     const [url, setUrl] = useState(project.publishedUrl || '');
-    const [imageUrl, setImageUrl] = useState<string | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
-
-    useEffect(() => {
-        // Robust image URL handling to prevent broken images from race conditions
-        if (project.moodboard && project.moodboard.length > 0) {
-            setImageUrl(project.moodboard[0]);
-        } else if (user?.id && project.id) {
-            // Fallback for Autopilot projects where moodboard might not be in state yet
-            // This constructs a predictable URL, assuming the first moodboard image is always moodboard_0.jpg
-            const predictedUrl = `${(window as any).__env.VITE_SUPABASE_URL}/storage/v1/object/public/assets/${user.id}/${project.id}/moodboard_0.jpg`;
-            setImageUrl(predictedUrl);
-        } else {
-            setImageUrl(null);
-        }
-    }, [project.moodboard, project.id, user?.id]);
 
     const handleUrlSave = () => {
         const trimmedUrl = url.trim();
@@ -72,16 +57,12 @@ const ProjectCard: React.FC<{
     return (
         <div
             draggable
+            onClick={onViewProject}
             onDragStart={(e) => e.dataTransfer.setData('projectId', project.id)}
-            className="bg-gray-800 rounded-lg border border-gray-700 hover:border-indigo-500 cursor-pointer transition-all duration-200 shadow-md hover:shadow-indigo-500/10 mb-4 overflow-hidden"
+            className="bg-gray-800 rounded-lg border border-gray-700 hover:border-indigo-500 cursor-pointer transition-all duration-200 shadow-md hover:shadow-indigo-500/10 mb-4"
         >
-            {imageUrl && (
-                <div className="aspect-video w-full bg-gray-900" onClick={onViewProject}>
-                    <img src={imageUrl} alt={`${project.name} moodboard`} className="w-full h-full object-cover" />
-                </div>
-            )}
             <div className="p-4">
-                <div onClick={onViewProject}>
+                <div>
                     <div className="flex items-start justify-between">
                         <h4 className="font-bold text-gray-200 truncate pr-2 flex-1">{project.name}</h4>
                         <div className="flex items-center gap-2 flex-shrink-0">

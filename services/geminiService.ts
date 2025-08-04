@@ -13,10 +13,20 @@ const parseGeminiJson = <T>(res: { text: string }, fallback: T | null = null): T
     }
 };
 
-export const generateVideoBlueprint = async (topicOrUrl: string, platform: Platform): Promise<Blueprint> => {
-    const textPrompt = `You are a world-class viral video strategist for ${platform}. Your task is to generate a complete video blueprint based on the topic or URL: "${topicOrUrl}".
+export const generateVideoBlueprint = async (
+    topicOrUrl: string, 
+    platform: Platform,
+    onProgress: (message: string) => void
+): Promise<Blueprint> => {
+    onProgress("Consulting AI strategist for core concepts...");
+    
+    const formatDescription = platform === 'youtube_long' 
+        ? "a horizontal, long-form YouTube video" 
+        : "a vertical, short-form video for platforms like YouTube Shorts, TikTok, or Instagram Reels";
 
-Your analysis must be sharp, insightful, and geared towards maximum audience engagement and shareability.
+    const textPrompt = `You are a world-class viral video strategist for ${formatDescription}. Your task is to generate a complete video blueprint based on the topic or URL: "${topicOrUrl}".
+
+Your analysis must be sharp, insightful, and geared towards maximum audience engagement and shareability for that specific format.
 
 Your output MUST be a JSON object with the following structure:
 1.  "strategicSummary": A concise, hard-hitting summary explaining WHY this video concept will perform well. Reference audience psychology, platform trends, or a unique angle.
@@ -64,21 +74,30 @@ Your output MUST be a JSON object with the following structure:
     });
 
     const blueprintContent = parseGeminiJson<{strategicSummary: string, suggestedTitles: string[], script: Script, moodboardDescription: string[]}>(response);
+    
+    onProgress("Strategic plan and script generated successfully!");
 
-    const imagePromises = blueprintContent.moodboardDescription.map((prompt: string) => 
-        supabase.invokeEdgeFunction('gemini-proxy', {
+    const moodboardUrls: string[] = [];
+    const aspectRatio = platform === 'youtube_long' ? '16:9' : '9:16';
+
+    for (let i = 0; i < blueprintContent.moodboardDescription.length; i++) {
+        const prompt = blueprintContent.moodboardDescription[i];
+        onProgress(`Generating moodboard image ${i + 1} of ${blueprintContent.moodboardDescription.length}...`);
+        
+        const imageResult = await supabase.invokeEdgeFunction('gemini-proxy', {
             type: 'generateImages',
             params: {
                 model: 'imagen-3.0-generate-002',
                 prompt: `A cinematic, visually stunning image for a YouTube video moodboard: ${prompt}`,
-                config: { numberOfImages: 1, outputMimeType: 'image/jpeg', aspectRatio: '16:9' }
+                config: { numberOfImages: 1, outputMimeType: 'image/jpeg', aspectRatio }
             }
-        })
-    );
-    const imageResults = await Promise.all(imagePromises);
-    const moodboardBase64 = imageResults.map(res => `data:image/jpeg;base64,${res.generatedImages[0].image.imageBytes}`);
+        });
+        moodboardUrls.push(`data:image/jpeg;base64,${imageResult.generatedImages[0].image.imageBytes}`);
+    }
+
+    onProgress("Finalizing your blueprint...");
     
-    return { ...blueprintContent, moodboard: moodboardBase64, platform };
+    return { ...blueprintContent, moodboard: moodboardUrls, platform };
 };
 
 export const generateAutopilotBacklog = async (
@@ -157,6 +176,7 @@ Your response **MUST** be a JSON array containing exactly 3 blueprint objects. E
     });
 
     const blueprintContents = parseGeminiJson<(Omit<Blueprint, 'moodboard' | 'platform'> & { moodboardDescription: string[] })[]>(response);
+    const aspectRatio = platform === 'youtube_long' ? '16:9' : '9:16';
 
     const allMoodboardPrompts = blueprintContents.flatMap(b => b.moodboardDescription);
     const allImagePromises = allMoodboardPrompts.map(prompt =>
@@ -165,7 +185,7 @@ Your response **MUST** be a JSON array containing exactly 3 blueprint objects. E
             params: {
                 model: 'imagen-3.0-generate-002',
                 prompt: `A cinematic, visually stunning image for a YouTube video moodboard: ${prompt}`,
-                config: { numberOfImages: 1, outputMimeType: 'image/jpeg', aspectRatio: '16:9' }
+                config: { numberOfImages: 1, outputMimeType: 'image/jpeg', aspectRatio }
             }
         })
     );
@@ -194,7 +214,9 @@ export const generateOptimizedScript = async (
         ? `Generate a new script about "${input.topic}".`
         : `Analyze and improve this existing script: "${input.userScript.substring(0, 2000)}..."`;
 
-    const prompt = `You are an expert scriptwriter and viral content analyst for ${platform}. Your task is to create a perfectly optimized script.
+    const formatDescription = platform === 'youtube_long' ? "long-form YouTube videos" : "short-form vertical videos (Shorts, TikToks)";
+
+    const prompt = `You are an expert scriptwriter and viral content analyst for ${formatDescription}. Your task is to create a perfectly optimized script.
 The desired script length is approximately ${desiredLengthInSeconds} seconds.
 Context: ${promptContext}
 
@@ -546,7 +568,7 @@ Your output MUST be a JSON object with:
 };
 
 export const analyzeAndGenerateThumbnails = async (title: string, platform: Platform, userId: string, projectId: string): Promise<string[]> => {
-    const aspectRatio = platform === 'youtube' ? '16:9' : '9:16';
+    const aspectRatio = platform === 'youtube_long' ? '16:9' : '9:16';
     
     const brainstormPrompt = `You are a viral marketing expert specializing in YouTube thumbnails. The video title is "${title}". Brainstorm 3 distinct, high-CTR thumbnail concepts. For each concept, provide a detailed prompt for an AI image generator. The prompts should describe visual elements, colors, text, and emotion designed to maximize clicks. Focus on concepts that create curiosity and have a strong focal point.
     

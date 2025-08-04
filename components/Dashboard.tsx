@@ -5,7 +5,8 @@ import { generateVideoBlueprint } from '../services/geminiService';
 import TutorialCallout from './TutorialCallout';
 import KanbanBoard from './KanbanBoard';
 import { PLANS } from '../services/paymentService';
-import { useAppContext, getErrorMessage } from '../contexts/AppContext';
+import { useAppContext } from '../contexts/AppContext';
+import { getErrorMessage } from '../utils';
 import Loader from './Loader';
 
 const platformConfig: { [key in Platform]: { icon: React.FC<{className?: string}>, nameKey: string, descKey: string } } = {

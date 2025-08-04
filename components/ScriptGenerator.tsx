@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Project, Script, Platform, ScriptOptimization, PlanId } from '../types';
 import { generateOptimizedScript } from '../services/geminiService';
 import { SparklesIcon, LightBulbIcon, CtaIcon, PencilIcon, MagicWandIcon, CheckBadgeIcon } from './Icons';
-import { useAppContext, getErrorMessage } from '../contexts/AppContext';
+import { useAppContext } from '../contexts/AppContext';
+import { getErrorMessage } from '../utils';
 import { PLANS } from '../services/paymentService';
 import ViralityGauge from './ViralityGauge';
 

@@ -3,7 +3,7 @@ import { useAppContext } from '../contexts/AppContext';
 import { generateAutopilotBacklog } from '../services/geminiService';
 import * as supabase from '../services/supabaseService';
 import { SparklesIcon, RocketLaunchIcon, PlusIcon, TrashIcon } from './Icons';
-import { Project } from '../types';
+import { Project, Script } from '../types';
 
 const Autopilot: React.FC = () => {
     const { user, setUser, consumeCredits, requirePermission, addToast, t, addProjects, setActiveProjectId, lockAndExecute } = useAppContext();
@@ -61,12 +61,24 @@ const Autopilot: React.FC = () => {
                 
                 // 1. Create a placeholder project to get an ID.
                 const initialProjectData: Omit<Project, 'id' | 'lastUpdated'> = {
-                    name: title, status: 'Autopilot', platform: bp.platform,
-                    topic: bp.strategicSummary, title: title, script: bp.script,
+                    name: title,
+                    status: 'Autopilot',
+                    platform: bp.platform,
+                    topic: bp.strategicSummary,
+                    title: title,
+                    script: bp.script,
                     moodboard: [], // Moodboard is initially empty
-                    workflowStep: 2, analysis: null, competitorAnalysis: null, 
-                    scheduledDate: null, assets: {}, soundDesign: null, 
-                    launchPlan: null, performance: null, publishedUrl: undefined,
+                    workflowStep: 2,
+                    analysis: null,
+                    competitorAnalysis: null,
+                    scheduledDate: null,
+                    assets: {},
+                    soundDesign: null,
+                    launchPlan: null,
+                    performance: null,
+                    publishedUrl: null,
+                    voiceoverVoiceId: null,
+                    last_performance_check: null,
                 };
                 const newProject = await supabase.createProject(initialProjectData, user.id);
 

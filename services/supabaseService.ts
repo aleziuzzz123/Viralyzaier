@@ -16,27 +16,34 @@ import {
     VideoPerformance,
     ChannelAudit,
     Database,
-    Json,
     Notification,
     ClonedVoice,
     Subscription,
+    Json,
 } from '../types';
-import { type AuthSession, type AuthChangeEvent } from '@supabase/supabase-js';
+import { type AuthSession, type AuthChangeEvent, type FunctionInvokeOptions } from '@supabase/supabase-js';
 
-// Type aliases for easier access to generated types
-type ProfileRow = Database['public']['Tables']['profiles']['Row'];
-type ProfileUpdate = Database['public']['Tables']['profiles']['Update'];
-type ProjectRow = Database['public']['Tables']['projects']['Row'];
-type ProjectInsert = Database['public']['Tables']['projects']['Insert'];
-type ProjectUpdate = Database['public']['Tables']['projects']['Update'];
-type NotificationRow = Database['public']['Tables']['notifications']['Row'];
+// --- Type Guards for Data Validation ---
+const isValidPlatform = (platform: any): platform is Platform => {
+    return ['youtube_long', 'youtube_short', 'tiktok', 'instagram'].includes(platform);
+};
+
+const isValidStatus = (status: any): status is ProjectStatus => {
+    return ['Idea', 'Scripting', 'Scheduled', 'Published', 'Autopilot'].includes(status);
+};
+
+const isValidSubscription = (sub: any): sub is Subscription => {
+    return sub && typeof sub === 'object' &&
+           ['free', 'pro', 'viralyzaier'].includes(sub.planId) &&
+           ['active', 'canceled'].includes(sub.status);
+};
 
 
 // --- Mappers ---
-const profileRowToUser = (row: ProfileRow, youtubeConnected: boolean): User => ({
+const profileRowToUser = (row: Database['public']['Tables']['profiles']['Row'], youtubeConnected: boolean): User => ({
     id: row.id,
     email: row.email,
-    subscription: row.subscription as unknown as Subscription,
+    subscription: isValidSubscription(row.subscription) ? (row.subscription as unknown as Subscription) : { planId: 'free', status: 'active', endDate: null },
     aiCredits: row.ai_credits,
     channelAudit: row.channel_audit as unknown as ChannelAudit | null,
     youtubeConnected,
@@ -44,43 +51,42 @@ const profileRowToUser = (row: ProfileRow, youtubeConnected: boolean): User => (
     cloned_voices: (row.cloned_voices as unknown as ClonedVoice[] | null) || [],
 });
 
-const userToProfileUpdate = (updates: Partial<User>): ProfileUpdate => {
-    const dbUpdates: ProfileUpdate = {};
+const userToProfileUpdate = (updates: Partial<User>): Database['public']['Tables']['profiles']['Update'] => {
+    const dbUpdates: Database['public']['Tables']['profiles']['Update'] = {};
     if (updates.aiCredits !== undefined) dbUpdates.ai_credits = updates.aiCredits;
     if (updates.channelAudit !== undefined) dbUpdates.channel_audit = updates.channelAudit as unknown as Json;
     if (updates.cloned_voices !== undefined) dbUpdates.cloned_voices = updates.cloned_voices as unknown as Json;
     if (updates.content_pillars !== undefined) dbUpdates.content_pillars = updates.content_pillars;
-    if (updates.email !== undefined) dbUpdates.email = updates.email;
     if (updates.subscription !== undefined) dbUpdates.subscription = updates.subscription as unknown as Json;
     return dbUpdates;
 };
 
-const projectRowToProject = (row: ProjectRow): Project => ({
+const projectRowToProject = (row: Database['public']['Tables']['projects']['Row']): Project => ({
     id: row.id,
     name: row.name,
     topic: row.topic,
-    platform: row.platform as Platform,
-    status: row.status as ProjectStatus,
+    platform: isValidPlatform(row.platform) ? row.platform : 'youtube_long',
+    status: isValidStatus(row.status) ? row.status : 'Idea',
     title: row.title,
     script: row.script as unknown as Script | null,
     analysis: row.analysis as unknown as Analysis | null,
     competitorAnalysis: row.competitor_analysis as unknown as CompetitorAnalysisResult | null,
     moodboard: row.moodboard,
-    assets: (row.assets as unknown as { [key: string]: SceneAssets } | null) || {},
+    assets: (row.assets as unknown as { [key: string]: SceneAssets }) || {},
     soundDesign: row.sound_design as unknown as SoundDesign | null,
     launchPlan: row.launch_plan as unknown as LaunchPlan | null,
     performance: row.performance as unknown as VideoPerformance | null,
     scheduledDate: row.scheduled_date,
-    publishedUrl: row.published_url || undefined,
+    publishedUrl: row.published_url,
     lastUpdated: row.last_updated,
     workflowStep: row.workflow_step as WorkflowStep,
-    voiceoverVoiceId: row.voiceover_voice_id || undefined,
-    last_performance_check: row.last_performance_check || undefined,
+    voiceoverVoiceId: row.voiceover_voice_id,
+    last_performance_check: row.last_performance_check,
 });
 
-const projectToProjectUpdate = (updates: Partial<Project>): ProjectUpdate => {
+const projectToProjectUpdate = (updates: Partial<Project>): Database['public']['Tables']['projects']['Update'] => {
     // This explicit mapping is safer and prevents accidental inclusion of fields not in ProjectUpdate
-    const dbUpdates: ProjectUpdate = {};
+    const dbUpdates: Database['public']['Tables']['projects']['Update'] = {};
     if (updates.name !== undefined) dbUpdates.name = updates.name;
     if (updates.topic !== undefined) dbUpdates.topic = updates.topic;
     if (updates.platform !== undefined) dbUpdates.platform = updates.platform;
@@ -103,10 +109,10 @@ const projectToProjectUpdate = (updates: Partial<Project>): ProjectUpdate => {
     return dbUpdates;
 }
 
-export const notificationRowToNotification = (row: NotificationRow): Notification => ({
+export const notificationRowToNotification = (row: Database['public']['Tables']['notifications']['Row']): Notification => ({
   id: row.id,
   user_id: row.user_id,
-  project_id: row.project_id || undefined,
+  project_id: row.project_id,
   message: row.message,
   is_read: row.is_read,
   created_at: row.created_at,
@@ -195,9 +201,7 @@ export const updateUserProfile = async (userId: string, updates: Partial<User>):
         .single();
 
     if (error) throw error;
-
-    const profileRow = data as ProfileRow | null;
-    if (!profileRow) throw new Error("User profile not found after update.");
+    if (!data) throw new Error("User profile not found after update.");
     
     // We need to re-fetch the youtube connected status as this local update doesn't know about it.
     const currentProfile = await getUserProfile(userId);
@@ -221,7 +225,7 @@ export const getProjectsForUser = async (userId: string): Promise<Project[]> => 
 };
 
 export const createProject = async (projectData: Omit<Project, 'id'|'lastUpdated'>, userId: string): Promise<Project> => {
-    const projectToInsert: ProjectInsert = {
+    const projectToInsert: Database['public']['Tables']['projects']['Insert'] = {
         user_id: userId,
         name: projectData.name,
         topic: projectData.topic,
@@ -237,22 +241,21 @@ export const createProject = async (projectData: Omit<Project, 'id'|'lastUpdated
         launch_plan: projectData.launchPlan as unknown as Json | null,
         performance: projectData.performance as unknown as Json | null,
         scheduled_date: projectData.scheduledDate,
-        published_url: projectData.publishedUrl || null,
+        published_url: projectData.publishedUrl,
         workflow_step: projectData.workflowStep,
-        voiceover_voice_id: projectData.voiceoverVoiceId || null,
-        last_performance_check: projectData.last_performance_check || null,
+        voiceover_voice_id: projectData.voiceoverVoiceId,
+        last_performance_check: projectData.last_performance_check,
     };
     
     const { data, error } = await supabase
         .from('projects')
-        .insert(projectToInsert)
+        .insert([projectToInsert])
         .select('*')
         .single();
         
     if (error) throw error;
-    const projectRow = data as ProjectRow | null;
-    if (!projectRow) throw new Error("Project data not returned after creation.");
-    return projectRowToProject(projectRow);
+    if (!data) throw new Error("Project data not returned after creation.");
+    return projectRowToProject(data);
 };
 
 export const updateProject = async (projectId: string, updates: Partial<Project>): Promise<Project> => {
@@ -266,9 +269,8 @@ export const updateProject = async (projectId: string, updates: Partial<Project>
         .single();
         
     if (error) throw error;
-    const projectRow = data as ProjectRow | null;
-    if (!projectRow) throw new Error("Project data not returned after update.");
-    return projectRowToProject(projectRow);
+    if (!data) throw new Error("Project data not returned after update.");
+    return projectRowToProject(data);
 };
 
 export const deleteProject = async (projectId: string): Promise<void> => {
@@ -302,24 +304,50 @@ export const invokeEdgeFunction = async (name: string, body: object | FormData, 
         throw new Error(sessionError?.message || 'User is not authenticated.');
     }
 
+    // Use native fetch for blob responses as it's more reliable than the Supabase client's handling.
+    if (responseType === 'blob') {
+        const functionUrl = `${(window as any).__env.VITE_SUPABASE_URL}/functions/v1/${name}`;
+        
+        const isFormData = body instanceof FormData;
+        const fetchOptions: RequestInit = {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                ...(isFormData ? {} : {'Content-Type': 'application/json'})
+            },
+            body: isFormData ? body : JSON.stringify(body)
+        };
+        
+        const response = await fetch(functionUrl, fetchOptions);
+        if (!response.ok) {
+            const errorText = await response.text();
+            try {
+                const errorJson = JSON.parse(errorText);
+                throw new Error(errorJson.error || `Function ${name} failed with status ${response.status}`);
+            } catch {
+                throw new Error(errorText || `Function ${name} failed with status ${response.status}`);
+            }
+        }
+        return await response.blob();
+    }
+    
+    // Existing logic for JSON responses using the Supabase client
     const headers: HeadersInit = {
         'Authorization': `Bearer ${session.access_token}`,
     };
     
-    // Let the Supabase client library handle JSON stringification and Content-Type header for objects,
-    // and correctly handle FormData as well. This is more robust.
-    const response = await supabase.functions.invoke(name, {
+    const options: FunctionInvokeOptions = {
         body,
         headers,
-    });
+    };
+    
+    const response = await supabase.functions.invoke(name, options);
     
     if (response.error) {
         try {
-            // Attempt to parse a more specific error message from the function's response.
             const errorBody = JSON.parse(response.error.context.responseText);
             throw new Error(errorBody.error || response.error.message);
         } catch (e) {
-            // Fallback to the default Supabase error.
             throw response.error;
         }
     }

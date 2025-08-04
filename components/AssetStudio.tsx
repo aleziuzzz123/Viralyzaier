@@ -3,7 +3,8 @@ import { Project, SceneAssets } from '../types';
 import { generateVideoClip, generateAnimatedImage, generateVoiceover, ELEVENLABS_VOICES } from '../services/generativeMediaService';
 import { uploadFile } from '../services/supabaseService';
 import { SparklesIcon, CtaIcon, DownloadIcon, PlayIcon, PhotoIcon, MicIcon, RefreshIcon, WarningIcon, CheckCircleIcon, XCircleIcon, InfoIcon, StopCircleIcon, ChevronDownIcon } from './Icons';
-import { useAppContext, getErrorMessage } from '../contexts/AppContext';
+import { useAppContext } from '../contexts/AppContext';
+import { getErrorMessage } from '../utils';
 import JSZip from 'jszip';
 
 interface AssetStudioProps {

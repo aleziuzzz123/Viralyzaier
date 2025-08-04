@@ -33,7 +33,7 @@ export interface User {
 }
 
 export type ProjectStatus = 'Idea' | 'Scripting' | 'Scheduled' | 'Published' | 'Autopilot';
-export type Platform = 'youtube' | 'tiktok' | 'instagram';
+export type Platform = 'youtube_long' | 'youtube_short' | 'tiktok' | 'instagram';
 export type WorkflowStep = 1 | 2 | 3 | 4 | 5 | 6;
 
 
@@ -53,17 +53,17 @@ export interface Project {
   launchPlan: LaunchPlan | null;
   performance: VideoPerformance | null;
   scheduledDate: string | null; // ISO string
-  publishedUrl?: string;
+  publishedUrl: string | null;
   lastUpdated: string; // ISO string
   workflowStep: WorkflowStep;
-  voiceoverVoiceId?: string;
-  last_performance_check?: string; // ISO string
+  voiceoverVoiceId: string | null;
+  last_performance_check: string | null; // ISO string
 }
 
 export interface Notification {
     id: string;
     user_id: string;
-    project_id?: string;
+    project_id: string | null;
     message: string;
     is_read: boolean;
     created_at: string;
@@ -184,9 +184,11 @@ export interface VideoDetails {
 }
 
 export interface SceneAssets {
-    brollVideo?: string; // URL to the generated video
-    graphics: string[]; // base64 strings for overlays
-    audio?: string; // URL to the generated audio
+    brollVideo?: string;
+    brollImage?: string;
+    generationType?: 'video' | 'animated_image';
+    graphics: string[];
+    audio?: string;
 }
 
 export interface SoundDesign {
@@ -230,8 +232,8 @@ export type Json =
   | number
   | boolean
   | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+  | { [key: string]: any }
+  | any[]
 
 export type Database = {
   public: {
@@ -254,13 +256,25 @@ export type Database = {
           user_id: string
         }
         Update: {
-          created_at?: string
-          id?: string
           is_read?: boolean
           message?: string
-          project_id?: string | null
-          user_id?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       profiles: {
         Row: {
@@ -293,6 +307,7 @@ export type Database = {
           stripe_customer_id?: string | null
           subscription?: Json
         }
+        Relationships: []
       }
       projects: {
         Row: {
@@ -364,6 +379,15 @@ export type Database = {
           voiceover_voice_id?: string | null
           workflow_step?: number
         }
+        Relationships: [
+          {
+            foreignKeyName: "projects_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       user_youtube_tokens: {
         Row: {
@@ -387,6 +411,15 @@ export type Database = {
           scope?: string
           user_id?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "user_youtube_tokens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
       }
     }
     Views: {

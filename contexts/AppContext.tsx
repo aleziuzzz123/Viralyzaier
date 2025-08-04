@@ -1,14 +1,12 @@
 import React, { createContext, useState, useEffect, useCallback, useContext, ReactNode, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { Project, User, PlanId, Blueprint, Toast, Platform, Opportunity, ContentGapSuggestion, PerformanceReview, Notification, ProjectStatus, Database } from '../types';
 import * as supabaseService from '../services/supabaseService';
 import { supabase } from '../services/supabaseClient'; // Import client directly
 import { type AuthSession } from '@supabase/supabase-js';
 import { createCheckoutSession, PLANS } from '../services/paymentService';
 import { fetchVideoPerformance } from '../services/youtubeService';
-import UpgradeModal from '../components/UpgradeModal';
-import ConfirmationModal from '../components/ConfirmationModal';
 import { translations, Language, TranslationKey } from '../translations';
+import { getErrorMessage } from '../utils';
 
 interface AppContextType {
     session: AuthSession | null;
@@ -46,6 +44,8 @@ interface AppContextType {
     addProjects: (newProjects: Project[]) => void;
     
     requestConfirmation: (title: string, message: string, onConfirm: () => void) => void;
+    handleConfirmation: () => void;
+    handleCancelConfirmation: () => void;
     setUpgradeModalOpen: (isOpen: boolean) => void;
     setPrefilledBlueprintPrompt: (prompt: string | null) => void;
     
@@ -68,33 +68,6 @@ interface ConfirmationState {
     message: string;
     onConfirm: () => void;
 }
-
-// A robust utility to extract a readable message from any error type.
-export const getErrorMessage = (error: unknown): string => {
-    if (typeof error === 'string') return error;
-    if (error && typeof error === 'object') {
-        if ('message' in error && typeof error.message === 'string') {
-            // This handles standard Errors and Supabase errors
-            let message = error.message;
-            if ('details' in error && typeof error.details === 'string' && error.details) {
-                message += ` (${error.details})`;
-            }
-             if ('hint' in error && typeof error.hint === 'string' && error.hint) {
-                message += ` Hint: ${error.hint}`;
-            }
-            return message;
-        }
-        // Fallback for other object types to prevent "[object Object]"
-        try {
-            const str = JSON.stringify(error);
-            if (str !== '{}') return str;
-        } catch {
-            // Fallback if stringify fails
-        }
-        return 'An unknown object error occurred. Check the console for details.';
-    }
-    return 'An unknown error occurred.';
-};
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -259,7 +232,12 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     }, [addToast, user]);
     
     const requestConfirmation = (title: string, message: string, onConfirm: () => void) => { setConfirmation({ isOpen: true, title, message, onConfirm }); };
-    const handleConfirmation = () => { confirmation.onConfirm(); setConfirmation({ isOpen: false, title: '', message: '', onConfirm: () => {} }); };
+    const handleConfirmation = () => { 
+        if(confirmation.isOpen) {
+            confirmation.onConfirm(); 
+        }
+        setConfirmation({ isOpen: false, title: '', message: '', onConfirm: () => {} }); 
+    };
     const handleCancelConfirmation = () => { setConfirmation({ isOpen: false, title: '', message: '', onConfirm: () => {} }); };
 
     const handleLogout = () => {
@@ -349,7 +327,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
                 topic: blueprint.strategicSummary, title: selectedTitle, script: blueprint.script,
                 moodboard: [], workflowStep: 2, analysis: null, competitorAnalysis: null, 
                 scheduledDate: null, assets: {}, soundDesign: null, launchPlan: null, 
-                performance: null, publishedUrl: undefined,
+                performance: null, publishedUrl: null, voiceoverVoiceId: null, last_performance_check: null,
             };
 
             newProject = await supabaseService.createProject(initialProjectData, user.id);
@@ -392,7 +370,8 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             name: suggestion.idea, status: 'Idea', platform: platform, topic: suggestion.reason,
             title: title, workflowStep: 1, script: null, analysis: null,
             competitorAnalysis: null, scheduledDate: null, moodboard: null, assets: {},
-            soundDesign: null, launchPlan: null, performance: null, publishedUrl: undefined,
+            soundDesign: null, launchPlan: null, performance: null, publishedUrl: null,
+            voiceoverVoiceId: null, last_performance_check: null,
         };
         const newProject = await supabaseService.createProject(newProjectData, user.id);
         setProjects(prev => [newProject, ...prev]);
@@ -503,14 +482,12 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         handleSubscriptionChange, handleUpdateProject, handleCreateProjectFromBlueprint,
         handleCreateProjectFromIdea, handleDeleteProject, requestConfirmation, setUpgradeModalOpen,
         setActiveProjectId, setUser, setPrefilledBlueprintPrompt, handleCreateProjectFromInsights,
-        addProjects, lockAndExecute
+        addProjects, lockAndExecute, handleConfirmation, handleCancelConfirmation,
     };
     
     return (
         <AppContext.Provider value={value}>
             {children}
-            <UpgradeModal />
-            {createPortal(<ConfirmationModal isOpen={confirmation.isOpen} onClose={handleCancelConfirmation} onConfirm={handleConfirmation} title={confirmation.title}>{confirmation.message}</ConfirmationModal>, document.getElementById('modal-root')!)}
         </AppContext.Provider>
     );
 };

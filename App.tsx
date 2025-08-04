@@ -16,6 +16,8 @@ import NotificationsPanel from './components/NotificationsPanel';
 import Autopilot from './components/Autopilot';
 import Settings from './components/Settings';
 import ScheduleModal from './components/ScheduleModal';
+import UpgradeModal from './components/UpgradeModal';
+import ConfirmationModal from './components/ConfirmationModal';
 
 
 type View = 'dashboard' | 'project' | 'calendar' | 'pricing' | 'channel' | 'assetLibrary' | 'autopilot' | 'settings';
@@ -107,7 +109,8 @@ const MainApp = () => {
     const { 
         session, user, projects,
         toasts, dismissToast, activeProjectId, setActiveProjectId,
-        t, notifications
+        t, notifications,
+        confirmation, handleConfirmation, handleCancelConfirmation
     } = useAppContext();
     const [currentView, setCurrentView] = useState<View>('dashboard');
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -123,7 +126,11 @@ const MainApp = () => {
     }, [activeProjectId, currentView]);
 
     const handleSetView = (view: View) => {
-        setCurrentView(view);
+        if (view === 'pricing' && currentView === 'project') {
+            // Do nothing to prevent navigation away from pricing when modal closes
+        } else {
+            setCurrentView(view);
+        }
         if (view !== 'project') {
             setActiveProjectId(null);
         }
@@ -209,10 +216,21 @@ const MainApp = () => {
             </main>
             
             <ScheduleModal />
+            <UpgradeModal />
+            {confirmation.isOpen && (
+                <ConfirmationModal 
+                    isOpen={confirmation.isOpen} 
+                    onClose={handleCancelConfirmation} 
+                    onConfirm={handleConfirmation} 
+                    title={confirmation.title}
+                >
+                    {confirmation.message}
+                </ConfirmationModal>
+            )}
             
             <BackendErrorModal />
     
-            {createPortal(toasts.map(toast => <ToastComponent key={toast.id} toast={toast} onDismiss={dismissToast} />), document.getElementById('toast-container')!)}
+            {document.getElementById('toast-container') && createPortal(toasts.map(toast => <ToastComponent key={toast.id} toast={toast} onDismiss={dismissToast} />), document.getElementById('toast-container')!)}
         </div>
     );
 };
