@@ -33,7 +33,7 @@ export interface User {
 }
 
 export type ProjectStatus = 'Idea' | 'Scripting' | 'Scheduled' | 'Published' | 'Autopilot';
-export type Platform = 'youtube_long' | 'youtube_short' | 'tiktok' | 'instagram';
+export type Platform = 'youtube' | 'tiktok' | 'instagram';
 export type WorkflowStep = 1 | 2 | 3 | 4 | 5 | 6;
 
 
@@ -184,11 +184,9 @@ export interface VideoDetails {
 }
 
 export interface SceneAssets {
-    brollVideo?: string;
-    brollImage?: string;
-    generationType?: 'video' | 'animated_image';
-    graphics: string[];
-    audio?: string;
+    brollVideo?: string; // URL to the generated video
+    graphics: string[]; // base64 strings for overlays
+    audio?: string; // URL to the generated audio
 }
 
 export interface SoundDesign {
@@ -256,25 +254,13 @@ export type Database = {
           user_id: string
         }
         Update: {
+          created_at?: string
+          id?: string
           is_read?: boolean
           message?: string
+          project_id?: string | null
+          user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "notifications_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "notifications_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          }
-        ]
       }
       profiles: {
         Row: {
@@ -302,10 +288,11 @@ export type Database = {
           channel_audit?: Json | null
           cloned_voices?: Json | null
           content_pillars?: string[] | null
+          email?: string
+          id?: string
           stripe_customer_id?: string | null
           subscription?: Json
         }
-        Relationships: []
       }
       projects: {
         Row: {
@@ -358,6 +345,7 @@ export type Database = {
           analysis?: Json | null
           assets?: Json | null
           competitor_analysis?: Json | null
+          id?: string
           last_performance_check?: string | null
           last_updated?: string
           launch_plan?: Json | null
@@ -372,18 +360,10 @@ export type Database = {
           status?: string
           title?: string | null
           topic?: string
+          user_id?: string
           voiceover_voice_id?: string | null
           workflow_step?: number
         }
-        Relationships: [
-          {
-            foreignKeyName: "projects_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          }
-        ]
       }
       user_youtube_tokens: {
         Row: {
@@ -407,15 +387,6 @@ export type Database = {
           scope?: string
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "user_youtube_tokens_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: true
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          }
-        ]
       }
     }
     Views: {
