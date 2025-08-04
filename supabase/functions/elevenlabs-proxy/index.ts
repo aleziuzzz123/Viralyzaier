@@ -63,8 +63,7 @@ serve(async (req: Request) => {
     }
 
     // Make the secure, server-to-server call to ElevenLabs.
-    // FIX: Removed '/stream' from the URL to request the complete audio file, not a stream.
-    const elevenLabsResponse = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+    const elevenLabsResponse = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -88,7 +87,7 @@ serve(async (req: Request) => {
       throw new Error(errorMessage);
     }
 
-    // Buffer the audio response to ensure stability before sending.
+    // FIX: Buffer the audio response to ensure stability before sending.
     const audioBlob = await elevenLabsResponse.blob();
     return new Response(audioBlob, {
       headers: {
