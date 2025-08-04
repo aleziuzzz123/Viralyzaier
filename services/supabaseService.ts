@@ -1,5 +1,3 @@
-
-
 import { supabase } from './supabaseClient';
 import { 
     Project, 
@@ -16,12 +14,12 @@ import {
     VideoPerformance,
     ChannelAudit,
     Database,
-    Json,
     Notification,
     ClonedVoice,
     Subscription,
+    Json,
 } from '../types';
-import { type AuthSession, type AuthChangeEvent } from '@supabase/supabase-js';
+import { type AuthSession, type AuthChangeEvent, type FunctionInvokeOptions } from '@supabase/supabase-js';
 
 // Type aliases for easier access to generated types
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
@@ -50,7 +48,6 @@ const userToProfileUpdate = (updates: Partial<User>): ProfileUpdate => {
     if (updates.channelAudit !== undefined) dbUpdates.channel_audit = updates.channelAudit as unknown as Json;
     if (updates.cloned_voices !== undefined) dbUpdates.cloned_voices = updates.cloned_voices as unknown as Json;
     if (updates.content_pillars !== undefined) dbUpdates.content_pillars = updates.content_pillars;
-    if (updates.email !== undefined) dbUpdates.email = updates.email;
     if (updates.subscription !== undefined) dbUpdates.subscription = updates.subscription as unknown as Json;
     return dbUpdates;
 };
@@ -66,7 +63,7 @@ const projectRowToProject = (row: ProjectRow): Project => ({
     analysis: row.analysis as unknown as Analysis | null,
     competitorAnalysis: row.competitor_analysis as unknown as CompetitorAnalysisResult | null,
     moodboard: row.moodboard,
-    assets: (row.assets as unknown as { [key: string]: SceneAssets } | null) || {},
+    assets: (row.assets as unknown as { [key: string]: SceneAssets }) || {},
     soundDesign: row.sound_design as unknown as SoundDesign | null,
     launchPlan: row.launch_plan as unknown as LaunchPlan | null,
     performance: row.performance as unknown as VideoPerformance | null,
@@ -157,7 +154,7 @@ export const sendPasswordResetEmail = async (email: string): Promise<void> => {
 export const getUserProfile = async (userId: string): Promise<User | null> => {
     // We now fetch the profile and check for YouTube tokens in parallel
     const [profileResult, tokenResult] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', userId).single(),
+        supabase.from('profiles').select('id, email, subscription, ai_credits, channel_audit, cloned_voices, content_pillars, stripe_customer_id').eq('id', userId).single(),
         supabase.from('user_youtube_tokens').select('user_id').eq('user_id', userId).single()
     ]);
 
@@ -191,13 +188,11 @@ export const updateUserProfile = async (userId: string, updates: Partial<User>):
         .from('profiles')
         .update(dbUpdates)
         .eq('id', userId)
-        .select('*')
+        .select('id, email, subscription, ai_credits, channel_audit, cloned_voices, content_pillars, stripe_customer_id')
         .single();
 
     if (error) throw error;
-
-    const profileRow = data as ProfileRow | null;
-    if (!profileRow) throw new Error("User profile not found after update.");
+    if (!data) throw new Error("User profile not found after update.");
     
     // We need to re-fetch the youtube connected status as this local update doesn't know about it.
     const currentProfile = await getUserProfile(userId);
@@ -212,12 +207,12 @@ export const updateUserProfile = async (userId: string, updates: Partial<User>):
 export const getProjectsForUser = async (userId: string): Promise<Project[]> => {
     const { data, error } = await supabase
         .from('projects')
-        .select('*')
+        .select('id, name, topic, platform, status, title, script, analysis, competitor_analysis, moodboard, assets, sound_design, launch_plan, performance, scheduled_date, published_url, last_updated, workflow_step, voiceover_voice_id, last_performance_check, user_id')
         .eq('user_id', userId)
         .order('last_updated', { ascending: false });
 
     if (error) throw error;
-    return (data || []).map(p => projectRowToProject(p));
+    return (data || []).map(p => projectRowToProject(p as ProjectRow));
 };
 
 export const createProject = async (projectData: Omit<Project, 'id'|'lastUpdated'>, userId: string): Promise<Project> => {
@@ -245,14 +240,13 @@ export const createProject = async (projectData: Omit<Project, 'id'|'lastUpdated
     
     const { data, error } = await supabase
         .from('projects')
-        .insert(projectToInsert)
-        .select('*')
+        .insert([projectToInsert])
+        .select('id, name, topic, platform, status, title, script, analysis, competitor_analysis, moodboard, assets, sound_design, launch_plan, performance, scheduled_date, published_url, last_updated, workflow_step, voiceover_voice_id, last_performance_check, user_id')
         .single();
         
     if (error) throw error;
-    const projectRow = data as ProjectRow | null;
-    if (!projectRow) throw new Error("Project data not returned after creation.");
-    return projectRowToProject(projectRow);
+    if (!data) throw new Error("Project data not returned after creation.");
+    return projectRowToProject(data);
 };
 
 export const updateProject = async (projectId: string, updates: Partial<Project>): Promise<Project> => {
@@ -262,13 +256,12 @@ export const updateProject = async (projectId: string, updates: Partial<Project>
         .from('projects')
         .update(dbUpdates)
         .eq('id', projectId)
-        .select('*')
+        .select('id, name, topic, platform, status, title, script, analysis, competitor_analysis, moodboard, assets, sound_design, launch_plan, performance, scheduled_date, published_url, last_updated, workflow_step, voiceover_voice_id, last_performance_check, user_id')
         .single();
         
     if (error) throw error;
-    const projectRow = data as ProjectRow | null;
-    if (!projectRow) throw new Error("Project data not returned after update.");
-    return projectRowToProject(projectRow);
+    if (!data) throw new Error("Project data not returned after update.");
+    return projectRowToProject(data);
 };
 
 export const deleteProject = async (projectId: string): Promise<void> => {
@@ -302,24 +295,50 @@ export const invokeEdgeFunction = async (name: string, body: object | FormData, 
         throw new Error(sessionError?.message || 'User is not authenticated.');
     }
 
+    // Use native fetch for blob responses as it's more reliable than the Supabase client's handling.
+    if (responseType === 'blob') {
+        const functionUrl = `${(window as any).__env.VITE_SUPABASE_URL}/functions/v1/${name}`;
+        
+        const isFormData = body instanceof FormData;
+        const fetchOptions: RequestInit = {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                ...(isFormData ? {} : {'Content-Type': 'application/json'})
+            },
+            body: isFormData ? body : JSON.stringify(body)
+        };
+        
+        const response = await fetch(functionUrl, fetchOptions);
+        if (!response.ok) {
+            const errorText = await response.text();
+            try {
+                const errorJson = JSON.parse(errorText);
+                throw new Error(errorJson.error || `Function ${name} failed with status ${response.status}`);
+            } catch {
+                throw new Error(errorText || `Function ${name} failed with status ${response.status}`);
+            }
+        }
+        return await response.blob();
+    }
+    
+    // Existing logic for JSON responses using the Supabase client
     const headers: HeadersInit = {
         'Authorization': `Bearer ${session.access_token}`,
     };
     
-    // Let the Supabase client library handle JSON stringification and Content-Type header for objects,
-    // and correctly handle FormData as well. This is more robust.
-    const response = await supabase.functions.invoke(name, {
+    const options: FunctionInvokeOptions = {
         body,
         headers,
-    });
+    };
+    
+    const response = await supabase.functions.invoke(name, options);
     
     if (response.error) {
         try {
-            // Attempt to parse a more specific error message from the function's response.
             const errorBody = JSON.parse(response.error.context.responseText);
             throw new Error(errorBody.error || response.error.message);
         } catch (e) {
-            // Fallback to the default Supabase error.
             throw response.error;
         }
     }
@@ -332,12 +351,12 @@ export const invokeEdgeFunction = async (name: string, body: object | FormData, 
 export const getNotifications = async (userId: string): Promise<Notification[]> => {
     const { data, error } = await supabase
         .from('notifications')
-        .select('*')
+        .select('id, user_id, project_id, message, is_read, created_at')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return (data || []).map(n => notificationRowToNotification(n));
+    return (data || []).map(n => notificationRowToNotification(n as NotificationRow));
 };
 
 export const markNotificationAsRead = async (notificationId: string): Promise<void> => {

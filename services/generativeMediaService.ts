@@ -35,11 +35,39 @@ export const generateVoiceover = async (text: string, voiceId: string = 'pNInz6o
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
 /**
+ * Generates a single image for use as an animated visual.
+ */
+export const generateAnimatedImage = async (prompt: string, platform: Platform): Promise<Blob> => {
+    const aspectRatio = platform === 'youtube_long' ? '16:9' : '9:16';
+    const imagePrompt = `A cinematic, visually stunning image for a video scene: ${prompt}. IMPORTANT: The main subject must be perfectly centered to avoid being cropped.`;
+    
+    const imageResponse = await invokeEdgeFunction('gemini-proxy', {
+        type: 'generateImages',
+        params: {
+            model: 'imagen-3.0-generate-002',
+            prompt: imagePrompt,
+            config: { 
+                numberOfImages: 1, 
+                outputMimeType: 'image/jpeg', 
+                aspectRatio: aspectRatio 
+            }
+        }
+    });
+
+    const base64ImageBytes = imageResponse.generatedImages[0].image.imageBytes;
+    const imageDataUrl = `data:image/jpeg;base64,${base64ImageBytes}`;
+    
+    const res = await fetch(imageDataUrl);
+    return await res.blob();
+};
+
+
+/**
  * Generates a video clip by calling a secure Supabase Edge Function.
  * The client now handles polling for the result from RunwayML.
  */
 export const generateVideoClip = async (prompt: string, platform: Platform): Promise<Blob> => {
-    const aspectRatio = platform === 'youtube' ? '16_9' : '9_16';
+    const aspectRatio = platform === 'youtube_long' ? '16_9' : '9_16';
 
     // Step 1: Initiate the generation and get a task UUID
     const startResult = await invokeEdgeFunction('runwayml-proxy', { prompt, aspectRatio });

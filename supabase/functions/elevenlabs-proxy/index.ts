@@ -87,8 +87,9 @@ serve(async (req: Request) => {
       throw new Error(errorMessage);
     }
 
-    // Stream the audio response directly back to the client.
-    return new Response(elevenLabsResponse.body, {
+    // FIX: Buffer the audio response to ensure stability before sending.
+    const audioBlob = await elevenLabsResponse.blob();
+    return new Response(audioBlob, {
       headers: {
         ...corsHeaders,
         'Content-Type': 'audio/mpeg',
