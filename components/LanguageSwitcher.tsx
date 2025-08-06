@@ -12,7 +12,11 @@ const languageOptions: { code: Language, name: string }[] = [
     { code: 'hi', name: 'हिन्दी' },
 ];
 
-const LanguageSwitcher: React.FC<{ variant?: 'header' | 'menu' }> = ({ variant = 'header' }) => {
+interface LanguageSwitcherProps {
+    variant?: 'header' | 'menu';
+}
+
+const LanguageSwitcher: React.FC<LanguageSwitcherProps> = ({ variant = 'header' }) => {
     const { language, setLanguage } = useAppContext();
     const [isOpen, setIsOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);

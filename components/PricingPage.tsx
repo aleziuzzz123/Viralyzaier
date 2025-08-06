@@ -6,7 +6,14 @@ import { PLANS } from '../services/paymentService';
 import { CheckBadgeIcon, CrownIcon } from './Icons';
 import { useAppContext } from '../contexts/AppContext';
 
-const PlanCard: React.FC<{ plan: Plan; onSelect: () => void; isCurrent: boolean; t: (key: string, replacements?: { [key: string]: string | number }) => string }> = ({ plan, onSelect, isCurrent, t }) => {
+interface PlanCardProps {
+    plan: Plan;
+    onSelect: () => void;
+    isCurrent: boolean;
+    t: (key: string, replacements?: { [key: string]: string | number }) => string;
+}
+
+const PlanCard: React.FC<PlanCardProps> = ({ plan, onSelect, isCurrent, t }) => {
     const isFree = plan.price === 0;
     
     const getPlanName = (id: PlanId) => {
