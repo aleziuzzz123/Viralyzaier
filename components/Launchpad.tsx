@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Project } from '../types';
-import { generateSeo, analyzeAndGenerateThumbnails, generatePromotionPlan } from '../services/geminiService';
+import { generateSeo, analyzeAndGenerateThumbnails, generatePromotionPlan, getSchedulingSuggestion } from '../services/geminiService';
 import { publishVideo } from '../services/youtubeService';
-import { SparklesIcon, ClipboardCopyIcon, DownloadIcon, RocketLaunchIcon, YouTubeIcon, CheckCircleIcon } from './Icons';
+import { SparklesIcon, ClipboardCopyIcon, DownloadIcon, RocketLaunchIcon, YouTubeIcon, CheckCircleIcon, CalendarIcon } from './Icons';
 import { useAppContext } from '../contexts/AppContext';
 import { getErrorMessage } from '../utils';
 
@@ -12,9 +12,10 @@ interface LaunchpadProps {
 
 const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
     const { user, consumeCredits, addToast, handleUpdateProject, t, setActiveProjectId, lockAndExecute } = useAppContext();
-    const [loading, setLoading] = useState<{ seo?: boolean, thumbnails?: boolean, promotion?: boolean }>({});
+    const [loading, setLoading] = useState<{ seo?: boolean, thumbnails?: boolean, promotion?: boolean, schedule?: boolean }>({});
     const [isPublishing, setIsPublishing] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [scheduleSuggestion, setScheduleSuggestion] = useState<string | null>(null);
 
     const copyToClipboard = (text: string) => {
         navigator.clipboard.writeText(text);
@@ -54,7 +55,7 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
         if (!await consumeCredits(4)) return; // Generate 2 images for 4 credits
         setLoading({ thumbnails: true });
         try {
-            const thumbnails = await analyzeAndGenerateThumbnails(project.title, project.platform, user.id, project.id);
+            const thumbnails = await analyzeAndGenerateThumbnails(project.title, project.platform);
             const updatedLaunchPlan = { ...(project.launchPlan || {}), thumbnails };
             await handleUpdateProject({ id: project.id, launchPlan: updatedLaunchPlan });
         } catch (e) {
@@ -74,6 +75,20 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
             await handleUpdateProject({ id: project.id, launchPlan: updatedLaunchPlan });
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to generate promotion plan.');
+        } finally {
+            setLoading({});
+        }
+    });
+    
+    const handleGetScheduleSuggestion = () => lockAndExecute(async () => {
+        if (!project.topic) return;
+        if (!await consumeCredits(1)) return;
+        setLoading({ schedule: true });
+        try {
+            const suggestion = await getSchedulingSuggestion(project.topic);
+            setScheduleSuggestion(suggestion);
+        } catch (e) {
+             setError(e instanceof Error ? e.message : 'Failed to get suggestion.');
         } finally {
             setLoading({});
         }
@@ -205,6 +220,19 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
                          )}
                     </div>
                      <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700 space-y-4">
+                        <h3 className="text-2xl font-bold text-white">{t('launchpad.predictive_scheduling_title')}</h3>
+                         {scheduleSuggestion ? (
+                             <div className="bg-gray-900/50 p-4 rounded-lg text-center animate-fade-in-up">
+                                 <p className="text-gray-300">{scheduleSuggestion}</p>
+                             </div>
+                         ) : (
+                            <button onClick={handleGetScheduleSuggestion} disabled={loading.schedule} className="w-full inline-flex items-center justify-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-full transition-colors disabled:bg-gray-600">
+                                <CalendarIcon className="w-5 h-5 mr-2" />
+                                {loading.schedule ? t('launchpad.predictive_scheduling_fetching') : t('launchpad.predictive_scheduling_button')}
+                            </button>
+                         )}
+                    </div>
+                     <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700 space-y-4">
                         <h3 className="text-2xl font-bold text-white">Direct Publishing</h3>
                         {user?.youtubeConnected ? (
                              project.status === 'Published' && project.publishedUrl && project.publishedUrl.includes('youtube.com') ? (
@@ -216,7 +244,7 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
                                     </a>
                                 </div>
                             ) : (
-                                <button onClick={handlePublishToYouTube} disabled={isPublishingDisabled} className="w-full inline-flex items-center justify-center px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-full transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed" title={isPublishingDisabled ? "Assemble video, generate SEO & Thumbnails in the Creative Studio to enable" : ""}>
+                                <button onClick={handlePublishToYouTube} disabled={isPublishingDisabled} className="w-full inline-flex items-center justify-center px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-full transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed" title={isPublishingDisabled ? "Assemble video, generate SEO & Thumbnails to enable" : ""}>
                                     <YouTubeIcon className="w-5 h-5 mr-2" />
                                     {isPublishing ? "Publishing..." : "Publish to YouTube"}
                                 </button>

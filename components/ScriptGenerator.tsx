@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Project, Script, Platform } from '../types';
-import { PencilIcon, CheckBadgeIcon, MagicWandIcon, SparklesIcon } from './Icons';
+import { PencilIcon, CheckBadgeIcon, MagicWandIcon, SparklesIcon, PlusIcon, TrashIcon } from './Icons';
 import { useAppContext } from '../contexts/AppContext';
 import { rewriteScriptScene } from '../services/geminiService';
 import { getErrorMessage } from '../utils';
@@ -41,7 +41,9 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ project, onScriptSaved }) =
 
         const newScript = { ...script };
         if (type === 'hook') {
-            newScript.hooks[index] = value;
+            const newHooks = [...newScript.hooks];
+            newHooks[index] = value;
+            newScript.hooks = newHooks;
         } else if (type === 'cta') {
             newScript.cta = value;
         } else if (type === 'scene') {
@@ -50,6 +52,18 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ project, onScriptSaved }) =
         setScript(newScript);
     };
     
+    const addHook = () => {
+        if (!script) return;
+        const newHooks = [...script.hooks, ''];
+        setScript({ ...script, hooks: newHooks });
+    };
+
+    const removeHook = (index: number) => {
+        if (!script || script.hooks.length <= 1) return;
+        const newHooks = script.hooks.filter((_, i) => i !== index);
+        setScript({ ...script, hooks: newHooks });
+    };
+
     const handleCopilotAction = async (sceneIndex: number, action: string) => {
         if (!script) return;
         if (!await consumeCredits(1)) return;
@@ -101,12 +115,28 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ project, onScriptSaved }) =
             <div className="bg-gray-900/40 p-8 rounded-2xl space-y-6">
                 <div>
                     <h4 className="font-bold text-indigo-400 mb-2">{t('script_generator.hooks_title')}</h4>
-                    <textarea
-                        value={script?.hooks.join('\n\n') || ''}
-                        onChange={e => handleScriptChange('hook', 0, 'visual', e.target.value)} // Simplified for now
-                        rows={3}
-                        className="w-full bg-gray-800/50 rounded-lg p-3 text-gray-300 border border-gray-700 focus:ring-indigo-500 focus:border-indigo-500"
-                    />
+                     <div className="space-y-3">
+                        {script?.hooks.map((hook, index) => (
+                            <div key={index} className="flex items-center gap-3 bg-gray-800/50 p-3 rounded-lg border border-gray-700">
+                                <span className="text-sm font-bold text-gray-400">{index + 1}.</span>
+                                <input
+                                    type="text"
+                                    value={hook}
+                                    onChange={e => handleScriptChange('hook', index, 'visual', e.target.value)}
+                                    placeholder={`Hook option ${index + 1}`}
+                                    className="w-full bg-transparent text-gray-300 focus:outline-none"
+                                />
+                                {script.hooks.length > 1 && (
+                                    <button onClick={() => removeHook(index)} className="p-1 text-gray-500 hover:text-red-400">
+                                        <TrashIcon className="w-4 h-4" />
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                        <button onClick={addHook} className="flex items-center gap-1 text-sm font-semibold text-indigo-400 hover:text-indigo-300 mt-2">
+                            <PlusIcon className="w-4 h-4" /> Add Hook Option
+                        </button>
+                    </div>
                 </div>
                 <div>
                     <h4 className="font-bold text-indigo-400 mb-2">{t('script_generator.script_title')}</h4>

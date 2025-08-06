@@ -130,14 +130,13 @@ const BlueprintStep: React.FC<BlueprintStepProps> = ({ project, onBlueprintAccep
         setProgress([]);
 
         try {
-            const activeBrandIdentity = brandIdentities.find(b => b.id === project.activeBrandIdentityId);
             const bp = await generateVideoBlueprint(
                 topic, 
                 project.platform, 
                 selectedStyle, 
                 (msg) => { setProgress(prev => [...prev, msg]); },
-                project.desiredLengthInSeconds,
-                activeBrandIdentity
+                60, // Default to 60 seconds as it's no longer saved on the project
+                undefined
             );
             setBlueprint(bp);
         } catch (e) {

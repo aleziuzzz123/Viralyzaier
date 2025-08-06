@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { generateAutopilotBacklog } from '../services/geminiService';
@@ -79,9 +80,6 @@ const Autopilot: React.FC = () => {
                     publishedUrl: null,
                     voiceoverVoiceId: null,
                     last_performance_check: null,
-                    timeline: null,
-                    style: null,
-                    desiredLengthInSeconds: 300, // Default for long-form
                 };
                 const newProject = await supabase.createProject(initialProjectData, user.id);
 
