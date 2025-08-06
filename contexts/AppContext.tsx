@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useCallback, useContext, ReactNode, useRef } from 'react';
-import { Project, User, PlanId, Blueprint, Toast, Platform, Opportunity, ContentGapSuggestion, PerformanceReview, Notification, ProjectStatus, Database, UserAsset, BrandIdentity, TimelineState } from '../types';
+import { Project, User, PlanId, Blueprint, Toast, Platform, Opportunity, ContentGapSuggestion, PerformanceReview, Notification, ProjectStatus, Database, UserAsset, BrandIdentity, TimelineState, VideoStyle } from '../types';
 import * as supabaseService from '../services/supabaseService';
 import { supabase } from '../services/supabaseClient'; // Import client directly
 import { type AuthSession } from '@supabase/supabase-js';
@@ -38,7 +38,7 @@ interface AppContextType {
     handleSubscriptionChange: (planId: PlanId) => Promise<void>;
 
     handleUpdateProject: (updatedProjectData: Partial<Project> & { id: string }) => Promise<Project | null>;
-    handleCreateProjectForBlueprint: (topic: string, platform: Platform, title: string) => Promise<void>;
+    handleCreateProjectForBlueprint: (topic: string, platform: Platform, title: string, desiredLengthInSeconds: number, voiceoverVoiceId: string, activeBrandIdentityId: string, style: VideoStyle) => Promise<void>;
     handleCreateProjectFromIdea: (suggestion: Opportunity | ContentGapSuggestion, platform: Platform) => Promise<void>;
     handleCreateProjectFromInsights: (review: PerformanceReview, originalProject: Project) => void;
     handleDeleteProject: (projectId: string) => void;
@@ -174,7 +174,6 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
 
                     if (!profile) {
                         console.warn("Profile not found for logged-in user. Attempting to create one as a fallback.");
-                        // This handles race conditions where the auth trigger is slow, or if it failed.
                         profile = await supabaseService.createProfileForUser(session.user.id, session.user.email!);
                         if (profile) {
                              addToast("Welcome! Your profile has been set up.", "success");
@@ -192,7 +191,6 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
                         setNotifications(userNotifications);
                         setBrandIdentities(userBrandIdentities);
                     } else {
-                        // If profile creation also fails, then there's a serious issue.
                         console.error("Critical error: User is logged in but profile does not exist and could not be created.");
                         addToast(t('toast.loading_user_error'), "error");
                         await supabaseService.signOut();
@@ -214,30 +212,72 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         }
     }, [session, addToast, t]);
     
-     // Real-time notifications subscription
+     // Real-time subscriptions
     useEffect(() => {
-        if (!session?.user) return;
+        if (!session?.user?.id) return;
 
-        const channel = supabase
+        const notificationsChannel = supabase
             .channel(`realtime:notifications:${session.user.id}`)
             .on<Database['public']['Tables']['notifications']['Row']>(
                 'postgres_changes',
-                { 
-                    event: 'INSERT', 
-                    schema: 'public', 
-                    table: 'notifications',
-                    filter: `user_id=eq.${session.user.id}`
-                },
+                { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${session.user.id}` },
                 (payload) => {
                     const newNotification = supabaseService.notificationRowToNotification(payload.new);
                     setNotifications(prev => [newNotification, ...prev]);
                     addToast(t('toast.new_notification'), 'success');
                 }
-            )
-            .subscribe();
+            ).subscribe();
+            
+        const profileChannel = supabase
+            .channel(`realtime:profiles:${session.user.id}`)
+            .on<Database['public']['Tables']['profiles']['Row']>(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${session.user.id}` },
+                (payload) => {
+                    setUser(currentUser => {
+                        if (currentUser) {
+                             const updatedProfile = supabaseService.profileRowToUser(payload.new, currentUser.youtubeConnected);
+                             if (updatedProfile.aiCredits > currentUser.aiCredits) {
+                                addToast(`Your plan has been renewed! You now have ${updatedProfile.aiCredits} AI credits.`, 'success');
+                             }
+                             if (updatedProfile.subscription.planId !== currentUser.subscription.planId) {
+                                addToast(`Your subscription has been updated to the ${updatedProfile.subscription.planId} plan!`, 'success');
+                             }
+                             return updatedProfile;
+                        }
+                        return null;
+                    });
+                }
+            ).subscribe();
+
+        const projectsChannel = supabase
+            .channel(`realtime:projects:${session.user.id}`)
+            .on<Database['public']['Tables']['projects']['Row']>(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'projects', filter: `user_id=eq.${session.user.id}` },
+                (payload) => {
+                    const updatedProject = supabaseService.projectRowToProject(payload.new as any);
+                    setProjects(currentProjects => {
+                        const existingIndex = currentProjects.findIndex(p => p.id === updatedProject.id);
+                        if(existingIndex > -1) {
+                            // If the project status changed from 'Rendering' to something else, it's done.
+                            const oldStatus = currentProjects[existingIndex].status;
+                            if(oldStatus === 'Rendering' && updatedProject.status !== 'Rendering') {
+                                addToast(`Video for "${updatedProject.name}" has finished rendering!`, 'success');
+                            }
+                            const newProjects = [...currentProjects];
+                            newProjects[existingIndex] = updatedProject;
+                            return newProjects;
+                        }
+                        return [updatedProject, ...currentProjects]; // Add new if not found
+                    });
+                }
+            ).subscribe();
 
         return () => {
-            supabase.removeChannel(channel);
+            supabase.removeChannel(notificationsChannel);
+            supabase.removeChannel(profileChannel);
+            supabase.removeChannel(projectsChannel);
         };
     }, [session, addToast, t]);
     
@@ -289,7 +329,6 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         try {
             await asyncOperation();
         } catch (error) {
-            // Error toast should be handled within the operation itself for better context
             console.error("Error during locked operation:", error);
         } finally {
             isOperationLocked.current = false;
@@ -356,7 +395,6 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         }
         try {
             if (planId === 'free') {
-                 // Logic to cancel subscription via Stripe customer portal can be added here
                  addToast("Freed plan selected. Manage cancellations in your Stripe portal.", 'info');
             } else {
                 const { checkoutUrl } = await createCheckoutSession(planId);
@@ -401,17 +439,26 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
                 performance: null,
                 scheduledDate: null,
                 publishedUrl: null,
-                voiceoverVoiceId: null,
+                voiceoverVoiceId: projectData.voiceoverVoiceId || null,
                 last_performance_check: null,
                 style: projectData.style || null,
                 timeline: {
+                    tracks: [
+                        { id: 'b-roll', type: 'b-roll', clips: [] },
+                        { id: 'a-roll', type: 'a-roll', clips: [] },
+                        { id: 'voiceover', type: 'voiceover', clips: [] },
+                        { id: 'music', type: 'music', clips: [] },
+                        { id: 'sfx', type: 'sfx', clips: [] },
+                        { id: 'text', type: 'text', clips: [] },
+                    ],
                     subtitles: [],
-                    musicUrl: null,
                     voiceoverVolume: 1,
                     musicVolume: 0.5,
-                    sfx: [],
-                    isDuckingEnabled: false,
+                    isDuckingEnabled: true,
+                    totalDuration: projectData.desiredLengthInSeconds || 60,
                 },
+                activeBrandIdentityId: projectData.activeBrandIdentityId,
+                desiredLengthInSeconds: projectData.desiredLengthInSeconds || 60,
             };
 
             const newProject = await supabaseService.createProject(baseProject, user.id);
@@ -424,20 +471,30 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         }
     }
     
-    const handleCreateProjectForBlueprint = async (topic: string, platform: Platform, title: string) => {
+    const handleCreateProjectForBlueprint = async (topic: string, platform: Platform, title: string, desiredLengthInSeconds: number, voiceoverVoiceId: string, activeBrandIdentityId: string, style: VideoStyle) => {
         if (!user) return;
-        await createProjectFromData({ topic, platform, name: title || "New Blueprint Project", status: 'Idea', workflowStep: 1 });
+        await createProjectFromData({ 
+            topic, 
+            platform, 
+            name: title || "New Blueprint Project", 
+            status: 'Idea', 
+            workflowStep: 1,
+            desiredLengthInSeconds,
+            voiceoverVoiceId,
+            activeBrandIdentityId,
+            style
+        });
     };
 
     const handleCreateProjectFromIdea = async (suggestion: Opportunity | ContentGapSuggestion, platform: Platform) => {
         const title = 'suggestedTitle' in suggestion ? suggestion.suggestedTitle : suggestion.potentialTitles[0];
-        await createProjectFromData({ topic: suggestion.idea, platform, name: title, title: title, status: 'Idea', workflowStep: 1 });
+        await createProjectFromData({ topic: suggestion.idea, platform, name: title, title: title, status: 'Idea', workflowStep: 1, desiredLengthInSeconds: 60 });
     };
     
     const handleCreateProjectFromInsights = (review: PerformanceReview, originalProject: Project) => {
         const newTopic = `Improving upon "${originalProject.name}" - ${review.whatToImprove[0]}`;
         const newName = `New Video based on "${originalProject.name}"`;
-        createProjectFromData({ topic: newTopic, platform: originalProject.platform, name: newName, status: 'Idea', workflowStep: 1 });
+        createProjectFromData({ topic: newTopic, platform: originalProject.platform, name: newName, status: 'Idea', workflowStep: 1, desiredLengthInSeconds: originalProject.desiredLengthInSeconds });
     };
 
     const addProjects = (newProjects: Project[]) => {

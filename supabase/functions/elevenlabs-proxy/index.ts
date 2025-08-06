@@ -21,64 +21,52 @@ serve(async (req: Request) => {
   }
 
   try {
-    // Fail-fast if the function is not configured correctly.
     if (!ELEVENLABS_API_KEY || !SUPABASE_URL || !SUPABASE_ANON_KEY) {
       throw new Error("Function is not configured with necessary ElevenLabs/Supabase secrets.");
     }
-
-    // Authenticate the user securely from the Authorization header.
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('Missing authorization header.');
-    }
+    if (!authHeader) throw new Error('Missing authorization header.');
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      throw new Error('Authentication failed.');
+    if (authError || !user) throw new Error('Authentication failed.');
+
+    const { type, text, voiceId } = await req.json();
+
+    if (!type || !text) {
+      throw new Error("Request body must include 'type' and 'text'.");
     }
 
-    // Process the request body more robustly.
-    const bodyText = await req.text();
-    if (!bodyText) {
-        return new Response(JSON.stringify({ error: 'Request body is empty.' }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400,
-        });
-    }
-    let parsedBody;
-    try {
-        parsedBody = JSON.parse(bodyText);
-    } catch (e) {
-        return new Response(JSON.stringify({ error: `Invalid JSON in request body: ${e.message}` }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400,
-        });
-    }
-    const { text, voiceId } = parsedBody;
+    let apiUrl, requestBody, acceptHeader;
 
-    if (!text || !voiceId) {
-      throw new Error("Request body must include 'text' and 'voiceId'.");
+    if (type === 'tts') {
+      if (!voiceId) throw new Error("TTS requests must include 'voiceId'.");
+      apiUrl = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
+      requestBody = JSON.stringify({
+        text: text,
+        model_id: 'eleven_multilingual_v2',
+        voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+      });
+      acceptHeader = 'audio/mpeg';
+    } else if (type === 'sfx') {
+      apiUrl = 'https://api.elevenlabs.io/v1/sound-effects';
+      requestBody = JSON.stringify({
+        text: text,
+      });
+      acceptHeader = 'audio/mpeg';
+    } else {
+      throw new Error(`Invalid request type: ${type}. Must be 'tts' or 'sfx'.`);
     }
 
-    // Make the secure, server-to-server call to ElevenLabs.
-    // FIX: Removed '/stream' from the URL to request the complete audio file, not a stream.
-    const elevenLabsResponse = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+    const elevenLabsResponse = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'xi-api-key': ELEVENLABS_API_KEY,
-        'Accept': 'audio/mpeg',
+        'Accept': acceptHeader,
       },
-      body: JSON.stringify({
-        text: text,
-        model_id: 'eleven_multilingual_v2', // A robust and versatile model
-        voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.75,
-        },
-      }),
+      body: requestBody,
     });
 
     if (!elevenLabsResponse.ok) {
@@ -88,13 +76,9 @@ serve(async (req: Request) => {
       throw new Error(errorMessage);
     }
 
-    // Buffer the audio response to ensure stability before sending.
     const audioBlob = await elevenLabsResponse.blob();
     return new Response(audioBlob, {
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'audio/mpeg',
-      },
+      headers: { ...corsHeaders, 'Content-Type': 'audio/mpeg' },
       status: 200,
     });
 

@@ -1,5 +1,5 @@
 import { Type } from "@google/genai";
-import { Analysis, Blueprint, CompetitorAnalysisResult, Platform, Script, TitleAnalysis, ContentGapSuggestion, VideoPerformance, PerformanceReview, SceneAssets, SoundDesign, LaunchPlan, ChannelAudit, Opportunity, ScriptOptimization, AIMusic, ScriptGoal, Subtitle, SFXClip, BrandIdentity, VideoStyle } from '../types';
+import { Analysis, Blueprint, CompetitorAnalysisResult, Platform, Script, TitleAnalysis, ContentGapSuggestion, VideoPerformance, PerformanceReview, SceneAssets, SoundDesign, LaunchPlan, ChannelAudit, Opportunity, ScriptOptimization, AIMusic, ScriptGoal, Subtitle, BrandIdentity, VideoStyle } from '../types';
 import * as supabase from './supabaseService';
 
 const parseGeminiJson = <T>(res: { text: string }, fallback: T | null = null): T => {
@@ -35,28 +35,47 @@ export const generateVideoBlueprint = async (
     topicOrUrl: string, 
     platform: Platform,
     style: VideoStyle,
-    onProgress: (message: string) => void
+    onProgress: (message: string) => void,
+    desiredLengthInSeconds: number,
+    brandIdentity?: BrandIdentity | null
 ): Promise<Blueprint> => {
     onProgress("Consulting AI strategist for core concepts...");
     
     const formatDescription = platform === 'youtube_long' 
         ? "a horizontal, long-form YouTube video" 
         : "a vertical, short-form video for platforms like YouTube Shorts, TikTok, or Instagram Reels";
+    
+    let brandIdentityPrompt = "No specific brand identity provided. Use a generally engaging and effective style.";
+    if (brandIdentity) {
+        brandIdentityPrompt = `
+- **Brand Name:** ${brandIdentity.name}
+- **Tone of Voice:** ${brandIdentity.toneOfVoice}
+- **Writing Style Guide:** ${brandIdentity.writingStyleGuide}
+- **Target Audience:** ${brandIdentity.targetAudience}
+- **Channel Mission:** ${brandIdentity.channelMission}
+- **Visual Style Guide:** ${brandIdentity.visualStyleGuide}
+- **Thumbnail Formula:** ${brandIdentity.thumbnailFormula}
+        `;
+    }
         
-    const textPrompt = `You are a world-class viral video strategist for ${formatDescription}. Your task is to generate a complete video blueprint based on the topic or URL: "${topicOrUrl}".
+    const textPrompt = `You are a world-class viral video strategist for ${formatDescription}. Your task is to generate a complete video blueprint based on the following parameters:
+**Topic/URL:** "${topicOrUrl}"
+**Desired Video Length:** Approximately ${desiredLengthInSeconds} seconds. Your script's pacing and scene count must reflect this.
+**Chosen Video Style:** "${style}". This style MUST heavily influence every aspect of your output.
+- For 'High-Energy Viral': Fast pacing, bold claims, quick cuts, high-enthusiasm language.
+- For 'Cinematic Documentary': Thoughtful pacing, narrative structure, elegant language, evocative visuals.
+- For 'Clean & Corporate': Clear, professional language, structured information, trustworthy tone.
 
-**The chosen video style is: "${style}".** This style MUST heavily influence every aspect of your output.
-- For **'High-Energy Viral'**: Think fast pacing, bold claims, quick cuts, and high-enthusiasm language.
-- For **'Cinematic Documentary'**: Think thoughtful pacing, narrative structure, elegant language, and evocative visual descriptions.
-- For **'Clean & Corporate'**: Think clear, professional language, structured information, and a trustworthy tone.
+**Brand Identity to Adhere To:**
+${brandIdentityPrompt}
 
 Your output MUST be a JSON object with the following structure:
-1.  "strategicSummary": A concise summary explaining WHY this video concept, in this style, will perform well.
-2.  "suggestedTitles": An array of 5 S-Tier titles, tailored to the chosen style.
-3.  "script": A full script object, with hooks, scenes, and a CTA all written in the chosen style.
-4.  "moodboardDescription": An array of 3 descriptive prompts for an AI image generator, each evoking the specific visual aesthetic of the chosen style.`;
+1. "strategicSummary": A concise summary explaining WHY this video concept, in this style and for this brand, will perform well.
+2. "suggestedTitles": An array of 5 S-Tier titles, tailored to the chosen style and brand identity.
+3. "script": A full script object, with hooks, scenes, and a CTA, all written in the chosen style and brand voice. The total duration should match the desired length.
+4. "moodboardDescription": An array of 3 descriptive prompts for an AI image generator, each evoking the specific visual aesthetic of the chosen style and brand.`;
     
-    const systemInstruction = `You are a world-class viral video strategist and your response MUST be a valid JSON object that strictly adheres to the provided schema. Ensure all fields, especially arrays like 'scenes' and 'suggestedTitles', are populated with high-quality, relevant content and are never empty. The output must reflect the chosen video style.`;
+    const systemInstruction = `You are a world-class viral video strategist and your response MUST be a valid JSON object that strictly adheres to the provided schema. Ensure all fields, especially arrays like 'scenes' and 'suggestedTitles', are populated with high-quality, relevant content and are never empty. The output must reflect the chosen video style, desired length, and brand identity.`;
 
     const response = await supabase.invokeEdgeFunction('gemini-proxy', {
         type: 'generateContent',
@@ -872,22 +891,26 @@ Your response MUST be a JSON object with two keys: "visual" and "voiceover".`;
     return parseGeminiJson(response);
 };
 
-
-export const generateSubtitlesFromScript = async (script: Script, style: VideoStyle): Promise<Subtitle[]> => {
+export const generateAnimatedSubtitles = async (script: Script): Promise<Subtitle[]> => {
     const scriptText = script.scenes.map(s => s.voiceover).join(' ');
 
-    const prompt = `You are an AI subtitling assistant. The desired video style is **"${style}"**. I will provide you with the full voiceover text. Your task is to break this text down into short, readable subtitle chunks and estimate their start and end times in seconds. The total duration should be roughly based on an average speaking rate of 2.5 words per second.
+    const prompt = `You are an AI subtitling assistant specializing in creating engaging, word-by-word animated subtitles for viral short-form videos. I will provide you with the full voiceover text.
+
+Your task is to:
+1. Break the text into logical subtitle chunks.
+2. For each chunk, provide an array of individual words with their start and end times in milliseconds, relative to the start of the chunk.
+3. Estimate the start and end time of the entire chunk in seconds, based on a natural speaking pace (approx. 2.5 words/sec).
 
 **Input Script:**
 "${scriptText}"
 
 **Output Format:**
 Your response must be a valid JSON array of subtitle objects. Each object must have:
-- "id": A unique UUID string for the subtitle.
-- "text": A string for the subtitle text (keep it short and punchy for 'High-Energy' styles).
-- "start": An integer representing the start time in seconds.
-- "end": An integer representing the end time in seconds.
-The start time of a subtitle should be the end time of the previous one. The first subtitle must start at 0.
+- "id": A unique UUID string.
+- "text": The full text of the subtitle chunk.
+- "start": The start time of the chunk in seconds (integer).
+- "end": The end time of the chunk in seconds (integer).
+- "words": An array of word objects, each with "word" (string), "start" (integer, in milliseconds relative to chunk start), and "end" (integer, in milliseconds relative to chunk start).
 `;
 
     const response = await supabase.invokeEdgeFunction('gemini-proxy', {
@@ -905,18 +928,30 @@ The start time of a subtitle should be the end time of the previous one. The fir
                             id: { type: Type.STRING },
                             text: { type: Type.STRING },
                             start: { type: Type.INTEGER },
-                            end: { type: Type.INTEGER }
+                            end: { type: Type.INTEGER },
+                            words: {
+                                type: Type.ARRAY,
+                                items: {
+                                    type: Type.OBJECT,
+                                    properties: {
+                                        word: { type: Type.STRING },
+                                        start: { type: Type.INTEGER },
+                                        end: { type: Type.INTEGER }
+                                    },
+                                    required: ["word", "start", "end"]
+                                }
+                            }
                         },
-                        required: ["id", "text", "start", "end"]
+                        required: ["id", "text", "start", "end", "words"]
                     }
                 }
             }
         }
     });
     
-    const basicSubtitles = parseGeminiJson<Omit<Subtitle, 'style' | 'isEditing'>[]>(response, []);
+    const subtitlesWithWords = parseGeminiJson<Omit<Subtitle, 'style' | 'isEditing'>[]>(response, []);
 
-    return basicSubtitles.map(sub => ({
+    return subtitlesWithWords.map(sub => ({
         ...sub,
         style: {
             color: '#FFFFFF',
@@ -925,7 +960,6 @@ The start time of a subtitle should be the end time of the previous one. The fir
         isEditing: false,
     }));
 };
-
 
 export const getMusicSuggestions = async (): Promise<AIMusic[]> => {
     // This is a simulated function. In a real application, this could call a more complex AI model

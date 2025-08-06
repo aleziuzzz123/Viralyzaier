@@ -52,10 +52,10 @@ serve(async (req: Request) => {
                 status: 400,
             });
         }
-        const { prompt, aspectRatio, uuid } = parsedBody;
+        const { prompt, aspectRatio, uuid, imageUrl, motionPrompt } = parsedBody;
 
         if (uuid) {
-            // Mode 2: Check status of an existing task
+            // Mode: Check status of an existing task
             const result = await runwayClient.tasks.retrieve(uuid);
             
             let responsePayload: { status: string; videoUrl?: string; error?: string } = {
@@ -63,8 +63,6 @@ serve(async (req: Request) => {
             };
 
             if (result.status === 'SUCCEEDED') {
-                // Handle race condition where task is 'SUCCEEDED' but output URL isn't ready.
-                // Force client to poll again by not sending 'SUCCEEDED' status yet.
                 if (Array.isArray(result.output) && result.output[0]) {
                     responsePayload.videoUrl = result.output[0];
                 } else {
@@ -79,26 +77,33 @@ serve(async (req: Request) => {
                 status: 200,
             });
 
+        } else if (imageUrl) {
+             // Mode: Animate existing image
+            const task = await runwayClient.imageToVideo.create({
+                model: 'gen3a_turbo',
+                promptImage: imageUrl,
+                promptText: motionPrompt || "subtle motion", // Use motion prompt or a default
+                ratio: aspectRatio === '16_9' ? '1280:768' : '768:1280',
+                duration: 5,
+            });
+            if (!task || !task.id) throw new Error("Runway SDK did not return a task with an ID.");
+            return new Response(JSON.stringify({ uuid: task.id }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
         } else if (prompt && aspectRatio) {
-            // Mode 1: True Text-to-Video Pipeline
-            // Step 1: Generate a seed image with Gemini based on the text prompt.
+            // Mode: True Text-to-Video Pipeline
+            // Step 1: Generate a seed image with Gemini
             const imagePrompt = `A cinematic, visually stunning image for a video scene: ${prompt}. IMPORTANT: The main subject must be perfectly centered to avoid being cropped.`;
             const imageResponse = await ai.models.generateImages({
                 model: 'imagen-3.0-generate-002',
                 prompt: imagePrompt,
-                config: { 
-                    numberOfImages: 1, 
-                    outputMimeType: 'image/jpeg', 
-                    aspectRatio: aspectRatio.replace('_', ':') 
-                }
+                config: { numberOfImages: 1, outputMimeType: 'image/jpeg', aspectRatio: aspectRatio.replace('_', ':') }
             });
             const base64ImageBytes = imageResponse.generatedImages[0].image.imageBytes;
             const imageDataUri = `data:image/jpeg;base64,${base64ImageBytes}`;
 
-            // Map standard aspect ratios to what gen3a_turbo supports to avoid errors.
             const runwayAspectRatio = aspectRatio === '16_9' ? '1280:768' : '768:1280';
 
-            // Step 2: Use the generated image to call Runway's image-to-video SDK method.
+            // Step 2: Use the image to call Runway's image-to-video
             const task = await runwayClient.imageToVideo.create({
                 model: 'gen3a_turbo',
                 promptImage: imageDataUri,
@@ -107,9 +112,7 @@ serve(async (req: Request) => {
                 duration: 5,
             });
 
-            if (!task || !task.id) {
-                throw new Error("Runway SDK did not return a task with an ID on creation.");
-            }
+            if (!task || !task.id) throw new Error("Runway SDK did not return a task with an ID on creation.");
 
             return new Response(JSON.stringify({ uuid: task.id }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -117,7 +120,7 @@ serve(async (req: Request) => {
             });
 
         } else {
-            throw new Error("Invalid request: must provide either 'uuid' or both 'prompt' and 'aspectRatio'.");
+            throw new Error("Invalid request: must provide 'uuid', 'imageUrl', or both 'prompt' and 'aspectRatio'.");
         }
 
     } catch (error) {

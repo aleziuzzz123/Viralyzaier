@@ -1,4 +1,4 @@
-import { Platform } from "../types";
+import { Platform, SceneAssets } from "../types";
 import { invokeEdgeFunction } from './supabaseService';
 
 // This service is now secure. API keys are handled by backend proxy functions.
@@ -25,7 +25,7 @@ export const ELEVENLABS_VOICES = [
  */
 export const generateVoiceover = async (text: string, voiceId: string = 'pNInz6obpgDQGcFmaJgB'): Promise<Blob> => {
     // The 'blob' responseType tells our helper to expect a file.
-    const response = await invokeEdgeFunction('elevenlabs-proxy', { text, voiceId }, 'blob');
+    const response = await invokeEdgeFunction<Blob>('elevenlabs-proxy', { type: 'tts', text, voiceId }, 'blob');
     if (!(response instanceof Blob)) {
         throw new Error("Failed to generate voiceover: Invalid response from server.");
     }
@@ -41,7 +41,7 @@ export const generateAnimatedImage = async (prompt: string, platform: Platform):
     const aspectRatio = platform === 'youtube_long' ? '16:9' : '9:16';
     const imagePrompt = `A cinematic, visually stunning image for a video scene: ${prompt}. IMPORTANT: The main subject must be perfectly centered to avoid being cropped.`;
     
-    const imageResponse = await invokeEdgeFunction('gemini-proxy', {
+    const imageResponse = await invokeEdgeFunction<{ generatedImages: { image: { imageBytes: string } }[] }>('gemini-proxy', {
         type: 'generateImages',
         params: {
             model: 'imagen-3.0-generate-002',
@@ -70,7 +70,7 @@ export const generateVideoClip = async (prompt: string, platform: Platform): Pro
     const aspectRatio = platform === 'youtube_long' ? '16_9' : '9_16';
 
     // Step 1: Initiate the generation and get a task UUID
-    const startResult = await invokeEdgeFunction('runwayml-proxy', { prompt, aspectRatio });
+    const startResult = await invokeEdgeFunction<{ uuid: string }>('runwayml-proxy', { prompt, aspectRatio });
     if (!startResult.uuid) {
         throw new Error("Failed to start video generation: Did not receive a task UUID.");
     }
@@ -83,7 +83,7 @@ export const generateVideoClip = async (prompt: string, platform: Platform): Pro
     for (let i = 0; i < maxAttempts; i++) {
         await delay(pollInterval);
         
-        const statusResult = await invokeEdgeFunction('runwayml-proxy', { uuid });
+        const statusResult = await invokeEdgeFunction<{ status: string; videoUrl?: string; error?: string }>('runwayml-proxy', { uuid });
 
         if (statusResult.status === 'SUCCEEDED') {
             if (!statusResult.videoUrl) {
@@ -104,4 +104,75 @@ export const generateVideoClip = async (prompt: string, platform: Platform): Pro
     }
 
     throw new Error("Video generation timed out. The task is still running, but the application has stopped waiting.");
+};
+
+
+/**
+ * Generates an AI B-Roll clip for a given scene description.
+ */
+export const generateAiBroll = async (sceneDescription: string, platform: Platform): Promise<Blob> => {
+    // This is essentially the same as generateVideoClip but could have a more specific internal prompt
+    return generateVideoClip(`Cinematic B-roll footage for a video scene about: ${sceneDescription}`, platform);
+};
+
+/**
+ * Animates a static image using AI.
+ */
+export const animateImage = async (imageUrl: string, motionPrompt: string): Promise<Blob> => {
+    const startResult = await invokeEdgeFunction<{ uuid: string }>('runwayml-proxy', {
+        imageUrl,
+        motionPrompt,
+        aspectRatio: '16_9' // Assume standard, could be passed in
+    });
+
+    if (!startResult.uuid) {
+        throw new Error("Failed to start image animation: Did not receive a task UUID.");
+    }
+    const { uuid } = startResult;
+
+    const maxAttempts = 25;
+    const pollInterval = 5000;
+
+    for (let i = 0; i < maxAttempts; i++) {
+        await delay(pollInterval);
+        const statusResult = await invokeEdgeFunction<{ status: string; videoUrl?: string; error?: string }>('runwayml-proxy', { uuid });
+        if (statusResult.status === 'SUCCEEDED') {
+            if (!statusResult.videoUrl) throw new Error("Animation succeeded but no URL was provided.");
+            const videoResponse = await fetch(statusResult.videoUrl);
+            if (!videoResponse.ok) throw new Error(`Failed to download the animated video`);
+            return await videoResponse.blob();
+        }
+        if (statusResult.status === 'FAILED') {
+            throw new Error(`Image animation failed: ${statusResult.error || 'Unknown error'}`);
+        }
+    }
+
+    throw new Error("Image animation timed out.");
+};
+
+/**
+ * Generates AI music from a text prompt using Stability AI.
+ */
+export const generateAiMusic = async (prompt: string, durationInSeconds: number): Promise<Blob> => {
+    return await invokeEdgeFunction<Blob>('stability-audio-proxy', { prompt, durationInSeconds }, 'blob');
+};
+
+/**
+ * Generates an AI sound effect from a text prompt.
+ */
+export const generateSfx = async (prompt: string): Promise<Blob> => {
+    return await invokeEdgeFunction<Blob>('elevenlabs-proxy', { type: 'sfx', text: prompt }, 'blob');
+};
+
+
+/**
+ * Calls the backend to stitch all assets into a final video.
+ */
+export const stitchAndRenderVideo = async (payload: {
+    scenes: SceneAssets[];
+    musicUrl: string | null;
+    voiceoverVolume: number;
+    musicVolume: number;
+}): Promise<{ finalVideoUrl: string }> => {
+    return await invokeEdgeFunction('video-stitcher', payload);
 };

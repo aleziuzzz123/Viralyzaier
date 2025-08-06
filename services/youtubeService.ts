@@ -112,3 +112,22 @@ export const fetchChannelVideos = async (): Promise<{id: string, title: string, 
         comments: parseInt(item.statistics.commentCount || '0', 10),
     }));
 };
+
+export const publishVideo = async (
+    projectId: string,
+    videoFileUrl: string,
+    title: string,
+    description: string,
+    tags: string[],
+    thumbnailUrl: string
+): Promise<string> => {
+    const { videoUrl } = await invokeEdgeFunction('youtube-publish', {
+        projectId,
+        videoFileUrl,
+        title,
+        description,
+        tags,
+        thumbnailUrl
+    });
+    return videoUrl;
+};

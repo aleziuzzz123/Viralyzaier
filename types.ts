@@ -1,7 +1,7 @@
 export type PlanId = 'free' | 'pro' | 'viralyzaier';
 export type ScriptGoal = 'educate' | 'subscribe' | 'sell' | 'entertain';
 export type Platform = 'youtube_long' | 'youtube_short' | 'tiktok' | 'instagram';
-export type ProjectStatus = 'Idea' | 'Scripting' | 'Scheduled' | 'Published' | 'Autopilot';
+export type ProjectStatus = 'Idea' | 'Scripting' | 'Rendering' | 'Scheduled' | 'Published' | 'Autopilot';
 export type WorkflowStep = 1 | 2 | 3 | 4;
 export type VisualType = 'ai_video' | 'ai_image' | 'ai_graphic' | 'stock' | 'user';
 export type VideoStyle = 'High-Energy Viral' | 'Cinematic Documentary' | 'Clean & Corporate';
@@ -235,24 +235,37 @@ export interface Subtitle {
         color: string;
         backgroundColor: string;
     };
+    words?: { word: string; start: number; end: number }[];
     isEditing?: boolean;
 }
 
-export interface SFXClip {
+
+export interface TimelineClip {
     id: string;
-    name: string;
-    url: string;
-    startTime: number;
+    type: 'video' | 'image' | 'audio' | 'text';
+    url: string; // Source URL
+    sceneIndex: number; // Link back to the original script scene
+    startTime: number; // Start time on the track in seconds
+    endTime: number; // End time on the track in seconds
+    sourceDuration: number; // Original duration of the asset
+    motionEffect?: 'zoom-in' | 'pan-left';
+}
+
+export interface TimelineTrack {
+    id: string;
+    type: 'a-roll' | 'b-roll' | 'voiceover' | 'music' | 'sfx' | 'text';
+    clips: TimelineClip[];
 }
 
 export interface TimelineState {
+    tracks: TimelineTrack[];
     subtitles: Subtitle[];
-    musicUrl: string | null;
     voiceoverVolume: number;
     musicVolume: number;
-    sfx: SFXClip[];
     isDuckingEnabled: boolean;
+    totalDuration: number;
 }
+
 
 export interface Project {
     id: string;
@@ -278,15 +291,10 @@ export interface Project {
     timeline: TimelineState | null;
     activeBrandIdentityId?: string | null;
     style: VideoStyle | null;
+    desiredLengthInSeconds: number;
 }
 
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+export type Json = string | number | boolean | null | { [key: string]: any } | any[];
 
 export interface Database {
   public: {
@@ -299,7 +307,7 @@ export interface Database {
           ai_credits: number
           channel_audit: Json | null
           content_pillars: string[] | null
-          cloned_voices: Json[] | null
+          cloned_voices: Json | null
           stripe_customer_id: string | null
         }
         Insert: {
@@ -309,7 +317,7 @@ export interface Database {
           ai_credits?: number
           channel_audit?: Json | null
           content_pillars?: string[] | null
-          cloned_voices?: Json[] | null
+          cloned_voices?: Json | null
           stripe_customer_id?: string | null
         }
         Update: {
@@ -319,10 +327,9 @@ export interface Database {
           ai_credits?: number
           channel_audit?: Json | null
           content_pillars?: string[] | null
-          cloned_voices?: Json[] | null
+          cloned_voices?: Json | null
           stripe_customer_id?: string | null
         }
-        Relationships: []
       }
       projects: {
         Row: {
@@ -351,6 +358,7 @@ export interface Database {
           timeline: Json | null
           active_brand_identity_id: string | null
           style: string | null
+          desired_length_in_seconds: number
         }
         Insert: {
           id?: string
@@ -378,6 +386,7 @@ export interface Database {
           timeline?: Json | null
           active_brand_identity_id?: string | null
           style?: string | null
+          desired_length_in_seconds?: number
         }
         Update: {
           id?: string
@@ -405,8 +414,8 @@ export interface Database {
           timeline?: Json | null
           active_brand_identity_id?: string | null
           style?: string | null
+          desired_length_in_seconds?: number
         }
-        Relationships: []
       }
       notifications: {
         Row: {
@@ -433,7 +442,6 @@ export interface Database {
           is_read?: boolean
           created_at?: string
         }
-        Relationships: []
       }
       user_youtube_tokens: {
          Row: {
@@ -457,7 +465,6 @@ export interface Database {
           expires_at?: string
           scope?: string
         }
-        Relationships: []
       }
       brand_identities: {
         Row: {
@@ -505,7 +512,6 @@ export interface Database {
             channel_mission?: string
             logo_url?: string | null
         }
-        Relationships: []
       }
     }
     Views: {

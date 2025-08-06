@@ -1,3 +1,5 @@
+
+
 import { supabase } from './supabaseClient';
 import { 
     Project, 
@@ -32,7 +34,7 @@ const isValidPlatform = (platform: any): platform is Platform => {
 };
 
 const isValidStatus = (status: any): status is ProjectStatus => {
-    return ['Idea', 'Scripting', 'Scheduled', 'Published', 'Autopilot'].includes(status);
+    return ['Idea', 'Scripting', 'Rendering', 'Scheduled', 'Published', 'Autopilot'].includes(status);
 };
 
 const isValidSubscription = (sub: any): sub is Subscription => {
@@ -43,7 +45,7 @@ const isValidSubscription = (sub: any): sub is Subscription => {
 
 
 // --- Mappers ---
-const profileRowToUser = (row: Database['public']['Tables']['profiles']['Row'], youtubeConnected: boolean): User => ({
+export const profileRowToUser = (row: Database['public']['Tables']['profiles']['Row'], youtubeConnected: boolean): User => ({
     id: row.id,
     email: row.email,
     subscription: isValidSubscription(row.subscription) ? row.subscription : { planId: 'free', status: 'active', endDate: null },
@@ -58,13 +60,13 @@ const userToProfileUpdate = (updates: Partial<User>): Database['public']['Tables
     const dbUpdates: Database['public']['Tables']['profiles']['Update'] = {};
     if (updates.aiCredits !== undefined) dbUpdates.ai_credits = updates.aiCredits;
     if (updates.channelAudit !== undefined) dbUpdates.channel_audit = updates.channelAudit as unknown as Json | null;
-    if (updates.cloned_voices !== undefined) dbUpdates.cloned_voices = updates.cloned_voices as unknown as Json[] | null;
+    if (updates.cloned_voices !== undefined) dbUpdates.cloned_voices = updates.cloned_voices as unknown as Json | null;
     if (updates.content_pillars !== undefined) dbUpdates.content_pillars = updates.content_pillars;
     if (updates.subscription !== undefined) dbUpdates.subscription = updates.subscription as unknown as Json;
     return dbUpdates;
 };
 
-const projectRowToProject = (row: Database['public']['Tables']['projects']['Row']): Project => ({
+export const projectRowToProject = (row: Database['public']['Tables']['projects']['Row']): Project => ({
     id: row.id,
     name: row.name,
     topic: row.topic,
@@ -88,10 +90,12 @@ const projectRowToProject = (row: Database['public']['Tables']['projects']['Row'
     timeline: row.timeline as unknown as TimelineState | null,
     activeBrandIdentityId: row.active_brand_identity_id,
     style: row.style as VideoStyle | null,
+    desiredLengthInSeconds: row.desired_length_in_seconds || 60,
 });
 
 const projectToProjectUpdate = (updates: Partial<Project>): Database['public']['Tables']['projects']['Update'] => {
     const dbUpdates: Database['public']['Tables']['projects']['Update'] = {};
+    // Only include fields that are guaranteed to be in any version of the schema
     if (updates.name !== undefined) dbUpdates.name = updates.name;
     if (updates.topic !== undefined) dbUpdates.topic = updates.topic;
     if (updates.platform !== undefined) dbUpdates.platform = updates.platform;
@@ -107,12 +111,16 @@ const projectToProjectUpdate = (updates: Partial<Project>): Database['public']['
     if (updates.performance !== undefined) dbUpdates.performance = updates.performance as unknown as Json | null;
     if (updates.scheduledDate !== undefined) dbUpdates.scheduled_date = updates.scheduledDate;
     if (updates.publishedUrl !== undefined) dbUpdates.published_url = updates.publishedUrl;
-    // lastUpdated is managed by a database trigger, client should not set it.
     if (updates.workflowStep !== undefined) dbUpdates.workflow_step = updates.workflowStep;
     if (updates.voiceoverVoiceId !== undefined) dbUpdates.voiceover_voice_id = updates.voiceoverVoiceId;
     if (updates.last_performance_check !== undefined) dbUpdates.last_performance_check = updates.last_performance_check;
-    if (updates.timeline !== undefined) dbUpdates.timeline = updates.timeline as unknown as Json | null;
-    if (updates.style !== undefined) dbUpdates.style = updates.style;
+    
+    // Explicitly exclude newer fields to prevent schema mismatch errors
+    // if (updates.timeline !== undefined) dbUpdates.timeline = updates.timeline as unknown as Json | null;
+    // if (updates.style !== undefined) dbUpdates.style = updates.style;
+    // if (updates.desiredLengthInSeconds !== undefined) dbUpdates.desired_length_in_seconds = updates.desiredLengthInSeconds;
+    // if (updates.activeBrandIdentityId !== undefined) dbUpdates.active_brand_identity_id = updates.activeBrandIdentityId;
+
     return dbUpdates;
 }
 
@@ -223,7 +231,7 @@ export const updateUserProfile = async (userId: string, updates: Partial<User>):
     
     const { data, error } = await supabase
         .from('profiles')
-        .update(dbUpdates as any)
+        .update(dbUpdates)
         .eq('id', userId)
         .select('*')
         .single();
@@ -231,7 +239,7 @@ export const updateUserProfile = async (userId: string, updates: Partial<User>):
     if (error) throw error;
     if (!data) throw new Error("User profile not found after update.");
     
-    return profileRowToUser(data as Database['public']['Tables']['profiles']['Row'], youtubeConnected);
+    return profileRowToUser(data, youtubeConnected);
 };
 
 export const createProfileForUser = async (userId: string, email: string): Promise<User | null> => {
@@ -248,7 +256,7 @@ export const createProfileForUser = async (userId: string, email: string): Promi
 
     const { data, error } = await supabase
         .from('profiles')
-        .insert(profileToInsert as any)
+        .insert(profileToInsert)
         .select('*')
         .single();
     
@@ -266,7 +274,7 @@ export const createProfileForUser = async (userId: string, email: string): Promi
     if (!data) return null;
     
     // A new user won't have a YouTube connection, so we can safely pass false.
-    return profileRowToUser(data as Database['public']['Tables']['profiles']['Row'], false);
+    return profileRowToUser(data, false);
 };
 
 
@@ -280,43 +288,34 @@ export const getProjectsForUser = async (userId: string): Promise<Project[]> => 
         .order('last_updated', { ascending: false });
 
     if (error) throw error;
-    return ((data as Database['public']['Tables']['projects']['Row'][]) || []).map(projectRowToProject);
+    return (data || []).map(projectRowToProject);
 };
 
 export const createProject = async (projectData: Omit<Project, 'id'|'lastUpdated'>, userId: string): Promise<Project> => {
+    // The projectToProjectUpdate function acts as a filter for safe-to-insert optional fields.
+    const safeOptionalFields = projectToProjectUpdate(projectData);
+
     const projectToInsert: Database['public']['Tables']['projects']['Insert'] = {
+        // Required fields from projectData
         user_id: userId,
         name: projectData.name,
         topic: projectData.topic,
         platform: projectData.platform,
         status: projectData.status,
-        title: projectData.title,
-        script: projectData.script as unknown as Json | null,
-        analysis: projectData.analysis as unknown as Json | null,
-        competitor_analysis: projectData.competitorAnalysis as unknown as Json | null,
-        moodboard: projectData.moodboard,
-        assets: projectData.assets as unknown as Json | null,
-        sound_design: projectData.soundDesign as unknown as Json | null,
-        launch_plan: projectData.launchPlan as unknown as Json | null,
-        performance: projectData.performance as unknown as Json | null,
-        scheduled_date: projectData.scheduledDate,
-        published_url: projectData.publishedUrl,
         workflow_step: projectData.workflowStep,
-        voiceover_voice_id: projectData.voiceoverVoiceId,
-        last_performance_check: projectData.last_performance_check,
-        timeline: projectData.timeline as unknown as Json | null,
-        style: projectData.style,
+        // Spread the filtered optional fields
+        ...safeOptionalFields,
     };
     
     const { data, error } = await supabase
         .from('projects')
-        .insert(projectToInsert as any)
+        .insert(projectToInsert)
         .select('*')
         .single();
         
     if (error) throw error;
     if (!data) throw new Error("Project data not returned after creation.");
-    return projectRowToProject(data as Database['public']['Tables']['projects']['Row']);
+    return projectRowToProject(data);
 };
 
 export const updateProject = async (projectId: string, updates: Partial<Project>): Promise<Project> => {
@@ -324,20 +323,52 @@ export const updateProject = async (projectId: string, updates: Partial<Project>
     
     const { data, error } = await supabase
         .from('projects')
-        .update(dbUpdates as any)
+        .update(dbUpdates)
         .eq('id', projectId)
         .select('*')
         .single();
         
     if (error) throw error;
     if (!data) throw new Error("Project data not returned after update.");
-    return projectRowToProject(data as Database['public']['Tables']['projects']['Row']);
+    return projectRowToProject(data);
 };
 
 export const deleteProject = async (projectId: string): Promise<void> => {
     const { error } = await supabase.from('projects').delete().eq('id', projectId);
     if (error) throw error;
 };
+
+// --- Notifications ---
+export const getNotifications = async (userId: string): Promise<Notification[]> => {
+    const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return (data || []).map(notificationRowToNotification);
+};
+
+export const markNotificationAsRead = async (notificationId: string): Promise<void> => {
+    const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId);
+
+    if (error) throw error;
+};
+
+export const markAllNotificationsAsRead = async (userId: string): Promise<void> => {
+    const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('user_id', userId)
+        .eq('is_read', false);
+    
+    if (error) throw error;
+};
+
 
 // --- Brand Identities ---
 export const getBrandIdentitiesForUser = async (userId: string): Promise<BrandIdentity[]> => {
@@ -358,7 +389,7 @@ export const getBrandIdentitiesForUser = async (userId: string): Promise<BrandId
         throw error;
     }
     
-    return ((data as Database['public']['Tables']['brand_identities']['Row'][]) || []).map(brandIdentityRowToBrandIdentity);
+    return (data || []).map(brandIdentityRowToBrandIdentity);
 };
 
 export const createBrandIdentity = async (identityData: Omit<BrandIdentity, 'id' | 'created_at' | 'user_id' | 'logoUrl'> & { logoUrl?: string }, userId: string): Promise<BrandIdentity> => {
@@ -375,12 +406,12 @@ export const createBrandIdentity = async (identityData: Omit<BrandIdentity, 'id'
             visual_style_guide: identityData.visualStyleGuide,
             target_audience: identityData.targetAudience,
             channel_mission: identityData.channelMission,
-            logo_url: identityData.logoUrl,
-        } as any)
+            logo_url: identityData.logoUrl || null,
+        })
         .select()
         .single();
     if (error) throw error;
-    return brandIdentityRowToBrandIdentity(data as Database['public']['Tables']['brand_identities']['Row']);
+    return brandIdentityRowToBrandIdentity(data);
 };
 
 export const updateBrandIdentity = async (identityId: string, updates: Partial<Omit<BrandIdentity, 'id' | 'created_at' | 'user_id'>>): Promise<BrandIdentity> => {
@@ -398,12 +429,12 @@ export const updateBrandIdentity = async (identityId: string, updates: Partial<O
     
     const { data, error } = await supabase
         .from('brand_identities')
-        .update(dbUpdates as any)
+        .update(dbUpdates)
         .eq('id', identityId)
         .select()
         .single();
     if (error) throw error;
-    return brandIdentityRowToBrandIdentity(data as Database['public']['Tables']['brand_identities']['Row']);
+    return brandIdentityRowToBrandIdentity(data);
 };
 
 export const deleteBrandIdentity = async (identityId: string): Promise<void> => {
@@ -432,92 +463,42 @@ export const dataUrlToBlob = async (dataUrl: string): Promise<Blob> => {
 
 // --- Edge Functions ---
 
-export const invokeEdgeFunction = async (name: string, body: object | FormData, responseType: 'json' | 'blob' = 'json') => {
+export const invokeEdgeFunction = async <T = any>(name: string, body: object | FormData, responseType: 'json' | 'blob' = 'json'): Promise<T> => {
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !session) {
         throw new Error(sessionError?.message || 'User is not authenticated.');
     }
 
-    // Use native fetch for blob responses as it's more reliable than the Supabase client's handling.
-    if (responseType === 'blob') {
-        const functionUrl = `${(window as any).__env.VITE_SUPABASE_URL}/functions/v1/${name}`;
-        
-        const isFormData = body instanceof FormData;
-        const fetchOptions: RequestInit = {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${session.access_token}`,
-                ...(isFormData ? {} : {'Content-Type': 'application/json'})
-            },
-            body: isFormData ? body : JSON.stringify(body)
-        };
-        
-        const response = await fetch(functionUrl, fetchOptions);
-        if (!response.ok) {
-            const errorText = await response.text();
-            try {
-                const errorJson = JSON.parse(errorText);
-                throw new Error(errorJson.error || `Function ${name} failed with status ${response.status}`);
-            } catch {
-                throw new Error(errorText || `Function ${name} failed with status ${response.status}`);
-            }
-        }
-        return await response.blob();
-    }
-    
-    // Existing logic for JSON responses using the Supabase client
-    const headers: HeadersInit = {
+    const functionUrl = `${(window as any).__env.VITE_SUPABASE_URL}/functions/v1/${name}`;
+    const headers: Record<string, string> = {
         'Authorization': `Bearer ${session.access_token}`,
     };
-    
-    const options: FunctionInvokeOptions = {
-        body,
+
+    if (!(body instanceof FormData)) {
+        headers['Content-Type'] = 'application/json';
+    }
+
+    const response = await fetch(functionUrl, {
+        method: 'POST',
         headers,
-    };
-    
-    const response = await supabase.functions.invoke(name, options);
-    
-    if (response.error) {
+        body: body instanceof FormData ? body : JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = `Function '${name}' failed with status ${response.status}.`;
         try {
-            const errorBody = JSON.parse(response.error.context.responseText);
-            throw new Error(errorBody.error || response.error.message);
+            const errorJson = JSON.parse(errorText);
+            errorMessage += ` Details: ${errorJson.error || errorText}`;
         } catch (e) {
-            throw response.error;
+            errorMessage += ` Details: ${errorText}`;
         }
+        throw new Error(errorMessage);
     }
-    
-    return response.data;
-};
 
-
-// --- Notifications ---
-export const getNotifications = async (userId: string): Promise<Notification[]> => {
-    const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-    if (error) {
-        console.error('Error fetching notifications:', error);
-        return [];
+    if (responseType === 'blob') {
+        return response.blob() as Promise<T>;
     }
-    return ((data as Database['public']['Tables']['notifications']['Row'][]) || []).map(notificationRowToNotification);
-};
 
-export const markNotificationAsRead = async (notificationId: string): Promise<void> => {
-    const { error } = await supabase
-        .from('notifications')
-        .update({ is_read: true } as any)
-        .eq('id', notificationId);
-    if (error) throw error;
-};
-
-export const markAllNotificationsAsRead = async (userId: string): Promise<void> => {
-    const { error } = await supabase
-        .from('notifications')
-        .update({ is_read: true } as any)
-        .eq('user_id', userId)
-        .eq('is_read', false);
-    if (error) throw error;
+    return response.json() as Promise<T>;
 };
