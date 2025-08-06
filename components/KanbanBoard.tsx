@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Project, ProjectStatus, Platform } from '../types';
-import { YouTubeIcon, TikTokIcon, InstagramIcon, PlusIcon, PencilIcon, RocketLaunchIcon } from './Icons';
+import { YouTubeIcon, TikTokIcon, InstagramIcon, PlusIcon, PencilIcon, RocketLaunchIcon, SparklesIcon } from './Icons';
 import { useAppContext } from '../contexts/AppContext';
 
 const platformIcons: { [key in Platform]: React.FC<{className?: string}> } = {
@@ -14,6 +14,7 @@ const statusConfig: { [key in ProjectStatus]: { color: string; bg: string; } } =
     'Autopilot': { color: 'border-purple-500', bg: 'bg-purple-900/20' },
     'Idea': { color: 'border-sky-500', bg: 'bg-sky-900/20' },
     'Scripting': { color: 'border-amber-500', bg: 'bg-amber-900/20' },
+    'Rendering': { color: 'border-pink-500', bg: 'bg-pink-900/20' },
     'Scheduled': { color: 'border-indigo-500', bg: 'bg-indigo-900/20' },
     'Published': { color: 'border-green-500', bg: 'bg-green-900/20' },
 };
@@ -58,10 +59,10 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewProject }) => 
 
     return (
         <div
-            draggable
+            draggable={project.status !== 'Rendering'}
             onClick={onViewProject}
             onDragStart={(e) => e.dataTransfer.setData('projectId', project.id)}
-            className="bg-gray-800 rounded-lg border border-gray-700 hover:border-indigo-500 cursor-pointer transition-all duration-200 shadow-md hover:shadow-indigo-500/10 mb-4"
+            className={`bg-gray-800 rounded-lg border border-gray-700 hover:border-indigo-500 transition-all duration-200 shadow-md hover:shadow-indigo-500/10 mb-4 ${project.status === 'Rendering' ? 'cursor-wait' : 'cursor-pointer'}`}
         >
             <div className="p-4">
                 <div>
@@ -77,6 +78,12 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewProject }) => 
                         <div className="mt-2 text-xs font-bold text-purple-400 flex items-center gap-1.5">
                             <RocketLaunchIcon className="w-4 h-4" />
                             AI Generated Idea
+                        </div>
+                    )}
+                     {project.status === 'Rendering' && (
+                        <div className="mt-2 text-xs font-bold text-pink-400 flex items-center gap-1.5">
+                            <SparklesIcon className="w-4 h-4 animate-pulse" />
+                            AI is Rendering...
                         </div>
                     )}
                      {project.status === 'Scheduled' && project.scheduledDate && (
@@ -144,13 +151,14 @@ interface KanbanBoardProps {
 
 const KanbanBoard: React.FC<KanbanBoardProps> = ({ projects, onViewProject }) => {
     const { addToast, handleUpdateProject, t, openScheduleModal } = useAppContext();
-    const statuses: ProjectStatus[] = ['Autopilot', 'Idea', 'Scripting', 'Scheduled', 'Published'];
+    const statuses: ProjectStatus[] = ['Autopilot', 'Idea', 'Scripting', 'Rendering', 'Scheduled', 'Published'];
 
     const getStatusName = (status: ProjectStatus) => {
         switch(status) {
             case 'Autopilot': return t('kanban.status_autopilot');
             case 'Idea': return t('kanban.status_idea');
             case 'Scripting': return t('kanban.status_scripting');
+            case 'Rendering': return "Rendering"; // New status
             case 'Scheduled': return t('kanban.status_scheduled');
             case 'Published': return t('kanban.status_published');
         }
@@ -160,23 +168,27 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ projects, onViewProject }) =>
         e.preventDefault();
         const projectId = e.dataTransfer.getData('projectId');
         const project = projects.find(p => p.id === projectId);
-        if (project && project.status !== newStatus) {
+        if (project && project.status !== newStatus && newStatus !== 'Rendering') { // Prevent dropping into Rendering
             if (newStatus === 'Scheduled') {
-                openScheduleModal(projectId); // Open modal instead of directly updating
+                openScheduleModal(projectId);
             } else {
-                handleUpdateProject({ id: project.id, status: newStatus, scheduledDate: null }); // Clear schedule date if moved out
+                handleUpdateProject({ id: project.id, status: newStatus, scheduledDate: null });
                 addToast(t('kanban.project_moved', {status: getStatusName(newStatus)}), 'success');
             }
         }
     };
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6">
             {statuses.map(status => (
                 <div 
                     key={status}
                     className={`p-4 rounded-lg h-full min-h-[300px] ${statusConfig[status].bg}`}
-                    onDragOver={(e) => e.preventDefault()}
+                    onDragOver={(e) => {
+                        if (status !== 'Rendering') {
+                            e.preventDefault();
+                        }
+                    }}
                     onDrop={(e) => handleDrop(e, status)}
                 >
                     <h3 className={`font-bold mb-4 pb-2 border-b-2 ${statusConfig[status].color}`}>

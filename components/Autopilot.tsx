@@ -81,6 +81,7 @@ const Autopilot: React.FC = () => {
                     last_performance_check: null,
                     timeline: null,
                     style: null,
+                    desiredLengthInSeconds: 300, // Default for long-form
                 };
                 const newProject = await supabase.createProject(initialProjectData, user.id);
 

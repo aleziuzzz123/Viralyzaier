@@ -6,9 +6,37 @@ interface SubtitleTrackProps {
     timeline: TimelineState;
     onUpdate: (updates: Partial<TimelineState>) => void;
     duration: number;
+    isPlaying: boolean;
+    currentTime: number;
 }
 
-const SubtitleTrack: React.FC<SubtitleTrackProps> = ({ timeline, onUpdate, duration }) => {
+const AnimatedSubtitle: React.FC<{ subtitle: Subtitle, isVisible: boolean }> = ({ subtitle, isVisible }) => {
+    if (!isVisible) return null;
+
+    return (
+        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 p-2 rounded-lg" style={{ backgroundColor: subtitle.style.backgroundColor }}>
+            <p className="text-xl font-bold text-center" style={{ color: subtitle.style.color }}>
+                {subtitle.words?.map((word, index) => (
+                    <span key={index} className="inline-block" style={{
+                        animation: `word-fade-in 0.2s ease-out forwards`,
+                        animationDelay: `${word.start}ms`,
+                        opacity: 0,
+                    }}>
+                        {word.word}&nbsp;
+                    </span>
+                ))}
+            </p>
+             <style>{`
+                @keyframes word-fade-in {
+                    to { opacity: 1; }
+                }
+            `}</style>
+        </div>
+    );
+};
+
+
+const SubtitleTrack: React.FC<SubtitleTrackProps> = ({ timeline, onUpdate, duration, isPlaying, currentTime }) => {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editText, setEditText] = useState('');
     const [stylePopoverId, setStylePopoverId] = useState<string | null>(null);
@@ -49,6 +77,9 @@ const SubtitleTrack: React.FC<SubtitleTrackProps> = ({ timeline, onUpdate, durat
     };
 
     if (duration === 0) return null; // Prevent division by zero
+    
+    const activeSubtitle = isPlaying ? timeline.subtitles.find(s => currentTime >= s.start && currentTime < s.end) : null;
+
 
     return (
         <div className="w-full h-10 bg-gray-900/50 rounded relative">
@@ -99,6 +130,7 @@ const SubtitleTrack: React.FC<SubtitleTrackProps> = ({ timeline, onUpdate, durat
                      )}
                 </div>
             ))}
+             {activeSubtitle && <AnimatedSubtitle subtitle={activeSubtitle} isVisible={isPlaying} />}
         </div>
     );
 };

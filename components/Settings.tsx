@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { SparklesIcon, UploadIcon, UserCircleIcon, TrashIcon, RefreshIcon } from './Icons';
@@ -48,7 +49,7 @@ const Settings: React.FC = () => {
                 formData.append('files', file);
             });
             
-            const newVoice: ClonedVoice = await invokeEdgeFunction('elevenlabs-voice-cloning', formData);
+            const newVoice = await invokeEdgeFunction<ClonedVoice>('elevenlabs-voice-cloning', formData);
             
             setUser(prevUser => {
                 if (!prevUser) return null;
@@ -74,7 +75,7 @@ const Settings: React.FC = () => {
         if (!user) return;
         setIsSyncing(true);
         try {
-            const syncedVoices = await invokeEdgeFunction('elevenlabs-sync-voices', {});
+            const syncedVoices = await invokeEdgeFunction<ClonedVoice[]>('elevenlabs-sync-voices', {});
             setUser(prevUser => prevUser ? { ...prevUser, cloned_voices: syncedVoices } : null);
             addToast("Voice statuses have been updated!", "success");
         } catch (err) {

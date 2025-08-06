@@ -6,7 +6,7 @@ import { searchStockMedia, generateTextGraphic } from '../services/geminiService
 import { generateVideoClip, generateAnimatedImage } from '../services/generativeMediaService';
 import { uploadFile } from '../services/supabaseService';
 import { getErrorMessage } from '../utils';
-import { v4 as uuidv4 } from 'https://esm.sh/uuid';
+import { v4 as uuidv4 } from 'uuid';
 
 interface AssetPickerModalProps {
     isOpen: boolean;
@@ -17,7 +17,7 @@ interface AssetPickerModalProps {
 }
 
 const AssetPickerModal: React.FC<AssetPickerModalProps> = ({ isOpen, onClose, project, scene, onAssetSelect }) => {
-    const { t, user, handleUpdateProject, addToast, consumeCredits } = useAppContext();
+    const { t, user, handleUpdateProject, addToast, consumeCredits, lockAndExecute } = useAppContext();
     const [activeTab, setActiveTab] = useState<'ai' | 'stock'>('ai');
     
     // Stock Media State
@@ -61,12 +61,12 @@ const AssetPickerModal: React.FC<AssetPickerModalProps> = ({ isOpen, onClose, pr
     }, [stockSearch, addToast, stockType]);
     
     useEffect(() => {
-        if(isOpen && activeTab === 'stock') {
+        if(isOpen && activeTab === 'stock' && stockResults.length === 0) {
             handleStockSearch();
         }
-    }, [isOpen, activeTab, stockType, handleStockSearch]);
+    }, [isOpen, activeTab, stockType, handleStockSearch, stockResults.length]);
 
-    const handleGenerate = async (type: 'video' | 'image' | 'graphic') => {
+    const handleGenerate = (type: 'video' | 'image' | 'graphic') => lockAndExecute(async () => {
         setIsGenerating(true);
         let cost = 0;
         let generationFunc: () => Promise<string | Blob>;
@@ -96,12 +96,13 @@ const AssetPickerModal: React.FC<AssetPickerModalProps> = ({ isOpen, onClose, pr
         }
 
         try {
+            addToast(`Generating AI ${type}... this may take a minute.`, 'info');
             const result = await generationFunc();
             const assetBlob = result instanceof Blob ? result : await (await fetch(result)).blob();
             
-            // FIX: Sanitize the file extension, especially for 'image/svg+xml'.
+            addToast(t('toast.uploading_asset', { type }), 'info');
             const subtype = assetBlob.type.split('/')[1];
-            const extension = subtype === 'svg+xml' ? 'svg' : subtype;
+            const extension = subtype === 'svg+xml' ? 'svg' : subtype.split('+')[0]; // handle svg+xml, etc.
             
             const path = `${user!.id}/${project.id}/ai_assets/${uuidv4()}.${extension}`;
             const assetUrl = await uploadFile(assetBlob, path);
@@ -111,7 +112,7 @@ const AssetPickerModal: React.FC<AssetPickerModalProps> = ({ isOpen, onClose, pr
         } finally {
             setIsGenerating(false);
         }
-    };
+    });
     
     if (!isOpen) return null;
     

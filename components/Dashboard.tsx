@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Project, Blueprint, Platform } from '../types';
-import { FilePlusIcon, SparklesIcon, LightBulbIcon, YouTubeIcon, TikTokIcon, InstagramIcon, CheckCircleIcon } from './Icons';
+import { Project, Blueprint, Platform, BrandIdentity, ClonedVoice, VideoStyle } from '../types';
+import { FilePlusIcon, SparklesIcon, LightBulbIcon, YouTubeIcon, TikTokIcon, InstagramIcon, CheckCircleIcon, PlayIcon, StopCircleIcon } from './Icons';
 import TutorialCallout from './TutorialCallout';
 import KanbanBoard from './KanbanBoard';
 import { PLANS } from '../services/paymentService';
 import { useAppContext } from '../contexts/AppContext';
 import { getErrorMessage } from '../utils';
 import Loader from './Loader';
+import { ELEVENLABS_VOICES, generateVoiceover } from '../services/generativeMediaService';
 
 const platformConfig: { [key in Platform]: { icon: React.FC<{className?: string}>, nameKey: string, descKey: string } } = {
     youtube_long: { icon: YouTubeIcon, nameKey: 'platform.youtube_long_name', descKey: 'platform.youtube_long_desc' },
@@ -21,10 +22,17 @@ interface NewProjectModalProps {
 }
 
 const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) => {
-    const { user, handleCreateProjectForBlueprint, t, addToast, lockAndExecute } = useAppContext();
+    const { user, handleCreateProjectForBlueprint, t, addToast, lockAndExecute, brandIdentities, consumeCredits } = useAppContext();
     const [topicOrUrl, setTopicOrUrl] = useState('');
     const [platform, setPlatform] = useState<Platform | null>(null);
+    const [desiredLengthInSeconds, setDesiredLengthInSeconds] = useState(60);
+    const [voiceoverVoiceId, setVoiceoverVoiceId] = useState<string>('pNInz6obpgDQGcFmaJgB');
+    const [activeBrandIdentityId, setActiveBrandIdentityId] = useState<string>('');
     const [error, setError] = useState<string | null>(null);
+    const [selectedStyle, setSelectedStyle] = useState<VideoStyle>('High-Energy Viral');
+    const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+
 
     const handleCreate = () => lockAndExecute(async () => {
         if (!platform) {
@@ -36,40 +44,90 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) =>
             return;
         }
         
-        await handleCreateProjectForBlueprint(topicOrUrl, platform, topicOrUrl);
+        await handleCreateProjectForBlueprint(topicOrUrl, platform, topicOrUrl, desiredLengthInSeconds, voiceoverVoiceId, activeBrandIdentityId, selectedStyle);
         handleClose();
     });
 
     const handleClose = () => {
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.src = '';
+        }
+        setPreviewingVoiceId(null);
         setTopicOrUrl('');
         setError(null);
         setPlatform(null);
+        setDesiredLengthInSeconds(60);
+        setVoiceoverVoiceId('pNInz6obpgDQGcFmaJgB');
+        setActiveBrandIdentityId('');
         onClose();
     };
+    
+    const handlePreviewVoice = (voiceId: string) => lockAndExecute(async () => {
+        if (previewingVoiceId === voiceId) {
+            audioRef.current?.pause();
+            setPreviewingVoiceId(null);
+            return;
+        }
+        
+        if (!await consumeCredits(1)) return;
+
+        setPreviewingVoiceId(voiceId);
+        try {
+            const sampleText = "Hello, this is a preview of my voice.";
+            const audioBlob = await generateVoiceover(sampleText, voiceId);
+            const audioUrl = URL.createObjectURL(audioBlob);
+            
+            if (audioRef.current) {
+                audioRef.current.src = audioUrl;
+                audioRef.current.play();
+                audioRef.current.onended = () => {
+                    setPreviewingVoiceId(null);
+                    URL.revokeObjectURL(audioUrl);
+                };
+            }
+        } catch (e) {
+            addToast(`Voice preview failed: ${getErrorMessage(e)}`, 'error');
+            setPreviewingVoiceId(null);
+        }
+    });
+    
+    const userVoices = user?.cloned_voices || [];
+    const allVoices = [...userVoices, ...ELEVENLABS_VOICES];
+
+    // Credit Calculation Logic
+    const calculateCredits = (seconds: number) => {
+        if (seconds <= 30) return 3;
+        if (seconds <= 60) return 5;
+        if (seconds <= 180) return 10;
+        return 15 + Math.floor((seconds - 180) / 60) * 5;
+    };
+    const creditCost = calculateCredits(desiredLengthInSeconds);
+    const maxDuration = user?.subscription.planId === 'viralyzaier' ? 3600 : 600;
 
     if (!isOpen) return null;
     
     return (
         <div 
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start pt-12 md:pt-20 justify-center z-50 animate-fade-in-up" 
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start pt-8 md:pt-16 justify-center z-50 animate-fade-in-up" 
             style={{ animationDuration: '0.3s' }} 
             onClick={handleClose}
             role="dialog"
             aria-modal="true"
             aria-labelledby="new-project-modal-title"
         >
-            <div className="bg-gray-800 border border-indigo-500/50 rounded-2xl shadow-2xl w-full max-w-2xl m-4 transform transition-all p-6 text-center flex flex-col" onClick={(e) => e.stopPropagation()}>
-                <header className="mb-4 flex-shrink-0">
+            <div className="bg-gray-800 border border-indigo-500/50 rounded-2xl shadow-2xl w-full max-w-3xl m-4 transform transition-all p-8 flex flex-col" onClick={(e) => e.stopPropagation()}>
+                <header className="mb-6 flex-shrink-0 text-center">
                     <h2 id="new-project-modal-title" className="text-3xl font-bold text-white mb-2 flex items-center justify-center">
                         <FilePlusIcon className="w-8 h-8 mr-3 text-indigo-400"/> {t('dashboard.new_blueprint')}
                     </h2>
                     <p className="text-gray-400">{t('blueprint_modal.subtitle')}</p>
                 </header>
                 
-                <div className="space-y-6">
-                    <div>
-                       <h3 className="text-lg font-semibold text-white mb-2 text-left">{t('blueprint_modal.step1')}</h3>
-                       <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-6 flex-grow overflow-y-auto pr-4 -mr-4">
+                     <div>
+                       <h3 className="text-lg font-semibold text-white mb-3 text-left">1. Select a Platform & Format</h3>
+                       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                            {(['youtube_long', 'youtube_short', 'tiktok', 'instagram'] as Platform[]).map(p => {
                                 const config = platformConfig[p];
                                 return (
@@ -78,14 +136,13 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) =>
                                            {React.createElement(config.icon, { className: "w-8 h-8" })}
                                            <span className="font-bold text-white">{t(config.nameKey as any)}</span>
                                        </div>
-                                       <p className="text-xs text-gray-400 mt-2">{t(config.descKey as any)}</p>
                                    </button>
                                 )
                            })}
                        </div>
                    </div>
                    <div>
-                       <h3 className="text-lg font-semibold text-white text-left mb-2">{t('blueprint_modal.step2')}</h3>
+                       <h3 className="text-lg font-semibold text-white text-left mb-3">2. Provide a Topic or URL</h3>
                        <textarea
                            value={topicOrUrl}
                            onChange={e => setTopicOrUrl(e.target.value)}
@@ -94,14 +151,61 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) =>
                            className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                        />
                    </div>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h3 className="text-lg font-semibold text-white text-left mb-3">3. Set Video Length</h3>
+                            <input
+                                type="range"
+                                min="10"
+                                max={maxDuration}
+                                step="5"
+                                value={desiredLengthInSeconds}
+                                onChange={e => setDesiredLengthInSeconds(parseInt(e.target.value))}
+                                className="w-full"
+                            />
+                            <p className="text-center text-gray-300 mt-2">{Math.floor(desiredLengthInSeconds / 60)}m {desiredLengthInSeconds % 60}s</p>
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-semibold text-white text-left mb-3">4. Choose Narrator Voice</h3>
+                            <div className="flex items-center gap-2">
+                                <select value={voiceoverVoiceId} onChange={e => setVoiceoverVoiceId(e.target.value)} className="flex-grow w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white">
+                                    <optgroup label="Your Voices">
+                                        {userVoices.map(v => <option key={v.id} value={v.id} disabled={v.status !== 'ready'}>{v.name} ({v.status})</option>)}
+                                    </optgroup>
+                                    <optgroup label="Standard Voices">
+                                        {ELEVENLABS_VOICES.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                                    </optgroup>
+                                </select>
+                                <button
+                                    onClick={() => handlePreviewVoice(voiceoverVoiceId)}
+                                    title="Preview Voice (1 Credit)"
+                                    className="p-3 bg-gray-700 rounded-lg text-white hover:bg-indigo-600 transition-colors flex-shrink-0"
+                                >
+                                    {previewingVoiceId === voiceoverVoiceId ? <StopCircleIcon className="w-5 h-5" /> : <PlayIcon className="w-5 h-5" />}
+                                </button>
+                            </div>
+                             <p className="text-xs text-gray-500 text-center mt-2">Previewing a voice costs 1 AI credit.</p>
+                        </div>
+                   </div>
+                   <div>
+                       <h3 className="text-lg font-semibold text-white text-left mb-3">{t('new_project_modal.brand_identity_label')}</h3>
+                       <select value={activeBrandIdentityId} onChange={e => setActiveBrandIdentityId(e.target.value)} className="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white">
+                           <option value="">{t('new_project_modal.no_identity')}</option>
+                           {brandIdentities.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                       </select>
+                   </div>
+               </div>
+               <div className="pt-6 border-t border-gray-700/50 mt-6 flex-shrink-0">
                    <button
                        onClick={handleCreate}
-                       className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors"
+                       className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors text-lg flex items-center justify-center"
                    >
-                       {t('new_project_modal.create_button')}
+                       <SparklesIcon className="w-6 h-6 mr-3"/>
+                       Generate Blueprint ({creditCost} Credits)
                    </button>
-                   {error && <p className="text-red-400 mt-2">{error}</p>}
+                   {error && <p className="text-red-400 mt-2 text-center">{error}</p>}
                </div>
+               <audio ref={audioRef} className="hidden" />
             </div>
         </div>
     );

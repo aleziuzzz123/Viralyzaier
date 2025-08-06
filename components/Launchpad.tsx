@@ -1,19 +1,17 @@
-
-
-
-
 import React, { useState } from 'react';
 import { Project } from '../types';
 import { generateSeo, analyzeAndGenerateThumbnails, generatePromotionPlan } from '../services/geminiService';
+import { publishVideo } from '../services/youtubeService';
 import { SparklesIcon, ClipboardCopyIcon, DownloadIcon, RocketLaunchIcon, YouTubeIcon, CheckCircleIcon } from './Icons';
 import { useAppContext } from '../contexts/AppContext';
+import { getErrorMessage } from '../utils';
 
 interface LaunchpadProps {
     project: Project;
 }
 
 const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
-    const { user, consumeCredits, addToast, handleUpdateProject, t, setActiveProjectId } = useAppContext();
+    const { user, consumeCredits, addToast, handleUpdateProject, t, setActiveProjectId, lockAndExecute } = useAppContext();
     const [loading, setLoading] = useState<{ seo?: boolean, thumbnails?: boolean, promotion?: boolean }>({});
     const [isPublishing, setIsPublishing] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -36,7 +34,7 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
         addToast("Title, description, and tags copied!", 'success');
     };
 
-    const handleGenerateSeo = async () => {
+    const handleGenerateSeo = () => lockAndExecute(async () => {
         if (!project.script || !project.title) return;
         if (!await consumeCredits(1)) return;
         setLoading({ seo: true });
@@ -49,9 +47,9 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
         } finally {
             setLoading({});
         }
-    };
+    });
     
-    const handleGenerateThumbnails = async () => {
+    const handleGenerateThumbnails = () => lockAndExecute(async () => {
         if (!project.title || !user) return;
         if (!await consumeCredits(4)) return; // Generate 2 images for 4 credits
         setLoading({ thumbnails: true });
@@ -64,9 +62,9 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
         } finally {
             setLoading({});
         }
-    };
+    });
 
-    const handleGeneratePromotion = async () => {
+    const handleGeneratePromotion = () => lockAndExecute(async () => {
         if (!project.title) return;
         if (!await consumeCredits(1)) return;
         setLoading({ promotion: true });
@@ -79,33 +77,39 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
         } finally {
             setLoading({});
         }
-    };
+    });
 
-    const handlePublishToYouTube = async () => {
+    const handlePublishToYouTube = () => lockAndExecute(async () => {
+        // The project.publishedUrl here is the URL to the video file in Supabase storage,
+        // which was set during the "Assemble & Analyze" step.
         if (!project.publishedUrl || !project.launchPlan?.thumbnails?.[0] || !project.launchPlan?.seo || !project.title) {
-            addToast("Missing required assets for publishing.", 'error');
+            addToast("Missing video file, SEO, or thumbnail for publishing.", 'error');
             return;
         }
         setIsPublishing(true);
-        // --- SIMULATION ---
-        // In a real application, this would call a secure backend function:
-        // await supabaseService.publishToYouTube(project.id);
-        // That function would handle the multi-step YouTube API upload process.
-        // For this demo, we simulate the process.
-        await new Promise(resolve => setTimeout(resolve, 4000));
-        
-        const fakeVideoId = Math.random().toString(36).substring(2, 13);
-        const publishedUrl = `https://www.youtube.com/watch?v=${fakeVideoId}`;
-        
-        await handleUpdateProject({
-            id: project.id,
-            status: 'Published',
-            publishedUrl: publishedUrl,
-        });
+        try {
+            const videoUrl = await publishVideo(
+                project.id, 
+                project.publishedUrl,
+                project.title,
+                project.launchPlan.seo.description,
+                project.launchPlan.seo.tags,
+                project.launchPlan.thumbnails[0]
+            );
+            
+            await handleUpdateProject({
+                id: project.id,
+                status: 'Published',
+                publishedUrl: videoUrl, // This now stores the final YouTube URL.
+            });
 
-        addToast("Video successfully published to YouTube!", 'success');
-        setIsPublishing(false);
-    };
+            addToast("Video successfully published to YouTube!", 'success');
+        } catch (e) {
+            addToast(`YouTube publish failed: ${getErrorMessage(e)}`, 'error');
+        } finally {
+            setIsPublishing(false);
+        }
+    });
 
     const isPublishingDisabled = isPublishing || !project.publishedUrl || !project.launchPlan?.thumbnails?.[0] || !project.launchPlan?.seo || !project.title;
 
@@ -203,7 +207,7 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
                      <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700 space-y-4">
                         <h3 className="text-2xl font-bold text-white">Direct Publishing</h3>
                         {user?.youtubeConnected ? (
-                             project.status === 'Published' && project.publishedUrl ? (
+                             project.status === 'Published' && project.publishedUrl && project.publishedUrl.includes('youtube.com') ? (
                                 <div className="text-center animate-fade-in-up">
                                     <CheckCircleIcon className="w-16 h-16 mx-auto text-green-400 mb-4" />
                                     <h4 className="text-lg font-bold text-white">Published!</h4>
@@ -212,7 +216,7 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
                                     </a>
                                 </div>
                             ) : (
-                                <button onClick={handlePublishToYouTube} disabled={isPublishingDisabled} className="w-full inline-flex items-center justify-center px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-full transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed" title={isPublishingDisabled ? "Generate all assets (SEO, Thumbnails) and connect YouTube to enable publishing" : ""}>
+                                <button onClick={handlePublishToYouTube} disabled={isPublishingDisabled} className="w-full inline-flex items-center justify-center px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-full transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed" title={isPublishingDisabled ? "Assemble video, generate SEO & Thumbnails in the Creative Studio to enable" : ""}>
                                     <YouTubeIcon className="w-5 h-5 mr-2" />
                                     {isPublishing ? "Publishing..." : "Publish to YouTube"}
                                 </button>

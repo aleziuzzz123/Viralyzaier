@@ -97,7 +97,7 @@ const BlueprintResult: React.FC<BlueprintResultProps> = ({ blueprint, project, o
 
 
 const BlueprintStep: React.FC<BlueprintStepProps> = ({ project, onBlueprintAccepted }) => {
-    const { t, consumeCredits, addToast, handleUpdateProject, setPrefilledBlueprintPrompt, prefilledBlueprintPrompt } = useAppContext();
+    const { t, consumeCredits, addToast, handleUpdateProject, setPrefilledBlueprintPrompt, prefilledBlueprintPrompt, brandIdentities } = useAppContext();
     const [activeTab, setActiveTab] = useState<'topic' | 'competitor' | 'trend'>('topic');
     const [topic, setTopic] = useState(prefilledBlueprintPrompt || project.topic);
     const [isLoading, setIsLoading] = useState(false);
@@ -130,9 +130,15 @@ const BlueprintStep: React.FC<BlueprintStepProps> = ({ project, onBlueprintAccep
         setProgress([]);
 
         try {
-            const bp = await generateVideoBlueprint(topic, project.platform, selectedStyle, (msg) => {
-                setProgress(prev => [...prev, msg]);
-            });
+            const activeBrandIdentity = brandIdentities.find(b => b.id === project.activeBrandIdentityId);
+            const bp = await generateVideoBlueprint(
+                topic, 
+                project.platform, 
+                selectedStyle, 
+                (msg) => { setProgress(prev => [...prev, msg]); },
+                project.desiredLengthInSeconds,
+                activeBrandIdentity
+            );
             setBlueprint(bp);
         } catch (e) {
             const errorMessage = getErrorMessage(e);
