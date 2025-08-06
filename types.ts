@@ -1,3 +1,4 @@
+
 export type PlanId = 'free' | 'pro' | 'viralyzaier';
 export type ScriptGoal = 'educate' | 'subscribe' | 'sell' | 'entertain';
 export type Platform = 'youtube_long' | 'youtube_short' | 'tiktok' | 'instagram';
@@ -226,16 +227,47 @@ export interface User {
     cloned_voices: ClonedVoice[];
 }
 
+export interface SubtitleWord {
+  word: string;
+  start: number; // in ms, relative to subtitle start
+  end: number; // in ms, relative to subtitle start
+  style?: { // Optional override for this word
+      fontWeight?: number;
+      color?: string;
+      isItalic?: boolean;
+  };
+}
+
 export interface Subtitle {
     id: string;
     text: string;
-    start: number;
-    end: number;
+    start: number; // in seconds
+    end: number; // in seconds
     style: {
-        color: string;
-        backgroundColor: string;
+        fontFamily: string;
+        fontSize: number; // px
+        fontWeight: number;
+        letterSpacing: number; // px
+        lineHeight: number; // multiplier
+        outline?: {
+            color: string;
+            width: number; // px
+        };
+        shadow?: {
+            color: string;
+            blur: number; // px
+            offsetX: number; // px
+            offsetY: number; // px
+        };
+        fill: {
+            type: 'color' | 'gradient' | 'texture';
+            color: string;
+            gradient?: { start: string; end: string; angle: number; };
+            texture?: string; // URL to texture image
+        };
+        backgroundColor: string; // For the backing box
     };
-    words?: { word: string; start: number; end: number }[];
+    words?: SubtitleWord[];
     isEditing?: boolean;
 }
 
@@ -243,17 +275,59 @@ export interface Subtitle {
 export interface TimelineClip {
     id: string;
     type: 'video' | 'image' | 'audio' | 'text';
-    url: string; // Source URL
-    sceneIndex: number; // Link back to the original script scene
-    startTime: number; // Start time on the track in seconds
-    endTime: number; // End time on the track in seconds
-    sourceDuration: number; // Original duration of the asset
-    motionEffect?: 'zoom-in' | 'pan-left';
+    url: string;
+    sceneIndex: number;
+    startTime: number;
+    endTime: number;
+    sourceDuration: number;
+    // --- Layout & Composition ---
+    positioning?: {
+        width: number; // percentage
+        height: number; // percentage
+        x: number; // percentage from left
+        y: number; // percentage from top
+        zIndex?: number;
+    };
+    // --- VFX & Animation Hub ---
+    animation?: {
+        in?: 'fade' | 'slide' | 'rise' | 'bounce' | 'pulse';
+        out?: 'fade' | 'slide' | 'rise';
+    };
+    transition?: { // Applied at the START of the clip
+        type: 'glitch' | 'whip_pan' | 'film_burn' | 'luma_fade' | 'page_peel';
+        duration: number; // in seconds
+    };
+    aiEffects?: {
+        backgroundRemoved?: boolean;
+        retouch?: boolean;
+        objectRemoved?: string;
+    };
+    effects?: {
+        kenBurns?: { direction: 'in' | 'out'; };
+    };
+    // --- Color & Audio Studio ---
+    color?: {
+      lut?: 'cancun' | 'vintage' | 'noir' | 'cyberpunk' | 'corporate';
+      adjustments?: {
+        exposure: number; // -100 to 100
+        contrast: number; // -100 to 100
+        saturation: number; // -100 to 100
+        temperature: number; // -100 to 100
+      }
+    };
+    audio?: {
+      enhance?: boolean;
+      voicePreset?: 'podcast' | 'cinematic' | 'radio' | 'robot';
+    };
+    // --- Existing ---
+    volume?: number;
+    text?: string;
+    style?: { [key: string]: string | number };
 }
 
 export interface TimelineTrack {
     id: string;
-    type: 'a-roll' | 'b-roll' | 'voiceover' | 'music' | 'sfx' | 'text';
+    type: 'a-roll' | 'b-roll' | 'voiceover' | 'music' | 'sfx' | 'text' | 'overlay';
     clips: TimelineClip[];
 }
 
@@ -289,12 +363,15 @@ export interface Project {
     voiceoverVoiceId: string | null;
     last_performance_check: string | null;
     timeline: TimelineState | null;
-    activeBrandIdentityId?: string | null;
-    style: VideoStyle | null;
-    desiredLengthInSeconds: number;
 }
 
-export type Json = string | number | boolean | null | { [key: string]: any } | any[];
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
 
 export interface Database {
   public: {
@@ -356,9 +433,6 @@ export interface Database {
           voiceover_voice_id: string | null
           last_performance_check: string | null
           timeline: Json | null
-          active_brand_identity_id: string | null
-          style: string | null
-          desired_length_in_seconds: number
         }
         Insert: {
           id?: string
@@ -384,9 +458,6 @@ export interface Database {
           voiceover_voice_id?: string | null
           last_performance_check?: string | null
           timeline?: Json | null
-          active_brand_identity_id?: string | null
-          style?: string | null
-          desired_length_in_seconds?: number
         }
         Update: {
           id?: string
@@ -412,9 +483,6 @@ export interface Database {
           voiceover_voice_id?: string | null
           last_performance_check?: string | null
           timeline?: Json | null
-          active_brand_identity_id?: string | null
-          style?: string | null
-          desired_length_in_seconds?: number
         }
       }
       notifications: {
@@ -511,6 +579,30 @@ export interface Database {
             target_audience?: string
             channel_mission?: string
             logo_url?: string | null
+        }
+      }
+      video_jobs: {
+        Row: {
+          id: string
+          project_id: string
+          user_id: string
+          status: string
+          job_payload: Json
+          created_at: string
+          output_url: string | null
+          error_message: string | null
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          user_id: string
+          status: string
+          job_payload: Json
+        }
+        Update: {
+          status?: string
+          output_url?: string | null
+          error_message?: string | null
         }
       }
     }

@@ -1,45 +1,60 @@
 // A robust utility to extract a readable message from any error type.
 export const getErrorMessage = (error: unknown): string => {
-    // Start with a fallback message
-    let message = 'An unknown error occurred.';
+    // Default fallback message
+    const fallbackMessage = 'An unknown error occurred. Please check the console for details.';
 
-    if (error instanceof Error) {
-        // Standard JavaScript errors, including Supabase errors
-        message = error.message;
-    } else if (typeof error === 'string' && error.length > 0) {
-        // Plain string errors
-        message = error;
-    } else if (error && typeof error === 'object') {
-        // Handles other objects with a 'message' property
-        if ('message' in error && typeof (error as any).message === 'string' && (error as any).message) {
-            message = (error as any).message;
-        } else {
-            // If no message property, try to stringify
-            try {
-                const str = JSON.stringify(error);
-                if (str !== '{}') {
-                    message = str;
-                }
-            } catch {
-                // Ignore stringify errors, fallback message will be used
-            }
+    if (!error) {
+        return fallbackMessage;
+    }
+
+    // Handle Supabase/Postgrest errors (which are objects, not Error instances)
+    if (typeof error === 'object' && 'message' in error && typeof (error as any).message === 'string') {
+        const err = error as { message: string; details?: string; hint?: string };
+        let fullMessage = err.message;
+        if (err.details) {
+            fullMessage += ` Details: ${err.details}`;
         }
+        if (err.hint) {
+            fullMessage += ` Hint: ${err.hint}`;
+        }
+        return fullMessage;
+    }
+
+    // Handle standard JavaScript Error objects
+    if (error instanceof Error) {
+        return error.message;
+    }
+
+    // Handle strings
+    if (typeof error === 'string' && error.length > 0) {
+        return error;
     }
     
-    // Append extra Supabase details if they exist on the object
-    if (error && typeof error === 'object') {
-        if ('details' in error && typeof (error as any).details === 'string' && (error as any).details) {
-            message += ` (${(error as any).details})`;
+    // As a last resort, try to stringify the object
+    try {
+        const str = JSON.stringify(error);
+        if (str !== '{}') {
+            return str;
         }
-        if ('hint' in error && typeof (error as any).hint === 'string' && (error as any).hint) {
-            message += ` Hint: ${(error as any).hint}`;
-        }
+    } catch {
+        // Fall through to the default fallback if stringify fails
     }
 
-    // Final sanity check to prevent "[object Object]"
-    if (message === '[object Object]') {
-        return 'An unknown object error occurred. Please check the console for details.';
-    }
+    return fallbackMessage;
+};
 
-    return message;
+// Converts a base64 string to a Blob object, which is safer for uploads.
+export const base64ToBlob = (base64: string, contentType: string = ''): Blob => {
+    const byteCharacters = atob(base64);
+    const byteArrays = [];
+    for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+        const slice = byteCharacters.slice(offset, offset + 512);
+        const byteNumbers = new Array(slice.length);
+        for (let i = 0; i < slice.length; i++) {
+            byteNumbers[i] = slice.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        byteArrays.push(byteArray);
+    }
+    return new Blob(byteArrays, { type: contentType });
 };

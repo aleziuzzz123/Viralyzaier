@@ -2,14 +2,27 @@ import { Type } from "@google/genai";
 import { TrendData } from '../types';
 import { invokeEdgeFunction } from './supabaseService';
 
-const parseGeminiJson = <T>(res: { text: string }, fallback: T | null = null): T => {
+const parseGeminiJson = <T>(res: { text: string | null | undefined }, fallback: T | null = null): T => {
     try {
-        const text = res.text.trim().replace(/^```json/, '').replace(/```$/, '').trim();
-        return JSON.parse(text) as T;
+        const rawText = res.text || '';
+        if (!rawText.trim()) {
+            if (fallback) return fallback;
+            throw new Error("AI returned an empty response.");
+        }
+        // This is a more robust way to find JSON in a string that might have other text.
+        const jsonMatch = rawText.match(/```json\n([\s\S]*?)\n```|({[\s\S]*})|(\[[\s\S]*\])/);
+        if (jsonMatch) {
+            const jsonString = jsonMatch[1] || jsonMatch[2] || jsonMatch[3];
+            if (jsonString) {
+                return JSON.parse(jsonString) as T;
+            }
+        }
+        // Fallback for cases where the string is just the JSON object without markers
+        return JSON.parse(rawText) as T;
     } catch (e) {
         console.error("Failed to parse Gemini JSON response:", res.text, e);
-        if (fallback !== null) return fallback as T;
-        throw new Error("AI returned invalid data format.");
+        if (fallback) return fallback;
+        throw new Error("AI returned invalid data format or no JSON was found.");
     }
 };
 
@@ -56,7 +69,7 @@ const trendDataSchema = {
 export const fetchTrends = async (keyword: string): Promise<TrendData> => {
     const prompt = `You are a Google Trends data simulator. Based on your training data, simulate the Google Trends for the keyword "${keyword}" over the last 30 days. Provide a plausible-looking interest graph (30 data points), top related queries (5), and breakout queries (5) that seem realistic for this topic.`;
 
-    const response = await invokeEdgeFunction('gemini-proxy', {
+    const response = await invokeEdgeFunction<{ text: string }>('gemini-proxy', {
         type: 'generateContent',
         params: {
             model: 'gemini-2.5-flash',

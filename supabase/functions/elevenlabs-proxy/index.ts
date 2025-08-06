@@ -69,14 +69,32 @@ serve(async (req: Request) => {
       body: requestBody,
     });
 
-    if (!elevenLabsResponse.ok) {
-      const errorBody = await elevenLabsResponse.json();
-      const errorMessage = errorBody.detail?.message || `ElevenLabs API Error: ${elevenLabsResponse.statusText}`;
-      console.error("ElevenLabs API Error:", errorBody);
+    const contentType = elevenLabsResponse.headers.get('Content-Type');
+
+    // ** CRITICAL FIX **
+    // A successful response MUST have the 'audio/mpeg' content type.
+    // APIs sometimes return 200 OK with a JSON or HTML error body. This catches that.
+    if (!elevenLabsResponse.ok || !contentType || !contentType.includes('audio/mpeg')) {
+      let errorBodyText = await elevenLabsResponse.text();
+      let errorMessage = `ElevenLabs API Error: ${elevenLabsResponse.statusText}. Response: ${errorBodyText.substring(0, 200)}`;
+      try {
+        const errorJson = JSON.parse(errorBodyText);
+        errorMessage = errorJson.detail?.message || JSON.stringify(errorJson.detail) || errorMessage;
+      } catch (e) {
+        // Not a JSON error, use the text.
+      }
+      console.error("ElevenLabs API Error:", errorMessage);
       throw new Error(errorMessage);
     }
-
+    
     const audioBlob = await elevenLabsResponse.blob();
+
+    // Robustness check: Ensure the blob is not empty.
+    if (audioBlob.size < 100) {
+        console.error("ElevenLabs returned a very small/empty audio file. Size:", audioBlob.size);
+        throw new Error("AI audio generation failed: The returned file was empty or invalid.");
+    }
+    
     return new Response(audioBlob, {
       headers: { ...corsHeaders, 'Content-Type': 'audio/mpeg' },
       status: 200,

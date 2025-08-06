@@ -55,7 +55,7 @@ export const createCheckoutSession = async (planId: PlanId): Promise<{ checkoutU
     
     // Pass the client's origin in the body for the function to use.
     // This is more reliable than depending on the Origin header.
-    const data = await supabase.invokeEdgeFunction('stripe-checkout', { 
+    const data = await supabase.invokeEdgeFunction<{ checkoutUrl: string }>('stripe-checkout', { 
         planId,
         origin: window.location.origin,
     });

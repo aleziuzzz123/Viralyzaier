@@ -5,7 +5,7 @@ import { invokeEdgeFunction } from './supabaseService';
 // It no longer contains any AI simulation logic.
 
 export const fetchChannelStats = async (): Promise<ChannelStats> => {
-    const data = await invokeEdgeFunction('youtube-api-proxy', {
+    const data = await invokeEdgeFunction<{ items: any[] }>('youtube-api-proxy', {
         endpoint: 'channels',
         params: {
             part: 'snippet,statistics',
@@ -40,7 +40,7 @@ export const fetchVideoPerformance = async (videoId: string): Promise<VideoPerfo
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const startDate = thirtyDaysAgo.toISOString().split('T')[0];
 
-    const data = await invokeEdgeFunction('youtube-api-proxy', {
+    const data = await invokeEdgeFunction<{ rows: any[][] }>('youtube-api-proxy', {
         endpoint: 'reports',
         isAnalytics: true,
         params: {
@@ -75,7 +75,7 @@ export const fetchVideoPerformance = async (videoId: string): Promise<VideoPerfo
 };
 
 export const fetchChannelVideos = async (): Promise<{id: string, title: string, views: number, likes: number, comments: number}[]> => {
-    const searchData = await invokeEdgeFunction('youtube-api-proxy', {
+    const searchData = await invokeEdgeFunction<{ items: any[] }>('youtube-api-proxy', {
         endpoint: 'search',
         params: {
             part: 'snippet',
@@ -92,7 +92,7 @@ export const fetchChannelVideos = async (): Promise<{id: string, title: string, 
     
     const videoIds = searchData.items.map((item: any) => item.id.videoId).join(',');
 
-    const videoDetailsData = await invokeEdgeFunction('youtube-api-proxy', {
+    const videoDetailsData = await invokeEdgeFunction<{ items: any[] }>('youtube-api-proxy', {
         endpoint: 'videos',
         params: {
             part: 'snippet,statistics',
@@ -121,7 +121,7 @@ export const publishVideo = async (
     tags: string[],
     thumbnailUrl: string
 ): Promise<string> => {
-    const { videoUrl } = await invokeEdgeFunction('youtube-publish', {
+    const { videoUrl } = await invokeEdgeFunction<{ videoUrl: string }>('youtube-publish', {
         projectId,
         videoFileUrl,
         title,

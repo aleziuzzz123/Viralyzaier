@@ -149,7 +149,7 @@ serve(async (req: Request) => {
                 model: 'gemini-2.5-flash',
                 contents: `A YouTube video titled "${project.title}" has seen its view count jump from ${oldViews} to ${newViews}! Write a short, exciting notification message for the creator celebrating this milestone.`
             });
-            const notificationMessage = response.text;
+            const notificationMessage = response.text ?? '';
             
             await supabaseAdmin.from('notifications').insert({
                 user_id: project.user_id,

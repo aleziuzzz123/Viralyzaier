@@ -1,5 +1,6 @@
 import { Platform, SceneAssets } from "../types";
 import { invokeEdgeFunction } from './supabaseService';
+import { base64ToBlob } from '../utils';
 
 // This service is now secure. API keys are handled by backend proxy functions.
 // We only need to check if the function endpoints are available to the user.
@@ -54,11 +55,18 @@ export const generateAnimatedImage = async (prompt: string, platform: Platform):
         }
     });
 
+    if (!imageResponse.generatedImages || imageResponse.generatedImages.length === 0 || !imageResponse.generatedImages[0].image?.imageBytes) {
+        throw new Error("AI image generation failed: The model returned an empty response, possibly due to safety filters.");
+    }
+
     const base64ImageBytes = imageResponse.generatedImages[0].image.imageBytes;
-    const imageDataUrl = `data:image/jpeg;base64,${base64ImageBytes}`;
-    
-    const res = await fetch(imageDataUrl);
-    return await res.blob();
+    const imageBlob = base64ToBlob(base64ImageBytes, 'image/jpeg');
+
+    if (imageBlob.size < 1000) { // Check if the blob is too small (e.g., < 1KB)
+        throw new Error("AI image generation failed: The returned image file was empty or invalid.");
+    }
+
+    return imageBlob;
 };
 
 
