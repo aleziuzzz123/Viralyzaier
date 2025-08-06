@@ -9,7 +9,12 @@ interface ChannelIntelligenceProps {
     project: Project;
 }
 
-const StatCard: React.FC<{ label: string; value: string | number; }> = ({ label, value }) => (
+interface StatCardProps {
+    label: string;
+    value: string | number;
+}
+
+const StatCard: React.FC<StatCardProps> = ({ label, value }) => (
     <div className="bg-gray-800/70 p-4 rounded-lg">
         <p className="text-sm text-gray-400">{label}</p>
         <p className="text-2xl font-bold text-white">{typeof value === 'number' ? value.toLocaleString() : value}</p>

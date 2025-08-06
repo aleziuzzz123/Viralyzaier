@@ -11,7 +11,11 @@ interface CalendarProps {
 const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
 const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay();
 
-const ParsedSuggestion: React.FC<{ text: string }> = ({ text }) => {
+interface ParsedSuggestionProps {
+    text: string;
+}
+
+const ParsedSuggestion: React.FC<ParsedSuggestionProps> = ({ text }) => {
     const parts = text.split(/(\*\*.*?\*\*)/g);
     return (
         <p className="text-gray-300 text-lg">

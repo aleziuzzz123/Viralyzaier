@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { PhotoIcon, MicIcon, ClipboardCopyIcon } from './Icons';
@@ -19,17 +20,17 @@ const AssetLibrary: React.FC = () => {
             if (!project.assets) return [];
             return Object.entries(project.assets).flatMap(([sceneIndex, sceneAssets]) => {
                 const assets: FlatAsset[] = [];
-                if (sceneAssets.brollVideo) {
+                if (sceneAssets.visualUrl) {
                     assets.push({
-                        url: sceneAssets.brollVideo,
-                        type: 'video',
+                        url: sceneAssets.visualUrl,
+                        type: 'video', // Note: This assumes all visuals in the library are videos.
                         projectName: project.name,
                         scene: parseInt(sceneIndex) + 1,
                     });
                 }
-                if (sceneAssets.audio) {
+                if (sceneAssets.voiceoverUrl) {
                     assets.push({
-                        url: sceneAssets.audio,
+                        url: sceneAssets.voiceoverUrl,
                         type: 'audio',
                         projectName: project.name,
                         scene: parseInt(sceneIndex) + 1,

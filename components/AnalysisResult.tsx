@@ -24,7 +24,12 @@ interface AnalysisResultProps {
   onProceedToLaunchpad: () => void;
 }
 
-const ScoreGauge: React.FC<{ score: number, t: (key: string) => string }> = ({ score, t }) => {
+interface ScoreGaugeProps {
+  score: number;
+  t: (key: string) => string;
+}
+
+const ScoreGauge: React.FC<ScoreGaugeProps> = ({ score, t }) => {
     const getScoreColor = (s: number) => {
         if (s >= 85) return '#22c55e'; // green-500
         if (s >= 70) return '#84cc16'; // lime-500
@@ -98,7 +103,14 @@ const ScoreGauge: React.FC<{ score: number, t: (key: string) => string }> = ({ s
     );
 };
 
-const DetailGauge: React.FC<{ icon: React.ReactNode, label: string, score: number, t: (key: string) => string }> = ({ icon, label, score, t }) => {
+interface DetailGaugeProps {
+  icon: React.ReactNode;
+  label: string;
+  score: number;
+  t: (key: string) => string;
+}
+
+const DetailGauge: React.FC<DetailGaugeProps> = ({ icon, label, score, t }) => {
     const displayScore = score;
     
     const getScoreColor = (s: number) => {
@@ -139,7 +151,13 @@ const DetailGauge: React.FC<{ icon: React.ReactNode, label: string, score: numbe
     );
 };
 
-const ImprovementItem: React.FC<{ suggestion: string, reason: string, t: (key: string) => string }> = ({ suggestion, reason, t }) => (
+interface ImprovementItemProps {
+  suggestion: string;
+  reason: string;
+  t: (key: string) => string;
+}
+
+const ImprovementItem: React.FC<ImprovementItemProps> = ({ suggestion, reason, t }) => (
   <li className="flex items-start group p-3 rounded-lg hover:bg-gray-900/50 transition-colors duration-200">
       <LightBulbIcon className="w-5 h-5 mr-4 mt-1 text-yellow-300 flex-shrink-0" />
       <div className="flex-1">

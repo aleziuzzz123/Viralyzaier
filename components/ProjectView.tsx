@@ -1,19 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Project, Analysis, Script as ScriptType, WorkflowStep, Platform } from '../types';
-import { TitleIcon, ScriptIcon, SparklesIcon, TrashIcon, PhotoIcon, CtaIcon, LockClosedIcon, CheckIcon, YouTubeIcon, TikTokIcon, InstagramIcon, MusicNoteIcon, RocketLaunchIcon, TrendIcon, TargetIcon, CheckBadgeIcon, LightBulbIcon } from './Icons';
-import TitleOptimizer from './TitleOptimizer';
+import { Project, Script as ScriptType, WorkflowStep, Platform, Blueprint } from '../types';
+import { TitleIcon, ScriptIcon, SparklesIcon, TrashIcon, PhotoIcon, CtaIcon, LockClosedIcon, CheckIcon, YouTubeIcon, TikTokIcon, InstagramIcon, MusicNoteIcon, RocketLaunchIcon, CheckBadgeIcon, LightBulbIcon, MagicWandIcon } from './Icons';
 import ScriptGenerator from './ScriptGenerator';
-import AnalysisResult from './AnalysisResult';
-import VideoUploader from './VideoUploader';
-import AssetStudio from './AssetStudio';
-import Storyboard from './Storyboard';
 import Launchpad from './Launchpad';
 import TutorialCallout from './TutorialCallout';
-import { analyzeVideo } from '../services/geminiService';
 import { useAppContext } from '../contexts/AppContext';
-import CompetitorAnalysis from './CompetitorAnalysis';
-import TrendExplorer from './TrendExplorer';
-import AnalysisLoader from './AnalysisLoader';
+import BlueprintStep from './BlueprintStep';
+import FinalEditStep from './FinalEditStep';
+import * as supabaseService from '../services/supabaseService';
+import { getErrorMessage } from '../utils';
 
 interface ProjectViewProps {
     project: Project;
@@ -26,13 +21,15 @@ const platformIcons: { [key in Platform]: React.FC<{className?: string}> } = {
     instagram: InstagramIcon,
 };
 
-const ProjectStepper: React.FC<{
+interface ProjectStepperProps {
     steps: { name: string; icon: React.ElementType }[];
     currentStep: number;
     unlockedStep: number;
     onStepSelect: (step: number) => void;
     t: (key: string) => string;
-}> = ({ steps, currentStep, unlockedStep, onStepSelect, t }) => {
+}
+
+const ProjectStepper: React.FC<ProjectStepperProps> = ({ steps, currentStep, unlockedStep, onStepSelect, t }) => {
     return (
         <nav aria-label="Progress">
             <ol role="list" className="flex items-center">
@@ -96,112 +93,27 @@ const ProjectStepper: React.FC<{
 };
 
 const workflowSteps = [
-    { name: 'project_view.stepper_strategy', icon: TitleIcon },
-    { name: 'project_view.stepper_script', icon: ScriptIcon },
-    { name: 'project_view.stepper_assets', icon: PhotoIcon },
-    { name: 'project_view.stepper_storyboard', icon: MusicNoteIcon },
-    { name: 'project_view.stepper_analysis', icon: SparklesIcon },
+    { name: 'project_view.stepper_blueprint', icon: LightBulbIcon },
+    { name: 'project_view.stepper_script_editor', icon: ScriptIcon },
+    { name: 'project_view.stepper_creative_studio', icon: PhotoIcon },
     { name: 'project_view.stepper_launch', icon: RocketLaunchIcon },
 ];
 
-const extractFrames = (videoFile: File): Promise<string[]> => {
-    return new Promise((resolve, reject) => {
-        const video = document.createElement('video');
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        const videoUrl = URL.createObjectURL(videoFile);
-
-        video.src = videoUrl;
-        video.muted = true;
-
-        const frames: string[] = [];
-        const capturePoints = [0.01, 0.3, 0.8]; // Capture at 1%, 30%, 80%
-        let captures = 0;
-
-        video.onloadedmetadata = () => {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-
-            const captureFrameAt = (time: number) => {
-                video.currentTime = time;
-            };
-
-            video.onseeked = () => {
-                if (!context) {
-                    URL.revokeObjectURL(videoUrl);
-                    reject(new Error("Canvas context is not available."));
-                    return;
-                }
-                context.drawImage(video, 0, 0, canvas.width, canvas.height);
-                const frameDataUrl = canvas.toDataURL('image/jpeg', 0.8);
-                frames.push(frameDataUrl);
-                captures++;
-
-                if (captures < capturePoints.length) {
-                    captureFrameAt(video.duration * capturePoints[captures]);
-                } else {
-                    URL.revokeObjectURL(videoUrl);
-                    resolve(frames);
-                }
-            };
-
-            video.onerror = (e) => {
-                URL.revokeObjectURL(videoUrl);
-                reject(new Error("Error loading video for frame extraction."));
-            };
-
-            // Start the process
-            video.currentTime = video.duration * capturePoints[0];
-        };
-        
-        video.load();
-    });
-};
-
-
 const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
     const { 
-        handleUpdateProject, handleDeleteProject, consumeCredits, 
-        dismissedTutorials, addToast, t
+        handleUpdateProject, handleDeleteProject, 
+        dismissedTutorials, addToast, t, user
     } = useAppContext();
     
     const [projectName, setProjectName] = useState(project.name);
     const [isNameSaved, setIsNameSaved] = useState(false);
     const [activeStep, setActiveStep] = useState<WorkflowStep>(project.workflowStep);
-    const [activeStrategyTab, setActiveStrategyTab] = useState<'topic' | 'competitor' | 'trend'>('topic');
-
-    // State for the Analysis tab
-    const [videoFile, setVideoFile] = useState<File | null>(null);
-    const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
-    const [analysisIsLoading, setAnalysisIsLoading] = useState<boolean>(false);
-    const [analysisError, setAnalysisError] = useState<string | null>(null);
-    const [analysisFrames, setAnalysisFrames] = useState<string[]>([]);
-
-
-    const handleFileSelect = (file: File) => {
-        setVideoFile(file);
-        setAnalysisError(null);
-    };
     
     useEffect(() => {
-        // Reset state if project changes
         setProjectName(project.name);
-        setVideoFile(null);
-        setAnalysisError(null);
-        setAnalysisIsLoading(false);
         setActiveStep(project.workflowStep);
-        setActiveStrategyTab('topic');
-    }, [project.id, project.workflowStep]);
+    }, [project.id, project.workflowStep, project.name]);
 
-    useEffect(() => {
-        if (!videoFile) {
-            setVideoPreviewUrl(null);
-            return;
-        }
-        const objectUrl = URL.createObjectURL(videoFile);
-        setVideoPreviewUrl(objectUrl);
-        return () => URL.revokeObjectURL(objectUrl);
-    }, [videoFile]);
 
     const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setProjectName(e.target.value);
@@ -218,199 +130,62 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
     };
     
     const advanceWorkflow = (toStep: WorkflowStep) => {
-        if (project.workflowStep < toStep) {
-            handleUpdateProject({ id: project.id, workflowStep: toStep });
+        const newStep = Math.max(project.workflowStep, toStep) as WorkflowStep;
+        if (project.workflowStep < newStep) {
+            handleUpdateProject({ id: project.id, workflowStep: newStep });
         }
         setActiveStep(toStep);
     };
 
-    const handleTitleSelect = (title: string) => {
-        const updates: Partial<Project> & { id: string } = { id: project.id, title: title };
-
-        const isFirstCompletion = project.workflowStep < 2;
-        if (isFirstCompletion) {
-            updates.workflowStep = 2;
-        }
-
-        handleUpdateProject(updates).then(() => {
-            // After the project state is updated, advance the UI
-            if (isFirstCompletion) {
-                addToast(t('toast.brief_complete'), 'success');
-                setActiveStep(2); // Automatically move to the next step
-            } else {
-                addToast(t('toast.topic_title_updated'), 'success');
-            }
-        });
-    };
-
-    const handleTrendSelect = (trend: string) => {
-        handleUpdateProject({ id: project.id, topic: trend });
-        addToast("Project topic updated from trend! Now, optimize titles for it.", 'success');
-        // Guide user back to the title optimizer for a seamless workflow
-        setActiveStrategyTab('topic');
-    };
-    
-    const handleScriptGenerated = (script: ScriptType) => {
-        handleUpdateProject({id: project.id, script, status: 'Scripting', workflowStep: 3 }).then(() => {
-            setActiveStep(3); // Automatically move to the next step
-        });
-    };
-
-    const handleAnalysisComplete = (analysis: Analysis | null) => {
-         handleUpdateProject({id: project.id, analysis }).then(() => {
-             if (analysis) {
-                 advanceWorkflow(6); // Go to launchpad on success
-             }
-         });
-    };
-    
-    const handleTopicChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        handleUpdateProject({ id: project.id, topic: e.target.value });
-    };
-    
-    const handleAnalyzeClick = React.useCallback(async () => {
-        if (!project.title) {
-            setAnalysisError(t('project_view.analysis.error_title_missing'));
-            return;
-        }
-        if (!videoFile) {
-          setAnalysisError(t('project_view.analysis.error_file_missing'));
-          return;
-        }
-        if (!await consumeCredits(5)) return; // Multimodal analysis is more expensive
-        
-        setAnalysisIsLoading(true);
-        setAnalysisError(null);
-        setAnalysisFrames([]); // Reset frames for loader
-
+    const handleBlueprintAccepted = async (blueprint: Blueprint, selectedTitle: string) => {
+        if (!user) return;
         try {
-            const frames = await extractFrames(videoFile);
-            setAnalysisFrames(frames); // Set frames so the cool loader can render
-            const result = await analyzeVideo(frames, project.title!, project.platform);
-            handleAnalysisComplete(result);
-        } catch (e: unknown) {
-            setAnalysisError(e instanceof Error ? e.message : t('project_view.analysis.error_unknown'));
-            handleAnalysisComplete(null);
-        } finally {
-            setAnalysisIsLoading(false);
-        }
-    }, [videoFile, project, consumeCredits, handleAnalysisComplete, project.title, project.platform, t]);
+             // Upload moodboard images and get URLs
+            const moodboardUrls = await Promise.all(
+                blueprint.moodboard.map(async (base64Img, index) => {
+                    const blob = await supabaseService.dataUrlToBlob(base64Img);
+                    const path = `${user.id}/${project.id}/moodboard_${index}.jpg`;
+                    return supabaseService.uploadFile(blob, path);
+                })
+            );
+            
+            // Update project with all blueprint data
+            await handleUpdateProject({
+                id: project.id,
+                title: selectedTitle,
+                name: selectedTitle, // Also update project name
+                script: blueprint.script,
+                moodboard: moodboardUrls,
+                competitorAnalysis: { // Placeholder since it's part of the same step now
+                    ...project.competitorAnalysis,
+                    videoTitle: project.topic,
+                }
+            });
 
-    const handleAnalysisReset = () => {
-        handleUpdateProject({id: project.id, analysis: null});
-        setVideoFile(null);
-        setVideoPreviewUrl(null);
-        setAnalysisError(null);
-        setActiveStep(5);
+            addToast(t('toast.brief_complete'), 'success');
+            advanceWorkflow(2);
+            
+        } catch (error) {
+             addToast(`Failed to save blueprint: ${getErrorMessage(error)}`, "error");
+        }
+    };
+
+    const handleScriptSaved = (script: ScriptType) => {
+        handleUpdateProject({id: project.id, script, status: 'Scripting' }).then(() => {
+            addToast("Script saved!", "success");
+            advanceWorkflow(3);
+        });
     };
     
     const renderActiveStep = () => {
         switch(activeStep) {
             case 1:
-                const strategyTabs = [
-                    { id: 'topic', name: t('project_view.strategy.from_topic'), icon: TitleIcon },
-                    { id: 'competitor', name: t('project_view.strategy.from_competitor'), icon: TargetIcon },
-                    { id: 'trend', name: t('project_view.strategy.from_trend'), icon: TrendIcon },
-                ];
-                return (
-                    <div className="w-full mx-auto animate-fade-in-up space-y-12">
-                         <header className="text-center">
-                            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-rose-500">Craft Your Strategy</h1>
-                            <p className="mt-4 text-lg text-gray-400 max-w-2xl mx-auto">Start with a topic, reverse-engineer a competitor, or ride a breakout trend.</p>
-                         </header>
-                        
-                         <div className="bg-gray-800/30 p-6 rounded-2xl border border-gray-700 max-w-4xl mx-auto flex items-start gap-4">
-                            <LightBulbIcon className="w-8 h-8 text-yellow-300 flex-shrink-0 mt-1" />
-                            <div>
-                                <h3 className="font-bold text-white">Your Starting Point</h3>
-                                <p className="text-sm text-gray-400 mt-1">A great video starts with a great strategy. Choose one of the three paths below to define your video's direction and create a high-potential title.</p>
-                            </div>
-                        </div>
-
-                         <div className="w-full max-w-5xl mx-auto">
-                            <div className="border-b border-gray-700 mb-8">
-                                <nav className="-mb-px flex justify-center space-x-8" aria-label="Tabs">
-                                    {strategyTabs.map(tab => (
-                                        <button
-                                            key={tab.id}
-                                            onClick={() => setActiveStrategyTab(tab.id as any)}
-                                            className={`${
-                                                activeStrategyTab === tab.id
-                                                    ? 'border-indigo-500 text-indigo-400'
-                                                    : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500'
-                                            } group inline-flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
-                                        >
-                                            <tab.icon className="-ml-0.5 mr-2 h-5 w-5" aria-hidden="true" />
-                                            <span>{tab.name}</span>
-                                        </button>
-                                    ))}
-                                </nav>
-                            </div>
-                            
-                            {activeStrategyTab === 'topic' && (
-                                <div className="w-full max-w-3xl mx-auto space-y-6">
-                                     <div>
-                                        <label htmlFor="topic" className="block text-sm font-bold text-gray-300 mb-2">{t('project_view.brief.topic_label')}</label>
-                                        <input id="topic" type="text" value={project.topic} onChange={handleTopicChange} placeholder={t('project_view.brief.topic_placeholder')} className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                                    </div>
-                                    <TitleOptimizer onTitleSelect={handleTitleSelect} onBack={() => {}} platform={project.platform} />
-                                </div>
-                            )}
-
-                            {activeStrategyTab === 'competitor' && <CompetitorAnalysis project={project} onApplyTitle={handleTitleSelect} />}
-
-                            {activeStrategyTab === 'trend' && <TrendExplorer onTrendSelect={handleTrendSelect} />}
-                         </div>
-                    </div>
-                );
+                return <BlueprintStep project={project} onBlueprintAccepted={handleBlueprintAccepted} />;
             case 2:
-                return <ScriptGenerator project={project} onScriptGenerated={handleScriptGenerated} onProceed={() => setActiveStep(3)} platform={project.platform} />;
+                return <ScriptGenerator project={project} onScriptSaved={handleScriptSaved} />;
             case 3:
-                return <AssetStudio project={project} onProceed={() => setActiveStep(4)} />;
+                return <FinalEditStep project={project} onProceed={() => advanceWorkflow(4)} />;
             case 4:
-                return <Storyboard project={project} onProceed={() => setActiveStep(5)} />;
-            case 5:
-                if (analysisIsLoading) return <AnalysisLoader frames={analysisFrames} />;
-
-                if (project.analysis) {
-                    return <AnalysisResult result={project.analysis} onReset={handleAnalysisReset} videoPreviewUrl={videoPreviewUrl || ''} onProceedToLaunchpad={() => setActiveStep(6)} />;
-                }
-                
-                if (project.workflowStep < 5) {
-                     return (
-                        <div className="text-center py-16 px-6 bg-gray-800/50 rounded-2xl">
-                            <h2 className="text-2xl font-bold text-white mb-3">{t('project_view.analysis.locked_title')}</h2>
-                            <p className="text-gray-400 mb-6 max-w-md mx-auto">{t('project_view.analysis.locked_subtitle')}</p>
-                        </div>
-                    );
-                }
-
-                const isAnalyzeDisabled = analysisIsLoading || !videoFile;
-                return (
-                     <div className="w-full flex flex-col items-center">
-                        <header className="text-center mb-8">
-                            <h1 className="text-3xl font-bold text-white">{t('project_view.analysis.title')}</h1>
-                            <p className="mt-2 text-lg text-gray-400">{t('project_view.analysis.subtitle')}</p>
-                        </header>
-                        {analysisError && <div className="bg-red-500/20 border border-red-500 text-red-300 px-4 py-3 rounded-lg relative mb-6 w-full max-w-lg text-center" role="alert">{analysisError}</div>}
-                        <div className="w-full max-w-lg mx-auto text-center">
-                            <VideoUploader onFileSelect={handleFileSelect} />
-                            {videoFile && (
-                            <div className="mt-6">
-                                <p className="text-gray-300 mb-4">{t('project_view.analysis.selected_file')} <span className="font-semibold text-white">{videoFile.name}</span></p>
-                                {videoPreviewUrl && <video src={videoPreviewUrl} controls className="w-full rounded-lg shadow-lg mx-auto max-h-64"></video>}
-                                <div className="flex items-center justify-center space-x-4 mt-6" title={isAnalyzeDisabled && !videoFile ? "Please upload a video first" : ""}>
-                                    <button onClick={handleAnalyzeClick} disabled={isAnalyzeDisabled} className="inline-flex items-center justify-center px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-full transition-all duration-300 ease-in-out transform hover:scale-105 shadow-lg disabled:bg-gray-500 disabled:cursor-not-allowed">
-                                        <SparklesIcon className="w-6 h-6 mr-3" />
-                                        {t('project_view.analysis.button')}
-                                    </button>
-                                </div>
-                            </div>
-                            )}
-                        </div>
-                    </div>
-                );
-            case 6:
                 return <Launchpad project={project} />;
             default:
                 return <div>Something went wrong.</div>;
@@ -451,7 +226,7 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
             {!dismissedTutorials.includes('workflow') && (
                  <div className="mb-8">
                     <TutorialCallout id="workflow">
-                        {t('project_view.tutorial_callout')}
+                        {t('project_view.tutorial_callout_new')}
                     </TutorialCallout>
                  </div>
              )}

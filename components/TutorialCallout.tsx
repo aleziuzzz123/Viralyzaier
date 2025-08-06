@@ -8,8 +8,12 @@ interface TutorialCalloutProps {
     children: React.ReactNode;
 }
 
+interface ParsedTutorialTextProps {
+    text: string;
+}
+
 // Helper component to parse and style the custom tags in the tutorial text.
-const ParsedTutorialText: React.FC<{ text: string }> = ({ text }) => {
+const ParsedTutorialText: React.FC<ParsedTutorialTextProps> = ({ text }) => {
     // Splits the string by the tags, e.g., "<1>Strategy</1>", keeping the delimiters.
     const parts = text.split(/(<\d+>.*?<\/\d+>)/g).filter(Boolean);
     return (

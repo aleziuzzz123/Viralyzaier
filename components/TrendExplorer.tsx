@@ -9,7 +9,12 @@ interface TrendExplorerProps {
   onTrendSelect: (trend: string) => void;
 }
 
-const TrendChart: React.FC<{ data: InterestPoint[], t: (key: string) => string }> = ({ data, t }) => {
+interface TrendChartProps {
+  data: InterestPoint[];
+  t: (key: string) => string;
+}
+
+const TrendChart: React.FC<TrendChartProps> = ({ data, t }) => {
   if (!data || data.length < 2) return <div className="h-48 flex items-center justify-center text-gray-500">{t('trend_explorer.not_enough_data')}</div>;
   
   const width = 500;
@@ -54,7 +59,15 @@ const TrendChart: React.FC<{ data: InterestPoint[], t: (key: string) => string }
   );
 };
 
-const QueryList: React.FC<{ title: string, queries: RelatedQuery[], icon: React.ReactNode, onSelect: (query: string) => void, t: (key: string) => string }> = ({ title, queries, icon, onSelect, t }) => (
+interface QueryListProps {
+  title: string;
+  queries: RelatedQuery[];
+  icon: React.ReactNode;
+  onSelect: (query: string) => void;
+  t: (key: string) => string;
+}
+
+const QueryList: React.FC<QueryListProps> = ({ title, queries, icon, onSelect, t }) => (
   <div className="bg-gray-800/50 rounded-2xl p-6 shadow-2xl border border-gray-700 h-full">
     <h3 className="flex items-center text-xl font-bold text-white mb-4">
       {icon}

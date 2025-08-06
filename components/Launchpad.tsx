@@ -1,9 +1,11 @@
 
 
+
+
 import React, { useState } from 'react';
 import { Project } from '../types';
 import { generateSeo, analyzeAndGenerateThumbnails, generatePromotionPlan } from '../services/geminiService';
-import { SparklesIcon, ClipboardCopyIcon, DownloadIcon } from './Icons';
+import { SparklesIcon, ClipboardCopyIcon, DownloadIcon, RocketLaunchIcon, YouTubeIcon, CheckCircleIcon } from './Icons';
 import { useAppContext } from '../contexts/AppContext';
 
 interface LaunchpadProps {
@@ -11,8 +13,9 @@ interface LaunchpadProps {
 }
 
 const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
-    const { user, consumeCredits, addToast, handleUpdateProject, t } = useAppContext();
+    const { user, consumeCredits, addToast, handleUpdateProject, t, setActiveProjectId } = useAppContext();
     const [loading, setLoading] = useState<{ seo?: boolean, thumbnails?: boolean, promotion?: boolean }>({});
+    const [isPublishing, setIsPublishing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const copyToClipboard = (text: string) => {
@@ -78,6 +81,35 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
         }
     };
 
+    const handlePublishToYouTube = async () => {
+        if (!project.publishedUrl || !project.launchPlan?.thumbnails?.[0] || !project.launchPlan?.seo || !project.title) {
+            addToast("Missing required assets for publishing.", 'error');
+            return;
+        }
+        setIsPublishing(true);
+        // --- SIMULATION ---
+        // In a real application, this would call a secure backend function:
+        // await supabaseService.publishToYouTube(project.id);
+        // That function would handle the multi-step YouTube API upload process.
+        // For this demo, we simulate the process.
+        await new Promise(resolve => setTimeout(resolve, 4000));
+        
+        const fakeVideoId = Math.random().toString(36).substring(2, 13);
+        const publishedUrl = `https://www.youtube.com/watch?v=${fakeVideoId}`;
+        
+        await handleUpdateProject({
+            id: project.id,
+            status: 'Published',
+            publishedUrl: publishedUrl,
+        });
+
+        addToast("Video successfully published to YouTube!", 'success');
+        setIsPublishing(false);
+    };
+
+    const isPublishingDisabled = isPublishing || !project.publishedUrl || !project.launchPlan?.thumbnails?.[0] || !project.launchPlan?.seo || !project.title;
+
+
     return (
         <div className="space-y-8 animate-fade-in-up">
             <header className="text-center">
@@ -87,85 +119,113 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
 
             {error && <p className="text-red-400 text-center">{error}</p>}
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* SEO */}
-                <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700 space-y-4 flex flex-col">
-                    <h3 className="text-2xl font-bold text-white">{t('launchpad.seo_title')}</h3>
-                    {project.launchPlan?.seo ? (
-                        <div className="space-y-4 animate-fade-in-up flex-grow flex flex-col">
-                            <div className="flex-grow">
-                                <div>
-                                    <h4 className="font-semibold text-gray-300 mb-2">{t('launchpad.description_title')}</h4>
-                                    <div className="bg-gray-900/50 p-3 rounded-lg text-sm text-gray-400 relative">
-                                        <p>{project.launchPlan.seo.description}</p>
-                                        <button onClick={() => copyToClipboard(project.launchPlan!.seo!.description)} className="absolute top-2 right-2 p-1 text-gray-400 hover:text-white"><ClipboardCopyIcon className="w-4 h-4" /></button>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* SEO & Promotion */}
+                <div className="space-y-8">
+                    <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700 space-y-4 flex flex-col">
+                        <h3 className="text-2xl font-bold text-white">{t('launchpad.seo_title')}</h3>
+                        {project.launchPlan?.seo ? (
+                            <div className="space-y-4 animate-fade-in-up flex-grow flex flex-col">
+                                <div className="flex-grow">
+                                    <div>
+                                        <h4 className="font-semibold text-gray-300 mb-2">{t('launchpad.description_title')}</h4>
+                                        <div className="bg-gray-900/50 p-3 rounded-lg text-sm text-gray-400 relative">
+                                            <p>{project.launchPlan.seo.description}</p>
+                                            <button onClick={() => copyToClipboard(project.launchPlan!.seo!.description)} className="absolute top-2 right-2 p-1 text-gray-400 hover:text-white"><ClipboardCopyIcon className="w-4 h-4" /></button>
+                                        </div>
+                                    </div>
+                                    <div className="mt-4">
+                                        <h4 className="font-semibold text-gray-300 mb-2">{t('launchpad.tags_title')}</h4>
+                                        <div className="flex flex-wrap gap-2">
+                                            {project.launchPlan.seo.tags.map(tag => <span key={tag} className="px-2 py-1 bg-gray-700 text-xs rounded-full">{tag}</span>)}
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="mt-4">
-                                    <h4 className="font-semibold text-gray-300 mb-2">{t('launchpad.tags_title')}</h4>
-                                    <div className="flex flex-wrap gap-2">
-                                        {project.launchPlan.seo.tags.map(tag => <span key={tag} className="px-2 py-1 bg-gray-700 text-xs rounded-full">{tag}</span>)}
-                                    </div>
+                                <div className="mt-4 border-t border-gray-700/50 pt-4">
+                                    <button
+                                        onClick={handleCopyForYouTube}
+                                        className="w-full inline-flex items-center justify-center px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-full transition-colors"
+                                    >
+                                        <ClipboardCopyIcon className="w-5 h-5 mr-2" />
+                                        {t('launchpad.copy_for_youtube')}
+                                    </button>
                                 </div>
                             </div>
-                            <div className="mt-4 border-t border-gray-700/50 pt-4">
-                                <button
-                                    onClick={handleCopyForYouTube}
-                                    className="w-full inline-flex items-center justify-center px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-full transition-colors"
-                                >
-                                    <ClipboardCopyIcon className="w-5 h-5 mr-2" />
-                                    {t('launchpad.copy_for_youtube')}
-                                </button>
-                            </div>
-                        </div>
-                    ) : (
-                        <button onClick={handleGenerateSeo} disabled={loading.seo} className="w-full inline-flex items-center justify-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-full transition-colors disabled:bg-gray-600">
-                            <SparklesIcon className="w-5 h-5 mr-2" />
-                            {loading.seo ? t('launchpad.seo_generating') : t('launchpad.seo_button')}
-                        </button>
-                    )}
+                        ) : (
+                            <button onClick={handleGenerateSeo} disabled={loading.seo} className="w-full inline-flex items-center justify-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-full transition-colors disabled:bg-gray-600">
+                                <SparklesIcon className="w-5 h-5 mr-2" />
+                                {loading.seo ? t('launchpad.seo_generating') : t('launchpad.seo_button')}
+                            </button>
+                        )}
+                    </div>
+                    <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700 space-y-4">
+                         <h3 className="text-2xl font-bold text-white">{t('launchpad.promotion_title')}</h3>
+                         {project.launchPlan?.promotionPlan ? (
+                             <ul className="space-y-3 animate-fade-in-up">
+                                {project.launchPlan.promotionPlan.map((item, i) => (
+                                    <li key={i} className="bg-gray-900/50 p-3 rounded-lg">
+                                        <p className="font-bold text-indigo-400">{item.platform}</p>
+                                        <p className="text-sm text-gray-300">{item.action}</p>
+                                    </li>
+                                ))}
+                             </ul>
+                         ) : (
+                             <button onClick={handleGeneratePromotion} disabled={loading.promotion} className="w-full inline-flex items-center justify-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-full transition-colors disabled:bg-gray-600">
+                                 <SparklesIcon className="w-5 h-5 mr-2" />
+                                {loading.promotion ? t('launchpad.promotion_strategizing') : t('launchpad.promotion_button')}
+                             </button>
+                         )}
+                    </div>
                 </div>
 
-                {/* Thumbnails */}
-                <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700 space-y-4">
-                     <h3 className="text-2xl font-bold text-white">{t('launchpad.thumbnail_title')}</h3>
-                     {project.launchPlan?.thumbnails ? (
-                         <div className="grid grid-cols-1 gap-4 animate-fade-in-up">
-                            {project.launchPlan.thumbnails.map((thumb, i) => (
-                                <div key={i} className="relative group aspect-video">
-                                    <img src={thumb} alt={`Thumbnail ${i+1}`} className="w-full h-full rounded-lg object-cover" />
-                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                        <a href={thumb} download={`thumbnail_${i+1}.jpg`} className="p-2 bg-white/20 backdrop-blur-sm text-white rounded-full hover:bg-white/30"><DownloadIcon className="w-5 h-5" /></a>
+                {/* Thumbnails & Publishing */}
+                 <div className="space-y-8">
+                    <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700 space-y-4">
+                         <h3 className="text-2xl font-bold text-white">{t('launchpad.thumbnail_title')}</h3>
+                         {project.launchPlan?.thumbnails ? (
+                             <div className="grid grid-cols-1 gap-4 animate-fade-in-up">
+                                {project.launchPlan.thumbnails.map((thumb, i) => (
+                                    <div key={i} className="relative group aspect-video">
+                                        <img src={thumb} alt={`Thumbnail ${i+1}`} className="w-full h-full rounded-lg object-cover" />
+                                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                            <a href={thumb} download={`thumbnail_${i+1}.jpg`} className="p-2 bg-white/20 backdrop-blur-sm text-white rounded-full hover:bg-white/30"><DownloadIcon className="w-5 h-5" /></a>
+                                        </div>
                                     </div>
+                                ))}
+                             </div>
+                         ) : (
+                             <button onClick={handleGenerateThumbnails} disabled={loading.thumbnails} className="w-full inline-flex items-center justify-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-full transition-colors disabled:bg-gray-600">
+                                 <SparklesIcon className="w-5 h-5 mr-2" />
+                                {loading.thumbnails ? t('launchpad.thumbnail_designing') : t('launchpad.thumbnail_button', { count: 2, credits: 4 })}
+                             </button>
+                         )}
+                    </div>
+                     <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700 space-y-4">
+                        <h3 className="text-2xl font-bold text-white">Direct Publishing</h3>
+                        {user?.youtubeConnected ? (
+                             project.status === 'Published' && project.publishedUrl ? (
+                                <div className="text-center animate-fade-in-up">
+                                    <CheckCircleIcon className="w-16 h-16 mx-auto text-green-400 mb-4" />
+                                    <h4 className="text-lg font-bold text-white">Published!</h4>
+                                    <a href={project.publishedUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-indigo-400 hover:underline break-all block mt-2">
+                                        {project.publishedUrl}
+                                    </a>
                                 </div>
-                            ))}
-                         </div>
-                     ) : (
-                         <button onClick={handleGenerateThumbnails} disabled={loading.thumbnails} className="w-full inline-flex items-center justify-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-full transition-colors disabled:bg-gray-600">
-                             <SparklesIcon className="w-5 h-5 mr-2" />
-                            {loading.thumbnails ? t('launchpad.thumbnail_designing') : t('launchpad.thumbnail_button', { count: 2, credits: 4 })}
-                         </button>
-                     )}
-                </div>
-                
-                {/* Promotion Plan */}
-                <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700 space-y-4">
-                     <h3 className="text-2xl font-bold text-white">{t('launchpad.promotion_title')}</h3>
-                     {project.launchPlan?.promotionPlan ? (
-                         <ul className="space-y-3 animate-fade-in-up">
-                            {project.launchPlan.promotionPlan.map((item, i) => (
-                                <li key={i} className="bg-gray-900/50 p-3 rounded-lg">
-                                    <p className="font-bold text-indigo-400">{item.platform}</p>
-                                    <p className="text-sm text-gray-300">{item.action}</p>
-                                </li>
-                            ))}
-                         </ul>
-                     ) : (
-                         <button onClick={handleGeneratePromotion} disabled={loading.promotion} className="w-full inline-flex items-center justify-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-full transition-colors disabled:bg-gray-600">
-                             <SparklesIcon className="w-5 h-5 mr-2" />
-                            {loading.promotion ? t('launchpad.promotion_strategizing') : t('launchpad.promotion_button')}
-                         </button>
-                     )}
+                            ) : (
+                                <button onClick={handlePublishToYouTube} disabled={isPublishingDisabled} className="w-full inline-flex items-center justify-center px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-full transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed" title={isPublishingDisabled ? "Generate all assets (SEO, Thumbnails) and connect YouTube to enable publishing" : ""}>
+                                    <YouTubeIcon className="w-5 h-5 mr-2" />
+                                    {isPublishing ? "Publishing..." : "Publish to YouTube"}
+                                </button>
+                            )
+                        ) : (
+                            <div className="text-center">
+                                <p className="text-gray-400 mb-4">Connect your YouTube channel to enable direct publishing.</p>
+                                <button onClick={() => setActiveProjectId(null)} className="font-semibold text-indigo-400 hover:underline">
+                                    Go to My Channel Hub
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

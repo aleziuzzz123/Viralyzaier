@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Project, Blueprint, Platform } from '../types';
 import { FilePlusIcon, SparklesIcon, LightBulbIcon, YouTubeIcon, TikTokIcon, InstagramIcon, CheckCircleIcon } from './Icons';
-import { generateVideoBlueprint } from '../services/geminiService';
 import TutorialCallout from './TutorialCallout';
 import KanbanBoard from './KanbanBoard';
 import { PLANS } from '../services/paymentService';
@@ -10,38 +9,24 @@ import { getErrorMessage } from '../utils';
 import Loader from './Loader';
 
 const platformConfig: { [key in Platform]: { icon: React.FC<{className?: string}>, nameKey: string, descKey: string } } = {
-    youtube_long: { icon: YouTubeIcon, nameKey: 'platform.youtube_long', descKey: 'platform.youtube_long_desc' },
-    youtube_short: { icon: YouTubeIcon, nameKey: 'platform.youtube_short', descKey: 'platform.youtube_short_desc' },
-    tiktok: { icon: TikTokIcon, nameKey: 'platform.tiktok', descKey: 'platform.tiktok_desc' },
-    instagram: { icon: InstagramIcon, nameKey: 'platform.instagram', descKey: 'platform.instagram_desc' },
+    youtube_long: { icon: YouTubeIcon, nameKey: 'platform.youtube_long_name', descKey: 'platform.youtube_long_desc' },
+    youtube_short: { icon: YouTubeIcon, nameKey: 'platform.youtube_short_name', descKey: 'platform.youtube_short_desc' },
+    tiktok: { icon: TikTokIcon, nameKey: 'platform.tiktok_name', descKey: 'platform.tiktok_desc' },
+    instagram: { icon: InstagramIcon, nameKey: 'platform.instagram_name', descKey: 'platform.instagram_desc' },
 };
 
-const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
-    const { user, consumeCredits, handleCreateProjectFromBlueprint, t, prefilledBlueprintPrompt, setPrefilledBlueprintPrompt, addToast, lockAndExecute } = useAppContext();
+interface NewProjectModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+}
+
+const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) => {
+    const { user, handleCreateProjectForBlueprint, t, addToast, lockAndExecute } = useAppContext();
     const [topicOrUrl, setTopicOrUrl] = useState('');
     const [platform, setPlatform] = useState<Platform | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [blueprint, setBlueprint] = useState<Blueprint | null>(null);
-    const [selectedTitle, setSelectedTitle] = useState<string | null>(null);
-    const [progressLogs, setProgressLogs] = useState<string[]>([]);
-    
-    useEffect(() => {
-        if (isOpen && prefilledBlueprintPrompt) {
-            setTopicOrUrl(prefilledBlueprintPrompt);
-            setPrefilledBlueprintPrompt(null);
-            addToast("Prompt pre-filled from performance insights!", 'success');
-        }
-    }, [isOpen, prefilledBlueprintPrompt, setPrefilledBlueprintPrompt, addToast]);
-    
-    useEffect(() => {
-        // This effect robustly handles the transition from loading to showing results.
-        if (blueprint) {
-            setIsLoading(false);
-        }
-    }, [blueprint]);
 
-    const handleGenerate = () => lockAndExecute(async () => {
+    const handleCreate = () => lockAndExecute(async () => {
         if (!platform) {
             setError(t('blueprint_modal.error_platform'));
             return;
@@ -51,185 +36,18 @@ const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; 
             return;
         }
         
-        setIsLoading(true);
-        setError(null);
-        setBlueprint(null);
-        setSelectedTitle(null);
-        setProgressLogs([]);
-
-        try {
-            const canProceed = await consumeCredits(5);
-            if (!canProceed) {
-                setIsLoading(false);
-                return;
-            }
-            
-            const onProgressCallback = (message: string) => {
-                setProgressLogs(prev => [...prev, message]);
-            };
-            
-            const blueprintResult = await generateVideoBlueprint(topicOrUrl, platform, onProgressCallback);
-            
-            if (blueprintResult) {
-                setBlueprint(blueprintResult); // This will trigger the useEffect to set isLoading to false
-            } else {
-                throw new Error("Failed to generate blueprint. The AI may have returned an invalid response.");
-            }
-        } catch (err) {
-            addToast(getErrorMessage(err), 'error');
-            setBlueprint(null);
-            setIsLoading(false); // Also ensure loading is false on error
-        }
-    });
-    
-    const handleUseChannelData = () => {
-        if (user?.channelAudit) {
-            const audit = user.channelAudit;
-            const prompt = `A video idea based on my channel's successful formula: "${audit.viralFormula}", targeting my audience: "${audit.audiencePersona}", and related to my content pillars: ${audit.contentPillars.join(', ')}.`;
-            setTopicOrUrl(prompt);
-            addToast(t('toast.topic_prefilled'), 'success');
-        }
-    };
-
-    const handleAccept = () => lockAndExecute(async () => {
-        if (blueprint && selectedTitle) {
-            await handleCreateProjectFromBlueprint(blueprint, selectedTitle);
-            handleClose();
-        } else {
-            addToast(t('toast.select_title_first'), 'error');
-        }
+        await handleCreateProjectForBlueprint(topicOrUrl, platform, topicOrUrl);
+        handleClose();
     });
 
     const handleClose = () => {
-        setBlueprint(null);
         setTopicOrUrl('');
         setError(null);
-        setSelectedTitle(null);
         setPlatform(null);
-        setIsLoading(false);
-        setProgressLogs([]);
         onClose();
     };
 
     if (!isOpen) return null;
-    
-    const renderContent = () => {
-        if (isLoading) {
-            return (
-                <div className="flex flex-col items-center justify-center space-y-4 text-center mt-8 px-4">
-                    <h3 className="text-xl font-bold text-white">{t('blueprint_modal.loading')}</h3>
-                    <p className="text-sm text-gray-500 mb-4">{t('blueprint_modal.loading_subtitle')}</p>
-                    <div className="w-full bg-gray-900/50 p-4 rounded-lg text-left h-48 overflow-y-auto">
-                        <ul className="space-y-2">
-                            {progressLogs.map((log, index) => (
-                                <li key={index} className="flex items-center text-sm text-gray-300 animate-fade-in-up">
-                                    {index < progressLogs.length - 1 ? (
-                                        <CheckCircleIcon className="w-5 h-5 mr-3 text-green-400 flex-shrink-0" />
-                                    ) : (
-                                        <SparklesIcon className="w-5 h-5 mr-3 text-indigo-400 flex-shrink-0 animate-pulse" />
-                                    )}
-                                    <span>{log}</span>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                </div>
-            );
-        }
-
-        if (blueprint) {
-            return (
-                <div className="space-y-6 text-left">
-                   <div>
-                       <h3 className="text-lg font-bold text-white mb-2">{t('blueprint_modal.strategic_summary')}</h3>
-                       <p className="text-gray-300 italic">"{blueprint.strategicSummary}"</p>
-                   </div>
-                   <div>
-                       <h3 className="text-lg font-bold text-white mb-2">{t('blueprint_modal.choose_title')}</h3>
-                       <ul className="space-y-2">
-                           {blueprint.suggestedTitles.map((title, i) => (
-                               <li key={i}>
-                                   <button 
-                                       onClick={() => setSelectedTitle(title)}
-                                       className={`w-full text-left p-3 rounded-lg transition-all border-2 ${selectedTitle === title ? 'bg-indigo-900/50 border-indigo-500' : 'bg-gray-700/50 border-transparent hover:border-indigo-600'}`}
-                                   >
-                                       <p className="text-gray-200 font-medium">{title}</p>
-                                   </button>
-                               </li>
-                           ))}
-                       </ul>
-                   </div>
-                   <div>
-                       <h3 className="text-lg font-bold text-white mb-2">{t('blueprint_modal.moodboard')}</h3>
-                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                           {blueprint.moodboard.map((imgSrc, i) => (
-                               <img key={i} src={imgSrc} alt={`Mood board image ${i + 1}`} className="w-full h-auto rounded-lg object-cover shadow-lg" />
-                           ))}
-                       </div>
-                   </div>
-                   <div>
-                       <h3 className="text-lg font-bold text-white mb-2">{t('blueprint_modal.full_script')}</h3>
-                       <div className="bg-gray-900/50 p-4 rounded-lg text-sm text-gray-400 max-h-48 overflow-y-auto">
-                           <p><span className="font-bold text-gray-300">{t('blueprint_modal.hook')}</span> {blueprint.script.hooks[0]}</p>
-                           <p className="mt-2"><span className="font-bold text-gray-300">{t('blueprint_modal.scene1')}</span> {blueprint.script.scenes[0].voiceover}</p>
-                           <p className="mt-2"><span className="font-bold text-gray-300">{t('blueprint_modal.cta')}</span> {blueprint.script.cta}</p>
-                       </div>
-                   </div>
-               </div>
-           );
-        }
-
-        return (
-            <div className="space-y-4">
-                <div>
-                   <h3 className="text-lg font-semibold text-white mb-2 text-left">{t('blueprint_modal.step1')}</h3>
-                   <div className="grid grid-cols-2 gap-4">
-                       {(['youtube_long', 'youtube_short', 'tiktok', 'instagram'] as Platform[]).map(p => {
-                            const config = platformConfig[p];
-                            return (
-                               <button key={p} onClick={() => setPlatform(p)} className={`text-left p-4 rounded-lg border-2 transition-colors ${platform === p ? 'bg-indigo-900/50 border-indigo-500' : 'bg-gray-700/50 border-transparent hover:border-indigo-600'}`}>
-                                   <div className="flex items-center gap-3">
-                                       {React.createElement(config.icon, { className: "w-8 h-8" })}
-                                       <span className="font-bold text-white">{t(config.nameKey as any)}</span>
-                                   </div>
-                                   <p className="text-xs text-gray-400 mt-2">{t(config.descKey as any)}</p>
-                               </button>
-                            )
-                       })}
-                   </div>
-               </div>
-               <div>
-                   <div className="flex justify-between items-center mb-2">
-                       <h3 className="text-lg font-semibold text-white text-left">{t('blueprint_modal.step2')}</h3>
-                       {user?.channelAudit && (
-                           <button 
-                               onClick={handleUseChannelData}
-                               className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 flex items-center"
-                           >
-                               <SparklesIcon className="w-4 h-4 mr-1.5"/>
-                               {t('blueprint_modal.use_channel_data')}
-                           </button>
-                       )}
-                   </div>
-                   <textarea
-                       value={topicOrUrl}
-                       onChange={e => setTopicOrUrl(e.target.value)}
-                       placeholder={t('blueprint_modal.topic_placeholder')}
-                       rows={2}
-                       className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                   />
-               </div>
-               <button
-                   onClick={handleGenerate}
-                   disabled={isLoading}
-                   className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed"
-               >
-                   {isLoading ? t('blueprint_modal.loading') : t('blueprint_modal.generate_button')}
-               </button>
-               {error && <p className="text-red-400 mt-2">{error}</p>}
-           </div>
-        );
-    }
     
     return (
         <div 
@@ -238,31 +56,52 @@ const BlueprintGeneratorModal: React.FC<{ isOpen: boolean; onClose: () => void; 
             onClick={handleClose}
             role="dialog"
             aria-modal="true"
-            aria-labelledby="blueprint-modal-title"
+            aria-labelledby="new-project-modal-title"
         >
-            <div className="bg-gray-800 border border-indigo-500/50 rounded-2xl shadow-2xl w-full max-w-3xl m-4 transform transition-all p-6 text-center max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-gray-800 border border-indigo-500/50 rounded-2xl shadow-2xl w-full max-w-2xl m-4 transform transition-all p-6 text-center flex flex-col" onClick={(e) => e.stopPropagation()}>
                 <header className="mb-4 flex-shrink-0">
-                    <h2 id="blueprint-modal-title" className="text-3xl font-bold text-white mb-2 flex items-center justify-center">
-                        <LightBulbIcon className="w-8 h-8 mr-3 text-yellow-300"/> {t('blueprint_modal.title')}
+                    <h2 id="new-project-modal-title" className="text-3xl font-bold text-white mb-2 flex items-center justify-center">
+                        <FilePlusIcon className="w-8 h-8 mr-3 text-indigo-400"/> {t('dashboard.new_blueprint')}
                     </h2>
                     <p className="text-gray-400">{t('blueprint_modal.subtitle')}</p>
                 </header>
                 
-                <div className="overflow-y-auto pr-4 -mr-4 space-y-4 flex-grow">
-                    {renderContent()}
-                </div>
-                
-                {blueprint && (
-                    <div className="pt-6 text-center flex-shrink-0">
-                        <button
-                            onClick={handleAccept}
-                            disabled={!selectedTitle || isLoading}
-                            className="w-full max-w-sm inline-flex items-center justify-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-full transition-all duration-300 ease-in-out transform hover:scale-105 shadow-lg disabled:bg-gray-500 disabled:cursor-not-allowed"
-                        >
-                            {t('blueprint_modal.accept_button')}
-                        </button>
-                    </div>
-                )}
+                <div className="space-y-6">
+                    <div>
+                       <h3 className="text-lg font-semibold text-white mb-2 text-left">{t('blueprint_modal.step1')}</h3>
+                       <div className="grid grid-cols-2 gap-4">
+                           {(['youtube_long', 'youtube_short', 'tiktok', 'instagram'] as Platform[]).map(p => {
+                                const config = platformConfig[p];
+                                return (
+                                   <button key={p} onClick={() => setPlatform(p)} className={`text-left p-4 rounded-lg border-2 transition-colors ${platform === p ? 'bg-indigo-900/50 border-indigo-500' : 'bg-gray-700/50 border-transparent hover:border-indigo-600'}`}>
+                                       <div className="flex items-center gap-3">
+                                           {React.createElement(config.icon, { className: "w-8 h-8" })}
+                                           <span className="font-bold text-white">{t(config.nameKey as any)}</span>
+                                       </div>
+                                       <p className="text-xs text-gray-400 mt-2">{t(config.descKey as any)}</p>
+                                   </button>
+                                )
+                           })}
+                       </div>
+                   </div>
+                   <div>
+                       <h3 className="text-lg font-semibold text-white text-left mb-2">{t('blueprint_modal.step2')}</h3>
+                       <textarea
+                           value={topicOrUrl}
+                           onChange={e => setTopicOrUrl(e.target.value)}
+                           placeholder={t('blueprint_modal.topic_placeholder')}
+                           rows={2}
+                           className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                       />
+                   </div>
+                   <button
+                       onClick={handleCreate}
+                       className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors"
+                   >
+                       {t('new_project_modal.create_button')}
+                   </button>
+                   {error && <p className="text-red-400 mt-2">{error}</p>}
+               </div>
             </div>
         </div>
     );
@@ -273,13 +112,13 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ onSelectProject }) => {
-    const { projects, user, dismissedTutorials, addToast, t, isInitialLoading } = useAppContext();
-    const [isBlueprintModalOpen, setIsBlueprintModalOpen] = useState(false);
+    const { user, projects, dismissedTutorials, addToast, t, isInitialLoading } = useAppContext();
+    const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
     
     useEffect(() => {
         const hasSeenOnboarding = localStorage.getItem('hasSeenOnboarding');
         if (user && projects.length === 0 && !isInitialLoading && !hasSeenOnboarding) {
-          setIsBlueprintModalOpen(true);
+          setIsNewProjectModalOpen(true);
           localStorage.setItem('hasSeenOnboarding', 'true');
         }
     }, [user, projects, isInitialLoading]);
@@ -291,7 +130,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelectProject }) => {
             addToast("Free Plan Project Limit Reached. Please upgrade.", 'error');
             return;
         }
-        setIsBlueprintModalOpen(true);
+        setIsNewProjectModalOpen(true);
     };
 
     if (isInitialLoading) {
@@ -318,7 +157,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelectProject }) => {
 
             {projects.length === 0 && !dismissedTutorials.includes('welcome') && (
                 <TutorialCallout id="welcome">
-                    {t('dashboard.tutorial_callout')}
+                    {t('dashboard.tutorial_callout_new')}
                 </TutorialCallout>
             )}
 
@@ -349,9 +188,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelectProject }) => {
                  )}
             </div>
             
-            <BlueprintGeneratorModal 
-                isOpen={isBlueprintModalOpen}
-                onClose={() => setIsBlueprintModalOpen(false)}
+            <NewProjectModal 
+                isOpen={isNewProjectModalOpen}
+                onClose={() => setIsNewProjectModalOpen(false)}
             />
         </div>
     );

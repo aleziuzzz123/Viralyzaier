@@ -3,7 +3,7 @@ import { useAppContext } from '../contexts/AppContext';
 import { generateAutopilotBacklog } from '../services/geminiService';
 import * as supabase from '../services/supabaseService';
 import { SparklesIcon, RocketLaunchIcon, PlusIcon, TrashIcon } from './Icons';
-import { Project, Script } from '../types';
+import { Project, Script, TimelineState } from '../types';
 
 const Autopilot: React.FC = () => {
     const { user, setUser, consumeCredits, requirePermission, addToast, t, addProjects, setActiveProjectId, lockAndExecute } = useAppContext();
@@ -79,6 +79,8 @@ const Autopilot: React.FC = () => {
                     publishedUrl: null,
                     voiceoverVoiceId: null,
                     last_performance_check: null,
+                    timeline: null,
+                    style: null,
                 };
                 const newProject = await supabase.createProject(initialProjectData, user.id);
 

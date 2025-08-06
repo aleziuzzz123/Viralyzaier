@@ -6,7 +6,7 @@ import ProjectView from './components/ProjectView';
 import ContentCalendar from './components/ContentCalendar';
 import PricingPage from './components/PricingPage';
 import UserMenu from './components/UserMenu';
-import Homepage from './components/Homepage';
+import LandingPage from './components/Homepage';
 import { DashboardIcon, CalendarIcon, GithubIcon, SparklesIcon, CheckCircleIcon, XCircleIcon, InfoIcon, ChartPieIcon, PhotoIcon, BellIcon, CogIcon, RocketLaunchIcon, WarningIcon } from './components/Icons';
 import ChannelHub from './components/ChannelHub';
 import AssetLibrary from './components/AssetLibrary';
@@ -78,7 +78,12 @@ const BackendErrorModal: React.FC = () => {
     );
 };
 
-const ToastComponent: React.FC<{ toast: Toast, onDismiss: (id: number) => void }> = ({ toast, onDismiss }) => {
+interface ToastComponentProps {
+    toast: Toast;
+    onDismiss: (id: number) => void;
+}
+
+const ToastComponent: React.FC<ToastComponentProps> = ({ toast, onDismiss }) => {
     useEffect(() => {
         const timer = setTimeout(() => {
             onDismiss(toast.id);
@@ -168,7 +173,7 @@ const MainApp = () => {
     };
     
     if (!session) {
-        return <Homepage />;
+        return <LandingPage />;
     }
 
     if (!user) {

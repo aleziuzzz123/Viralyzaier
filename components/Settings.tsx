@@ -3,6 +3,7 @@ import { useAppContext } from '../contexts/AppContext';
 import { SparklesIcon, UploadIcon, UserCircleIcon, TrashIcon, RefreshIcon } from './Icons';
 import { invokeEdgeFunction } from '../services/supabaseService';
 import { ClonedVoice } from '../types';
+import BrandIdentityHub from './BrandIdentityHub';
 
 const Settings: React.FC = () => {
     const { user, t, requirePermission, addToast, setUser, consumeCredits } = useAppContext();
@@ -91,6 +92,8 @@ const Settings: React.FC = () => {
                 <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white">{t('settings.title')}</h1>
                 <p className="mt-4 text-lg text-gray-400 max-w-2xl mx-auto">{t('settings.subtitle')}</p>
             </header>
+            
+            <BrandIdentityHub />
 
             <div className="max-w-4xl mx-auto bg-gray-800/50 p-8 rounded-2xl border border-gray-700">
                 <h2 className="text-2xl font-bold text-white mb-2 flex items-center">

@@ -18,10 +18,12 @@ const statusConfig: { [key in ProjectStatus]: { color: string; bg: string; } } =
     'Published': { color: 'border-green-500', bg: 'bg-green-900/20' },
 };
 
-const ProjectCard: React.FC<{
+interface ProjectCardProps {
     project: Project;
     onViewProject: () => void;
-}> = ({ project, onViewProject }) => {
+}
+
+const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewProject }) => {
     const { user, handleUpdateProject, addToast, t } = useAppContext();
     const [isEditingUrl, setIsEditingUrl] = useState(false);
     const [url, setUrl] = useState(project.publishedUrl || '');
