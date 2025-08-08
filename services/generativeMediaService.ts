@@ -1,6 +1,6 @@
-import { Platform, SceneAssets } from "../types.js";
-import { invokeEdgeFunction } from './supabaseService.js';
-import { base64ToBlob } from '../utils.js';
+import { Platform, SceneAssets } from "../types";
+import { invokeEdgeFunction } from './supabaseService';
+import { base64ToBlob } from '../utils';
 
 // This service is now secure. API keys are handled by backend proxy functions.
 // We only need to check if the function endpoints are available to the user.
@@ -17,7 +17,7 @@ export const ELEVENLABS_VOICES = [
     { id: 'SOYHLrjzK2X1ezoPC6cr', name: 'Nicole - Confident, Engaging' },
     { id: 'ThT5KcBeYPX3keUQqHPh', name: 'Gigi - Playful, Bubbly' },
     { id: 'TxGEqnHWrfWFTfGW9XjX', name: 'James - Formal, Announcer' },
-    { id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam - Deep, Narrative' }
+    { id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam - Deep, Narrative' },
 ];
 
 /**
@@ -71,10 +71,10 @@ export const generateAnimatedImage = async (prompt: string, platform: Platform):
 
 
 /**
- * Generates a video clip using RunwayML by calling a secure Supabase Edge Function.
+ * Generates a video clip by calling a secure Supabase Edge Function.
  * The client now handles polling for the result from RunwayML.
  */
-export const generateRunwayVideoClip = async (prompt: string, platform: Platform): Promise<Blob> => {
+export const generateVideoClip = async (prompt: string, platform: Platform): Promise<Blob> => {
     const aspectRatio = platform === 'youtube_long' ? '16_9' : '9_16';
 
     // Step 1: Initiate the generation and get a task UUID
@@ -119,8 +119,8 @@ export const generateRunwayVideoClip = async (prompt: string, platform: Platform
  * Generates an AI B-Roll clip for a given scene description.
  */
 export const generateAiBroll = async (sceneDescription: string, platform: Platform): Promise<Blob> => {
-    // This is essentially the same as generateRunwayVideoClip but could have a more specific internal prompt
-    return generateRunwayVideoClip(`Cinematic B-roll footage for a video scene about: ${sceneDescription}`, platform);
+    // This is essentially the same as generateVideoClip but could have a more specific internal prompt
+    return generateVideoClip(`Cinematic B-roll footage for a video scene about: ${sceneDescription}`, platform);
 };
 
 /**

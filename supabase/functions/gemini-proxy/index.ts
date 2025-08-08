@@ -80,6 +80,8 @@ serve(async (req: Request) => {
         serializableResult = { text: result.text };
     } else if (type === 'generateImages') {
         serializableResult = { generatedImages: result.generatedImages };
+    } else {
+        serializableResult = result; // Fallback for other potential types
     }
     
     return new Response(JSON.stringify(serializableResult), {

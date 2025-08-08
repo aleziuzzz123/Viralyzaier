@@ -1,6 +1,6 @@
 import { Type } from "@google/genai";
-import { TrendData } from '../types.js';
-import { invokeEdgeFunction } from './supabaseService.js';
+import { TrendData } from '../types';
+import { invokeEdgeFunction } from './supabaseService';
 
 const parseGeminiJson = <T>(res: { text: string | null | undefined }, fallback: T | null = null): T => {
     try {

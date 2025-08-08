@@ -1,6 +1,8 @@
 {
-  "name": "Copy of Vid Script Hub",
-  "description": "A tool that generates viral video scripts for users, combining a sleek, modern, dark-mode aesthetic with high-conversion principles. Using google ecosystem api, its worlds best warrior plus product, full of value.",
-  "requestFramePermissions": [],
+  "name": "Copy of Viralyzaier: Your AI Video Growth Engine.",
+  "description": "Viralyzaier is the end-to-end AI strategic partner for experts, coaches, and educators who want to grow their business with video. It transforms your expertise into high-performing content through a guided workflow that covers scriptwriting, asset generation, performance analysis, and data-driven growth. Stop guessing and start building your authority. This tool potential is to generate at least 5000 dollars daily.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
   "prompt": ""
 }

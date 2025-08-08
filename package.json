@@ -1,14 +1,24 @@
 {
-  "name": "vidscripthub-vercel",
-  "version": "1.0.0",
+  "name": "copy-of-viralyzaier:-your-ai-video-growth-engine.",
   "private": true,
+  "version": "0.0.0",
+  "type": "module",
   "scripts": {
-    "build": "echo 'No build required'"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
     "@google/genai": "^1.11.0",
-    "@supabase/supabase-js": "^2.45.0",
-    "@types/node": "^20.14.9",
-    "@vercel/node": "^3.2.0"
+    "@supabase/supabase-js": "^2.44.4",
+    "jszip": "3.10.1",
+    "uuid": "9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
   }
 }
