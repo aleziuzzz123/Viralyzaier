@@ -1,9 +1,8 @@
-
 export type PlanId = 'free' | 'pro' | 'viralyzaier';
 export type ScriptGoal = 'educate' | 'subscribe' | 'sell' | 'entertain';
 export type Platform = 'youtube_long' | 'youtube_short' | 'tiktok' | 'instagram';
 export type ProjectStatus = 'Idea' | 'Scripting' | 'Rendering' | 'Scheduled' | 'Published' | 'Autopilot';
-export type WorkflowStep = 1 | 2 | 3 | 4;
+export type WorkflowStep = 1 | 2 | 3 | 4 | 5;
 export type VisualType = 'ai_video' | 'ai_image' | 'ai_graphic' | 'stock' | 'user';
 export type VideoStyle = 'High-Energy Viral' | 'Cinematic Documentary' | 'Clean & Corporate';
 
@@ -18,7 +17,7 @@ export interface Plan {
 }
 
 export interface ClonedVoice {
-    id: string;
+    id:string;
     name: string;
     status: 'pending' | 'ready' | 'failed';
 }
@@ -115,6 +114,7 @@ export interface ChannelStats {
     subscriberCount: number;
     totalViews: number;
     totalVideos: number;
+
     topPerformingVideo: {
         title: string;
         views: number;
@@ -271,23 +271,29 @@ export interface Subtitle {
     isEditing?: boolean;
 }
 
+export type KeyframeableProperty = 'x' | 'y' | 'scale' | 'rotation' | 'opacity' | 'volume';
 
 export interface TimelineClip {
     id: string;
     type: 'video' | 'image' | 'audio' | 'text';
     url: string;
-    sceneIndex: number;
-    startTime: number;
-    endTime: number;
-    sourceDuration: number;
+    sceneIndex: number; // -1 for non-scene clips like music
+    startTime: number; // in seconds
+    endTime: number; // in seconds
+    sourceDuration: number; // original duration of the media
+
     // --- Layout & Composition ---
     positioning?: {
         width: number; // percentage
         height: number; // percentage
         x: number; // percentage from left
         y: number; // percentage from top
-        zIndex?: number;
+        rotation: number; // degrees
+        scale: number; // multiplier
+        zIndex: number;
     };
+    opacity: number; // 0 to 1
+
     // --- VFX & Animation Hub ---
     animation?: {
         in?: 'fade' | 'slide' | 'rise' | 'bounce' | 'pulse';
@@ -315,14 +321,20 @@ export interface TimelineClip {
         temperature: number; // -100 to 100
       }
     };
+    volume: number; // 0 to 1
     audio?: {
       enhance?: boolean;
       voicePreset?: 'podcast' | 'cinematic' | 'radio' | 'robot';
     };
-    // --- Existing ---
-    volume?: number;
+    
+    // For text clips
     text?: string;
-    style?: { [key: string]: string | number };
+    style?: Partial<Subtitle['style']>;
+
+    // Keyframing
+    keyframes?: {
+        [key in KeyframeableProperty]?: { time: number; value: number }[];
+    };
 }
 
 export interface TimelineTrack {
@@ -370,7 +382,7 @@ export type Json =
   | number
   | boolean
   | null
-  | { [key: string]: Json | undefined }
+  | { [key: string]: Json }
   | Json[];
 
 export interface Database {

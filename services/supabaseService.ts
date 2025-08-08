@@ -58,8 +58,8 @@ export const profileRowToUser = (row: Database['public']['Tables']['profiles']['
 const userToProfileUpdate = (updates: Partial<User>): Database['public']['Tables']['profiles']['Update'] => {
     const dbUpdates: Database['public']['Tables']['profiles']['Update'] = {};
     if (updates.aiCredits !== undefined) dbUpdates.ai_credits = updates.aiCredits;
-    if (updates.channelAudit !== undefined) dbUpdates.channel_audit = updates.channelAudit as unknown as Json | null;
-    if (updates.cloned_voices !== undefined) dbUpdates.cloned_voices = updates.cloned_voices as unknown as Json | null;
+    if (updates.channelAudit !== undefined) dbUpdates.channel_audit = updates.channelAudit as unknown as Json;
+    if (updates.cloned_voices !== undefined) dbUpdates.cloned_voices = updates.cloned_voices as unknown as Json;
     if (updates.content_pillars !== undefined) dbUpdates.content_pillars = updates.content_pillars;
     if (updates.subscription !== undefined) dbUpdates.subscription = updates.subscription as unknown as Json;
     return dbUpdates;
@@ -86,6 +86,7 @@ export const projectRowToProject = (row: Database['public']['Tables']['projects'
     workflowStep: row.workflow_step as WorkflowStep,
     voiceoverVoiceId: row.voiceover_voice_id,
     last_performance_check: row.last_performance_check,
+    timeline: row.timeline as unknown as TimelineState | null,
 });
 
 const projectToProjectUpdate = (updates: Partial<Project>): Database['public']['Tables']['projects']['Update'] => {
@@ -95,19 +96,20 @@ const projectToProjectUpdate = (updates: Partial<Project>): Database['public']['
     if (updates.platform !== undefined) dbUpdates.platform = updates.platform;
     if (updates.status !== undefined) dbUpdates.status = updates.status;
     if (updates.title !== undefined) dbUpdates.title = updates.title;
-    if (updates.script !== undefined) dbUpdates.script = updates.script as unknown as Json | null;
-    if (updates.analysis !== undefined) dbUpdates.analysis = updates.analysis as unknown as Json | null;
-    if (updates.competitorAnalysis !== undefined) dbUpdates.competitor_analysis = updates.competitorAnalysis as unknown as Json | null;
+    if (updates.script !== undefined) dbUpdates.script = updates.script as unknown as Json;
+    if (updates.analysis !== undefined) dbUpdates.analysis = updates.analysis as unknown as Json;
+    if (updates.competitorAnalysis !== undefined) dbUpdates.competitor_analysis = updates.competitorAnalysis as unknown as Json;
     if (updates.moodboard !== undefined) dbUpdates.moodboard = updates.moodboard;
-    if (updates.assets !== undefined) dbUpdates.assets = updates.assets as unknown as Json | null;
-    if (updates.soundDesign !== undefined) dbUpdates.sound_design = updates.soundDesign as unknown as Json | null;
-    if (updates.launchPlan !== undefined) dbUpdates.launch_plan = updates.launchPlan as unknown as Json | null;
-    if (updates.performance !== undefined) dbUpdates.performance = updates.performance as unknown as Json | null;
+    if (updates.assets !== undefined) dbUpdates.assets = updates.assets as unknown as Json;
+    if (updates.soundDesign !== undefined) dbUpdates.sound_design = updates.soundDesign as unknown as Json;
+    if (updates.launchPlan !== undefined) dbUpdates.launch_plan = updates.launchPlan as unknown as Json;
+    if (updates.performance !== undefined) dbUpdates.performance = updates.performance as unknown as Json;
     if (updates.scheduledDate !== undefined) dbUpdates.scheduled_date = updates.scheduledDate;
     if (updates.publishedUrl !== undefined) dbUpdates.published_url = updates.publishedUrl;
     if (updates.workflowStep !== undefined) dbUpdates.workflow_step = updates.workflowStep;
     if (updates.voiceoverVoiceId !== undefined) dbUpdates.voiceover_voice_id = updates.voiceoverVoiceId;
     if (updates.last_performance_check !== undefined) dbUpdates.last_performance_check = updates.last_performance_check;
+    if (updates.timeline !== undefined) dbUpdates.timeline = updates.timeline as unknown as Json;
     
     dbUpdates.last_updated = new Date().toISOString();
     return dbUpdates;
@@ -220,7 +222,7 @@ export const createProfileForUser = async (userId: string, email: string): Promi
     const { data, error } = await supabase.from('profiles').insert([{
         id: userId,
         email,
-        subscription: { planId: 'free', status: 'active', endDate: null },
+        subscription: { planId: 'free', status: 'active', endDate: null } as unknown as Json,
         ai_credits: freePlan.creditLimit,
     }]).select().single();
     if (error) throw error;
