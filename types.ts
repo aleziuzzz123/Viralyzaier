@@ -6,8 +6,8 @@ export type Json =
   | number
   | boolean
   | null
-  | { [key: string]: any }
-  | any[];
+  | { [key: string]: Json | undefined }
+  | Json[];
 export interface JsonObject {
   [key: string]: Json | undefined;
 }
@@ -304,7 +304,7 @@ export type Database = {
           stripe_customer_id?: string | null
         }
         Relationships: []
-      },
+      }
       projects: {
         Row: {
           id: string
@@ -382,19 +382,19 @@ export type Database = {
           timeline?: Json | null
         }
         Relationships: []
-      },
+      }
       notifications: {
         Row: { id: string; user_id: string; project_id: string | null; message: string; is_read: boolean; created_at: string; }
         Insert: { id?: string; user_id: string; project_id?: string | null; message: string; is_read?: boolean; created_at?: string; }
         Update: { id?: string; user_id?: string; project_id?: string | null; message?: string; is_read?: boolean; created_at?: string; }
         Relationships: []
-      },
+      }
       user_youtube_tokens: {
         Row: { user_id: string; access_token: string; refresh_token: string; expires_at: string; scope: string; }
         Insert: { user_id: string; access_token: string; refresh_token: string; expires_at: string; scope: string; }
         Update: { user_id?: string; access_token?: string; refresh_token?: string; expires_at?: string; scope?: string; }
         Relationships: []
-      },
+      }
       video_jobs: {
         Row: {
           id: string
@@ -427,7 +427,7 @@ export type Database = {
           error_message?: string | null
         }
         Relationships: []
-      },
+      }
       brand_identities: {
         Row: {
           id: string
