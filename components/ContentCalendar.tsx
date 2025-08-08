@@ -1,7 +1,8 @@
+
 import React, { useState } from 'react';
-import { SparklesIcon, XCircleIcon } from './Icons.tsx';
-import { getSchedulingSuggestion } from '../services/geminiService.ts';
-import { useAppContext } from '../contexts/AppContext.tsx';
+import { SparklesIcon, XCircleIcon } from './Icons';
+import { getSchedulingSuggestion } from '../services/geminiService';
+import { useAppContext } from '../contexts/AppContext';
 
 interface CalendarProps {
 }
@@ -68,7 +69,7 @@ const ContentCalendar: React.FC<CalendarProps> = () => {
             setCurrentMonth(0);
             setCurrentYear(currentYear + 1);
         } else {
-            setCurrentMonth(currentMonth - 1);
+            setCurrentMonth(currentMonth + 1);
         }
     };
 

@@ -1,5 +1,7 @@
+
+
 import React from 'react';
-import { Analysis } from '../types.ts';
+import { Analysis } from '../types';
 import {
   CheckCircleIcon,
   LightBulbIcon,
@@ -13,8 +15,8 @@ import {
   InfoIcon,
   RocketLaunchIcon,
   PhotoIcon
-} from './Icons.tsx';
-import { useAppContext } from '../contexts/AppContext.tsx';
+} from './Icons';
+import { useAppContext } from '../contexts/AppContext';
 
 interface AnalysisResultProps {
   result: Analysis | null;

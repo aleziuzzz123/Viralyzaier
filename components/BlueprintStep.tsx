@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { Project, Blueprint, VideoStyle } from '../types.ts';
-import { useAppContext } from '../contexts/AppContext.tsx';
-import { generateVideoBlueprint } from '../services/geminiService.ts';
-import CompetitorAnalysis from './CompetitorAnalysis.tsx';
-import TrendExplorer from './TrendExplorer.tsx';
-import { LightBulbIcon, TargetIcon, BreakoutIcon, CheckCircleIcon, SparklesIcon, FilmIcon, TypeIcon } from './Icons.tsx';
-import Loader from './Loader.tsx';
-import { getErrorMessage } from '../utils.ts';
+import { Project, Blueprint, VideoStyle } from '../types';
+import { useAppContext } from '../contexts/AppContext';
+import { generateVideoBlueprint } from '../services/geminiService';
+import CompetitorAnalysis from './CompetitorAnalysis';
+import TrendExplorer from './TrendExplorer';
+import { LightBulbIcon, TargetIcon, TrendIcon, CheckCircleIcon, SparklesIcon, FilmIcon, TypeIcon } from './Icons';
+import Loader from './Loader';
+import { getErrorMessage } from '../utils';
 
 interface BlueprintStepProps {
     project: Project;
@@ -114,7 +114,7 @@ const BlueprintStep: React.FC<BlueprintStepProps> = ({ project, onBlueprintAccep
     const styleOptions: { id: VideoStyle, name: string, description: string, icon: React.FC<{className?:string}> }[] = [
         { id: 'High-Energy Viral', name: t('style.viral_name'), description: t('style.viral_desc'), icon: SparklesIcon },
         { id: 'Cinematic Documentary', name: t('style.cinematic_name'), description: t('style.cinematic_desc'), icon: FilmIcon },
-        { id: 'Clean & Corporate', name: t('style.corporate_name'), description: t('style.corporate_desc'), icon: TypeIcon }
+        { id: 'Clean & Corporate', name: t('style.corporate_name'), description: t('style.corporate_desc'), icon: TypeIcon },
     ];
 
     const handleGenerateBlueprint = async () => {
@@ -158,7 +158,7 @@ const BlueprintStep: React.FC<BlueprintStepProps> = ({ project, onBlueprintAccep
     const tabs = [
         { id: 'topic', name: t('project_view.strategy.from_topic'), icon: LightBulbIcon },
         { id: 'competitor', name: t('project_view.strategy.from_competitor'), icon: TargetIcon },
-        { id: 'trend', name: t('project_view.strategy.from_trend'), icon: BreakoutIcon }
+        { id: 'trend', name: t('project_view.strategy.from_trend'), icon: TrendIcon },
     ];
     
     if (isLoading) return <BlueprintLoader progress={progress} />;

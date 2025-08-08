@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { useAppContext } from '../contexts/AppContext.tsx';
+import { useAppContext } from '../contexts/AppContext';
 
 const Loader: React.FC = () => {
   const { t } = useAppContext();

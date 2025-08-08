@@ -1,14 +1,10 @@
-
-
-
-
 import React, { useState } from 'react';
-import { useAppContext } from '../contexts/AppContext.tsx';
-import { BrandIdentity } from '../types.ts';
-import { PlusIcon, PencilIcon, TrashIcon, XCircleIcon, PaintBrushIcon, UploadIcon } from './Icons.tsx';
-import { uploadFile, dataUrlToBlob } from '../services/supabaseService.ts';
-import { getErrorMessage } from '../utils.ts';
-import { v4 as uuidv4 } from 'uuid';
+import { useAppContext } from '../contexts/AppContext';
+import { BrandIdentity } from '../types';
+import { PlusIcon, PencilIcon, TrashIcon, XCircleIcon, PaintBrushIcon, UploadIcon } from './Icons';
+import { uploadFile, dataUrlToBlob } from '../services/supabaseService';
+import { getErrorMessage } from '../utils';
+import { v4 as uuidv4 } from 'https://esm.sh/uuid';
 
 interface BrandIdentityModalProps {
     isOpen: boolean;

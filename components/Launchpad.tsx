@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Project, LaunchPlan } from '../types.ts';
-import { generateSeo, analyzeAndGenerateThumbnails, generatePromotionPlan, getSchedulingSuggestion } from '../services/geminiService.ts';
-import { publishVideo } from '../services/youtubeService.ts';
-import { SparklesIcon, ClipboardCopyIcon, DownloadIcon, RocketLaunchIcon, YouTubeIcon, CheckCircleIcon, CalendarIcon } from './Icons.tsx';
-import { useAppContext } from '../contexts/AppContext.tsx';
-import { getErrorMessage } from '../utils.ts';
+import { Project } from '../types';
+import { generateSeo, analyzeAndGenerateThumbnails, generatePromotionPlan, getSchedulingSuggestion } from '../services/geminiService';
+import { publishVideo } from '../services/youtubeService';
+import { SparklesIcon, ClipboardCopyIcon, DownloadIcon, RocketLaunchIcon, YouTubeIcon, CheckCircleIcon, CalendarIcon } from './Icons';
+import { useAppContext } from '../contexts/AppContext';
+import { getErrorMessage } from '../utils';
 
 interface LaunchpadProps {
     project: Project;
@@ -41,10 +41,7 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
         setLoading({ seo: true });
         try {
             const seo = await generateSeo(project.title, project.script, project.platform);
-            const updatedLaunchPlan: LaunchPlan = { 
-                ...(project.launchPlan || { thumbnails: null, promotionPlan: null, seo: { description: '', tags: [] } }),
-                seo 
-            };
+            const updatedLaunchPlan = { ...(project.launchPlan || {}), seo };
             await handleUpdateProject({ id: project.id, launchPlan: updatedLaunchPlan });
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to generate SEO.');
@@ -59,10 +56,7 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
         setLoading({ thumbnails: true });
         try {
             const thumbnails = await analyzeAndGenerateThumbnails(project.title, project.platform);
-            const updatedLaunchPlan: LaunchPlan = { 
-                ...(project.launchPlan || { seo: { description: '', tags: [] }, thumbnails: null, promotionPlan: null }),
-                thumbnails 
-            };
+            const updatedLaunchPlan = { ...(project.launchPlan || {}), thumbnails };
             await handleUpdateProject({ id: project.id, launchPlan: updatedLaunchPlan });
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to generate thumbnails.');
@@ -77,10 +71,7 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
         setLoading({ promotion: true });
         try {
             const promotionPlan = await generatePromotionPlan(project.title, project.platform);
-            const updatedLaunchPlan: LaunchPlan = { 
-                ...(project.launchPlan || { seo: { description: '', tags: [] }, thumbnails: null, promotionPlan: null }),
-                promotionPlan 
-            };
+            const updatedLaunchPlan = { ...(project.launchPlan || {}), promotionPlan };
             await handleUpdateProject({ id: project.id, launchPlan: updatedLaunchPlan });
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to generate promotion plan.');

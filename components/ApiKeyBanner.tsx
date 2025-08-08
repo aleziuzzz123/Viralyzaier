@@ -1,6 +1,7 @@
+
 import React from 'react';
-import { WarningIcon } from './Icons.tsx';
-import { useAppContext } from '../contexts/AppContext.tsx';
+import { WarningIcon } from './Icons';
+import { useAppContext } from '../contexts/AppContext';
 
 const ApiKeyBanner: React.FC = () => {
   const { t } = useAppContext();
