@@ -1,60 +1,49 @@
 import React from 'react';
-import { XCircleIcon, WarningIcon } from './Icons.tsx';
-import { useAppContext } from '../contexts/AppContext.tsx';
 
 interface ConfirmationModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    onConfirm: () => void;
-    title: string;
-    children: React.ReactNode;
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  message: string;
 }
 
-const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ isOpen, onClose, onConfirm, title, children }) => {
-    const { t } = useAppContext();
-    if (!isOpen) return null;
+export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ isOpen, onClose, onConfirm, title, message }) => {
+  if (!isOpen) return null;
 
-    return (
-        <div 
-            className="fixed inset-0 modal-overlay flex items-center justify-center animate-fade-in-up" 
-            style={{ animationDuration: '0.3s' }}
-            onClick={onClose}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="confirmation-modal-title"
-        >
-            <div 
-                className="bg-gray-800 border border-red-500/50 rounded-2xl shadow-2xl w-full max-w-md m-4 p-8 text-center transform transition-all"
-                onClick={(e) => e.stopPropagation()}
-            >
-                <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-white">
-                    <XCircleIcon className="w-8 h-8"/>
-                </button>
-                
-                <div className="mx-auto bg-red-900/50 border border-red-500/50 p-4 rounded-full w-fit mb-6">
-                   <WarningIcon className="w-12 h-12 text-red-400" />
-                </div>
-                
-                <h2 id="confirmation-modal-title" className="text-3xl font-bold text-white mb-3">{title}</h2>
-                <p className="text-gray-300 mb-8">{children}</p>
-                
-                <div className="flex justify-center gap-4">
-                     <button
-                        onClick={onClose}
-                        className="w-full py-3 bg-gray-600 hover:bg-gray-500 text-white font-bold rounded-lg transition-all"
-                    >
-                        {t('confirmation_modal.cancel')}
-                    </button>
-                    <button
-                        onClick={onConfirm}
-                        className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-all"
-                    >
-                        {t('confirmation_modal.confirm')}
-                    </button>
-                </div>
+  return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-[#2A1A5E] rounded-xl border border-[#4A3F7A] shadow-2xl w-full max-w-md p-6 relative" onClick={(e) => e.stopPropagation()}>
+        <div className="text-center">
+            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-900/50">
+                <i className="fa-solid fa-triangle-exclamation text-red-400 text-xl"></i>
+            </div>
+            <h3 className="text-lg leading-6 font-bold text-white mt-4" id="modal-title">
+                {title}
+            </h3>
+            <div className="mt-2">
+                <p className="text-sm text-purple-200">
+                    {message}
+                </p>
             </div>
         </div>
-    );
+        <div className="mt-6 flex justify-center gap-4">
+          <button
+            type="button"
+            className="px-6 py-2.5 text-sm font-bold text-purple-200 bg-transparent rounded-md hover:bg-[#1A0F3C]/50 transition-colors duration-200 w-full"
+            onClick={onClose}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="px-6 py-2.5 text-sm font-bold bg-red-600 text-white rounded-md hover:bg-red-700 transition-all duration-200 w-full"
+            onClick={onConfirm}
+          >
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 };
-
-export default ConfirmationModal;
