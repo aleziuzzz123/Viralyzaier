@@ -11,7 +11,7 @@ const ViralityGauge: React.FC<ViralityGaugeProps> = ({ score, size = 'lg' }) => 
         if (s >= 75) return 'text-lime-400';
         if (s >= 50) return 'text-yellow-400';
         if (s >= 25) return 'text-orange-400';
-        return 'text-red-500';
+        return 'text-red-400';
     };
 
     const config = {

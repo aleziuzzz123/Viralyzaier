@@ -1,7 +1,26 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
-import { TimelineState, TimelineClip, Subtitle, SubtitleWord } from '../types';
-import { useAppContext } from '../contexts/AppContext';
-import { WarningIcon } from './Icons';
+import { TimelineState, TimelineClip, Subtitle, SubtitleWord, KeyframeableProperty } from '../types.ts';
+import { useAppContext } from '../contexts/AppContext.tsx';
+import { WarningIcon } from './Icons.tsx';
+
+// Helper to interpolate keyframe values
+const interpolateKeyframes = (keyframes: { time: number; value: number }[] | undefined, currentTime: number, defaultValue: number): number => {
+    if (!keyframes || keyframes.length === 0) return defaultValue;
+    if (keyframes.length === 1) return keyframes[0].value;
+
+    if (currentTime <= keyframes[0].time) return keyframes[0].value;
+    if (currentTime >= keyframes[keyframes.length - 1].time) return keyframes[keyframes.length - 1].value;
+
+    const nextKfIndex = keyframes.findIndex(kf => kf.time > currentTime);
+    const prevKf = keyframes[nextKfIndex - 1];
+    const nextKf = keyframes[nextKfIndex];
+
+    if (!prevKf || !nextKf) return defaultValue;
+
+    const progress = (currentTime - prevKf.time) / (nextKf.time - prevKf.time);
+    return prevKf.value + (nextKf.value - prevKf.value) * progress;
+};
+
 
 interface LivePreviewPlayerProps {
     timeline: TimelineState;
@@ -28,7 +47,6 @@ const renderSubtitleStyle = (style: Subtitle['style']): React.CSSProperties => {
     const shadows: string[] = [];
     if (style.outline && style.outline.width > 0) {
         const { color, width } = style.outline;
-        // Create a more solid outline effect with text-shadow
         for (let i = 0; i < 360; i += 30) {
           const x = Math.cos(i * Math.PI / 180) * width;
           const y = Math.sin(i * Math.PI / 180) * width;
@@ -38,18 +56,14 @@ const renderSubtitleStyle = (style: Subtitle['style']): React.CSSProperties => {
     if (style.shadow) {
         shadows.push(`${style.shadow.offsetX}px ${style.shadow.offsetY}px ${style.shadow.blur}px ${style.shadow.color}`);
     }
-    if (shadows.length > 0) {
-        css.textShadow = shadows.join(', ');
-    }
+    if (shadows.length > 0) { css.textShadow = shadows.join(', '); }
 
     if (style.fill.type === 'gradient' && style.fill.gradient) {
         css.backgroundImage = `linear-gradient(${style.fill.gradient.angle}deg, ${style.fill.gradient.start}, ${style.fill.gradient.end})`;
         css.backgroundClip = 'text';
-        css.WebkitBackgroundClip = 'text';
     } else if (style.fill.type === 'texture' && style.fill.texture) {
         css.backgroundImage = `url(${style.fill.texture})`;
         css.backgroundClip = 'text';
-        css.WebkitBackgroundClip = 'text';
     }
 
     return css;
@@ -71,33 +85,16 @@ const getClipFilterStyle = (clip: TimelineClip): string => {
         case 'cancun': filters.push('sepia(0.2) contrast(1.1) saturate(1.2)'); break;
         case 'vintage': filters.push('sepia(0.5) contrast(0.9) brightness(0.9)'); break;
         case 'noir': filters.push('grayscale(1) contrast(1.3)'); break;
-        case 'cyberpunk': filters.push('hue-rotate(-50deg) saturate(1.5) contrast(1.1)'); break;
-        case 'corporate': filters.push('saturate(0.9) brightness(1.05)'); break;
       }
     }
     if (clip.color?.adjustments) {
-        const { exposure = 0, contrast = 0, saturation = 0, temperature = 0 } = clip.color.adjustments;
+        const { exposure = 0, contrast = 0, saturation = 0 } = clip.color.adjustments;
         filters.push(`brightness(${1 + exposure / 100})`);
         filters.push(`contrast(${1 + contrast / 100})`);
         filters.push(`saturate(${1 + saturation / 100})`);
-        if (temperature > 0) filters.push(`sepia(${temperature / 200})`);
-        if (temperature < 0) filters.push(`hue-rotate(${temperature / 10}deg)`);
     }
     return filters.join(' ');
 };
-
-const getAnimationClass = (clip: TimelineClip, currentTime: number): string => {
-    const animation = clip.animation;
-    if (!animation) return '';
-    const duration = 0.5; // seconds
-    if (animation.in && currentTime >= clip.startTime && currentTime < clip.startTime + duration) {
-        return `animate-${animation.in}-in`;
-    }
-    if (animation.out && currentTime <= clip.endTime && currentTime > clip.endTime - duration) {
-        return `animate-${animation.out}-out`;
-    }
-    return 'opacity-100';
-}
 
 const LivePreviewPlayer: React.FC<LivePreviewPlayerProps> = ({
     timeline, isPlaying, currentTime, onTimeUpdate, onEnded, aspectRatio = '16/9', children, selectedClipId, onClipUpdate
@@ -105,7 +102,6 @@ const LivePreviewPlayer: React.FC<LivePreviewPlayerProps> = ({
     const mediaRefs = useRef<Record<string, HTMLMediaElement | null>>({});
     const playerContainerRef = useRef<HTMLDivElement>(null);
     const [mediaErrors, setMediaErrors] = useState<Record<string, string | null>>({});
-    const [draggingOverlay, setDraggingOverlay] = useState<{clipId: string, type: 'move' | 'resize' | 'rotate', initialMouseX: number, initialMouseY: number, initialClipData: any} | null>(null);
 
     const handleMediaError = useCallback((e: React.SyntheticEvent<HTMLMediaElement | HTMLImageElement, Event>, clipId: string) => {
         const media = e.currentTarget as HTMLMediaElement;
@@ -149,67 +145,6 @@ const LivePreviewPlayer: React.FC<LivePreviewPlayerProps> = ({
         });
     }, [currentTime, allClips]);
 
-    const handleOverlayInteractionStart = (e: React.MouseEvent, clip: TimelineClip, type: 'move' | 'resize' | 'rotate') => {
-        e.preventDefault();
-        e.stopPropagation();
-        setDraggingOverlay({
-            clipId: clip.id,
-            type,
-            initialMouseX: e.clientX,
-            initialMouseY: e.clientY,
-            initialClipData: {
-                x: clip.positioning?.x || 50,
-                y: clip.positioning?.y || 50,
-                width: clip.positioning?.width || 20,
-                height: clip.positioning?.height || 20,
-                rotation: clip.positioning?.rotation || 0,
-            },
-        });
-    };
-    
-    const handleOverlayInteractionMove = useCallback((e: MouseEvent) => {
-        if (!draggingOverlay || !playerContainerRef.current) return;
-        const rect = playerContainerRef.current.getBoundingClientRect();
-        const clip = allClips.find(c => c.id === draggingOverlay.clipId);
-        if(!clip) return;
-        
-        let newPositioning = { ...clip.positioning, ...draggingOverlay.initialClipData };
-
-        if (draggingOverlay.type === 'move') {
-            const deltaX = (e.clientX - draggingOverlay.initialMouseX) / rect.width * 100;
-            const deltaY = (e.clientY - draggingOverlay.initialMouseY) / rect.height * 100;
-            newPositioning.x = draggingOverlay.initialClipData.x + deltaX;
-            newPositioning.y = draggingOverlay.initialClipData.y + deltaY;
-            newPositioning.x = Math.max(0, Math.min(100 - newPositioning.width, newPositioning.x));
-            newPositioning.y = Math.max(0, Math.min(100 - newPositioning.height, newPositioning.y));
-        } else if (draggingOverlay.type === 'rotate') {
-            const centerX = rect.left + (newPositioning.x + newPositioning.width / 2) / 100 * rect.width;
-            const centerY = rect.top + (newPositioning.y + newPositioning.height / 2) / 100 * rect.height;
-            const initialAngle = Math.atan2(draggingOverlay.initialMouseY - centerY, draggingOverlay.initialMouseX - centerX) * (180 / Math.PI);
-            const currentAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
-            const angleDelta = currentAngle - initialAngle;
-            newPositioning.rotation = (draggingOverlay.initialClipData.rotation + angleDelta + 360) % 360;
-        }
-
-        onClipUpdate(draggingOverlay.clipId, { positioning: newPositioning as any });
-
-    }, [draggingOverlay, onClipUpdate, allClips]);
-
-    const handleOverlayInteractionEnd = useCallback(() => {
-        setDraggingOverlay(null);
-    }, []);
-
-    useEffect(() => {
-        if(draggingOverlay) {
-            window.addEventListener('mousemove', handleOverlayInteractionMove);
-            window.addEventListener('mouseup', handleOverlayInteractionEnd);
-        }
-        return () => {
-            window.removeEventListener('mousemove', handleOverlayInteractionMove);
-            window.removeEventListener('mouseup', handleOverlayInteractionEnd);
-        }
-    }, [draggingOverlay, handleOverlayInteractionMove, handleOverlayInteractionEnd]);
-
     const activeSubtitle = timeline.subtitles.find(s => currentTime >= s.start && currentTime < s.end);
     
     return (
@@ -219,14 +154,21 @@ const LivePreviewPlayer: React.FC<LivePreviewPlayerProps> = ({
                 if (!isVisible) return null;
                 const hasError = !!mediaErrors[clip.id];
 
+                // Keyframe Interpolation
+                const scale = interpolateKeyframes(clip.keyframes?.scale, currentTime, clip.positioning?.scale ?? 1);
+                const x = interpolateKeyframes(clip.keyframes?.x, currentTime, clip.positioning?.x ?? 0);
+                const y = interpolateKeyframes(clip.keyframes?.y, currentTime, clip.positioning?.y ?? 0);
+                const rotation = interpolateKeyframes(clip.keyframes?.rotation, currentTime, clip.positioning?.rotation ?? 0);
+                const opacity = interpolateKeyframes(clip.keyframes?.opacity, currentTime, clip.opacity ?? 1);
+
                 const positionStyle: React.CSSProperties = {
-                    left: `${clip.positioning?.x || 0}%`,
-                    top: `${clip.positioning?.y || 0}%`,
+                    left: `${x}%`,
+                    top: `${y}%`,
                     width: `${clip.positioning?.width || 100}%`,
                     height: `${clip.positioning?.height || 100}%`,
-                    transform: `rotate(${clip.positioning?.rotation || 0}deg) scale(${clip.positioning?.scale || 1})`,
+                    transform: `translateX(-50%) translateY(-50%) rotate(${rotation}deg) scale(${scale})`,
                     zIndex: clip.positioning?.zIndex || (track.type === 'overlay' ? 10 : 1),
-                    opacity: clip.opacity
+                    opacity: opacity
                 };
 
                 const baseClasses = 'absolute object-cover';
@@ -234,42 +176,35 @@ const LivePreviewPlayer: React.FC<LivePreviewPlayerProps> = ({
                 if (hasError) {
                     return (
                         <div key={clip.id} style={positionStyle} className={`${baseClasses} bg-red-900/50 flex flex-col items-center justify-center text-red-300 p-2`}>
-                            <WarningIcon className="w-8 h-8" />
-                            <p className="text-sm font-bold text-center mt-2">Media Error</p>
-                            <p className="text-xs text-center mt-1">{mediaErrors[clip.id]}</p>
+                            <WarningIcon className="w-8 h-8" /><p className="text-sm font-bold text-center mt-2">Media Error</p><p className="text-xs text-center mt-1">{mediaErrors[clip.id]}</p>
                         </div>
                     );
                 }
                 
-                if (!clip.url?.trim()) return null;
+                if (!clip.url?.trim() && clip.type !== 'text') return null;
                 const filterStyle = { filter: getClipFilterStyle(clip) };
-                const animationClass = getAnimationClass(clip, currentTime);
                 const isVideo = clip.type === 'video' || clip.url.includes('.mp4') || clip.url.includes('.webm') || clip.url.includes('giphy');
-                
+                const kenBurnsClass = clip.effects?.kenBurns ? `ken-burns-${clip.effects.kenBurns.direction}` : '';
+                const animationDuration = `${clip.endTime - clip.startTime}s`;
+
                 if (track.type === 'voiceover' || track.type === 'music' || track.type === 'sfx') {
-                     return <audio key={clip.id} id={clip.id} ref={el => { mediaRefs.current[clip.id] = el; if(el) el.volume = clip.volume * (track.type === 'voiceover' ? timeline.voiceoverVolume : track.type === 'music' ? timeline.musicVolume : 1); }} src={clip.url} onError={(e) => handleMediaError(e, clip.id)} />
+                     return <audio key={clip.id} id={clip.id} ref={el => { mediaRefs.current[clip.id] = el; if(el) el.volume = interpolateKeyframes(clip.keyframes?.volume, currentTime, clip.volume); }} src={clip.url} onError={(e) => handleMediaError(e, clip.id)} />
+                }
+                
+                 if (clip.type === 'text') {
+                    return (
+                        <div key={clip.id} style={positionStyle} className={`${baseClasses} flex items-center justify-center p-4`}>
+                            <p style={renderSubtitleStyle(clip.style as Subtitle['style'])} className="text-center">{clip.text}</p>
+                        </div>
+                    )
                 }
 
                  return (
-                    <div 
-                        key={clip.id} 
-                        style={positionStyle} 
-                        className={`${baseClasses} ${selectedClipId === clip.id ? 'outline outline-2 outline-pink-500 outline-offset-2' : ''} ${track.type === 'overlay' ? 'cursor-move' : ''} ${animationClass}`}
-                        onMouseDown={(e) => track.type === 'overlay' && handleOverlayInteractionStart(e, clip, 'move')}
-                    >
+                    <div key={clip.id} style={positionStyle} className={`${baseClasses} ${selectedClipId === clip.id ? 'outline outline-2 outline-pink-500 outline-offset-2' : ''} ${track.type === 'overlay' ? 'cursor-move' : ''}`}>
                         {isVideo ? (
-                            <video id={clip.id} ref={el => { mediaRefs.current[clip.id] = el }} src={clip.url} muted loop style={filterStyle} className="w-full h-full" onError={(e) => handleMediaError(e, clip.id)}/>
+                            <video id={clip.id} ref={el => { mediaRefs.current[clip.id] = el }} src={clip.url} muted loop style={filterStyle} className={`w-full h-full ${kenBurnsClass}`} onError={(e) => handleMediaError(e, clip.id)}/>
                         ) : (
-                            <img id={clip.id} src={clip.url} style={filterStyle} className="w-full h-full" onError={(e) => handleMediaError(e, clip.id)} />
-                        )}
-                         {track.type === 'overlay' && selectedClipId === clip.id && (
-                            <>
-                                <div className="absolute -top-1 -left-1 w-3 h-3 bg-white rounded-full border-2 border-pink-500 cursor-nwse-resize"></div>
-                                <div className="absolute -top-1 -right-1 w-3 h-3 bg-white rounded-full border-2 border-pink-500 cursor-nesw-resize"></div>
-                                <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-white rounded-full border-2 border-pink-500 cursor-nesw-resize"></div>
-                                <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-white rounded-full border-2 border-pink-500 cursor-nwse-resize"></div>
-                                <div onMouseDown={(e) => handleOverlayInteractionStart(e, clip, 'rotate')} className="absolute -top-5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white rounded-full border-2 border-pink-500 cursor-alias" title="Rotate"></div>
-                            </>
+                            <img id={clip.id} src={clip.url} style={{...filterStyle, animationDuration}} className={`w-full h-full ${kenBurnsClass}`} onError={(e) => handleMediaError(e, clip.id)} />
                         )}
                     </div>
                  );

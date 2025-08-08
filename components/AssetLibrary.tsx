@@ -1,8 +1,10 @@
 
 
+
+
 import React, { useState, useMemo } from 'react';
-import { useAppContext } from '../contexts/AppContext';
-import { PhotoIcon, MicIcon, ClipboardCopyIcon } from './Icons';
+import { useAppContext } from '../contexts/AppContext.tsx';
+import { PhotoIcon, MicIcon, ClipboardCopyIcon } from './Icons.tsx';
 
 interface FlatAsset {
     url: string;

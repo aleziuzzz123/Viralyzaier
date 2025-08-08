@@ -1,7 +1,6 @@
-
 import React from 'react';
-import { XCircleIcon, WarningIcon } from './Icons';
-import { useAppContext } from '../contexts/AppContext';
+import { XCircleIcon, WarningIcon } from './Icons.tsx';
+import { useAppContext } from '../contexts/AppContext.tsx';
 
 interface ConfirmationModalProps {
     isOpen: boolean;

@@ -1,10 +1,13 @@
 
+
+
+
 import React, { useState, useCallback } from 'react';
-import { useAppContext } from '../contexts/AppContext';
-import { SparklesIcon, UploadIcon, UserCircleIcon, TrashIcon, RefreshIcon } from './Icons';
-import { invokeEdgeFunction } from '../services/supabaseService';
-import { ClonedVoice } from '../types';
-import BrandIdentityHub from './BrandIdentityHub';
+import { useAppContext } from '../contexts/AppContext.tsx';
+import { SparklesIcon, UploadIcon, UserCircleIcon, TrashIcon, RefreshIcon } from './Icons.tsx';
+import { invokeEdgeFunction } from '../services/supabaseService.ts';
+import { ClonedVoice } from '../types.ts';
+import BrandIdentityHub from './BrandIdentityHub.tsx';
 
 const Settings: React.FC = () => {
     const { user, t, requirePermission, addToast, setUser, consumeCredits } = useAppContext();

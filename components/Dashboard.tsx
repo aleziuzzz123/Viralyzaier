@@ -1,22 +1,18 @@
-
-
-
-
 import React, { useState, useEffect, useRef } from 'react';
-import { Project, Blueprint, Platform, BrandIdentity, ClonedVoice, VideoStyle } from '../types';
-import { FilePlusIcon, SparklesIcon, LightBulbIcon, YouTubeIcon, TikTokIcon, InstagramIcon, CheckCircleIcon, PlayIcon, StopCircleIcon, FilmIcon, TypeIcon } from './Icons';
-import KanbanBoard from './KanbanBoard';
-import { PLANS } from '../services/paymentService';
-import { useAppContext } from '../contexts/AppContext';
-import { getErrorMessage } from '../utils';
-import Loader from './Loader';
-import { ELEVENLABS_VOICES, generateVoiceover } from '../services/generativeMediaService';
+import { Project, Blueprint, Platform, BrandIdentity, ClonedVoice, VideoStyle } from '../types.ts';
+import { FilePlusIcon, SparklesIcon, LightBulbIcon, YouTubeIcon, TikTokIcon, InstagramIcon, CheckCircleIcon, PlayIcon, StopCircleIcon, FilmIcon, TypeIcon } from './Icons.tsx';
+import KanbanBoard from './KanbanBoard.tsx';
+import { PLANS } from '../services/paymentService.ts';
+import { useAppContext } from '../contexts/AppContext.tsx';
+import { getErrorMessage } from '../utils.ts';
+import Loader from './Loader.tsx';
+import { ELEVENLABS_VOICES, generateVoiceover } from '../services/generativeMediaService.ts';
 
 const platformConfig: { [key in Platform]: { icon: React.FC<{className?: string}>, nameKey: string, descKey: string } } = {
     youtube_long: { icon: YouTubeIcon, nameKey: 'platform.youtube_long_name', descKey: 'platform.youtube_long_desc' },
     youtube_short: { icon: YouTubeIcon, nameKey: 'platform.youtube_short_name', descKey: 'platform.youtube_short_desc' },
     tiktok: { icon: TikTokIcon, nameKey: 'platform.tiktok_name', descKey: 'platform.tiktok_desc' },
-    instagram: { icon: InstagramIcon, nameKey: 'platform.instagram_name', descKey: 'platform.instagram_desc' },
+    instagram: { icon: InstagramIcon, nameKey: 'platform.instagram_name', descKey: 'platform.instagram_desc' }
 };
 
 interface NewProjectModalProps {

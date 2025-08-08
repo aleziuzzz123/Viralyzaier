@@ -1,6 +1,6 @@
 import React from 'react';
-import { TitleAnalysis } from '../types';
-import { SparklesIcon } from './Icons';
+import { TitleAnalysis } from '../types.ts';
+import { SparklesIcon } from './Icons.tsx';
 
 interface TitleAnalysisResultProps {
   results: { analysis: TitleAnalysis; suggestions: string[] };

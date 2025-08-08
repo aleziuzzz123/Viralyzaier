@@ -1,9 +1,8 @@
-
 import React, { useState, useCallback } from 'react';
-import { TrendData, InterestPoint, RelatedQuery } from '../types';
-import { fetchTrends } from '../services/googleTrendsService';
-import { SearchIcon, BreakoutIcon, TopTopicsIcon, SparklesIcon } from './Icons';
-import { useAppContext } from '../contexts/AppContext';
+import { TrendData, InterestPoint, RelatedQuery } from '../types.ts';
+import { fetchTrends } from '../services/googleTrendsService.ts';
+import { SearchIcon, BreakoutIcon, TopTopicsIcon, SparklesIcon } from './Icons.tsx';
+import { useAppContext } from '../contexts/AppContext.tsx';
 
 interface TrendExplorerProps {
   onTrendSelect: (trend: string) => void;

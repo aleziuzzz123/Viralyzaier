@@ -1,11 +1,13 @@
 
 
+
+
 import React, { useState, useRef } from 'react';
-import { useAppContext } from '../contexts/AppContext';
-import { generateAutopilotBacklog } from '../services/geminiService';
-import * as supabase from '../services/supabaseService';
-import { SparklesIcon, RocketLaunchIcon, PlusIcon, TrashIcon } from './Icons';
-import { Project, Script, TimelineState } from '../types';
+import { useAppContext } from '../contexts/AppContext.tsx';
+import { generateAutopilotBacklog } from '../services/geminiService.ts';
+import * as supabase from '../services/supabaseService.ts';
+import { SparklesIcon, RocketLaunchIcon, PlusIcon, TrashIcon } from './Icons.tsx';
+import { Project, Script, TimelineState } from '../types.ts';
 
 const Autopilot: React.FC = () => {
     const { user, setUser, consumeCredits, requirePermission, addToast, t, addProjects, setActiveProjectId, lockAndExecute } = useAppContext();

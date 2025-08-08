@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { CrownIcon, CreditIcon, LogoutIcon, SparklesIcon, CogIcon } from './Icons';
-import { useAppContext } from '../contexts/AppContext';
-import * as supabase from '../services/supabaseService';
-import { PLANS } from '../services/paymentService';
+import { CrownIcon, CreditIcon, LogoutIcon, SparklesIcon, CogIcon } from './Icons.tsx';
+import { useAppContext } from '../contexts/AppContext.tsx';
+import * as supabase from '../services/supabaseService.ts';
+import { PLANS } from '../services/paymentService.ts';
 
 interface UserMenuProps {
     onNavigate: (view: 'pricing' | 'settings') => void;

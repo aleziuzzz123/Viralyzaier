@@ -1,10 +1,8 @@
-
-
 import React, { useState, useCallback, useEffect } from 'react';
-import { analyzeTitles } from '../services/geminiService';
-import { TitleAnalysis, Platform } from '../types';
-import { SparklesIcon, PlusIcon, TrashIcon, LightBulbIcon, MagicWandIcon } from './Icons';
-import { useAppContext } from '../contexts/AppContext';
+import { analyzeTitles } from '../services/geminiService.ts';
+import { TitleAnalysis, Platform } from '../types.ts';
+import { SparklesIcon, PlusIcon, TrashIcon, LightBulbIcon, MagicWandIcon } from './Icons.tsx';
+import { useAppContext } from '../contexts/AppContext.tsx';
 
 interface TitleOptimizerProps {
     onTitleSelect: (title: string) => void;

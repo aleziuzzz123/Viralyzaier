@@ -10,7 +10,7 @@ const tutorials = [
     { title: "Trimming Clips", description: "Hover over the edge of a clip and drag to change its length.", gif: "https://storage.googleapis.com/gemini-web-assets/notebook-assets/trim_demo.gif" },
     { title: "Moving Clips", description: "Click and drag the center of a clip to move it to a new position on the timeline.", gif: "https://storage.googleapis.com/gemini-web-assets/notebook-assets/move_demo.gif" },
     { title: "Adding Stickers", description: "Search for a sticker in the VFX panel, then click to add it. Select it on the preview to move or resize.", gif: "https://storage.googleapis.com/gemini-web-assets/notebook-assets/sticker_demo.gif" },
-    { title: "Applying Effects", description: "Select a clip, then choose an animation, transition, or AI effect from the Inspector panel.", gif: "https://storage.googleapis.com/gemini-web-assets/notebook-assets/effect_demo.gif" },
+    { title: "Applying Effects", description: "Select a clip, then choose an animation, transition, or AI effect from the Inspector panel.", gif: "https://storage.googleapis.com/gemini-web-assets/notebook-assets/effect_demo.gif" }
 ];
 
 const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {

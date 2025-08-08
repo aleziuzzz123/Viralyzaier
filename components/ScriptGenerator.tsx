@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Project, Script, Platform } from '../types';
-import { PencilIcon, CheckBadgeIcon, MagicWandIcon, SparklesIcon, PlusIcon, TrashIcon } from './Icons';
-import { useAppContext } from '../contexts/AppContext';
-import { rewriteScriptScene } from '../services/geminiService';
-import { getErrorMessage } from '../utils';
+import { Project, Script, Platform } from '../types.ts';
+import { PencilIcon, CheckBadgeIcon, MagicWandIcon, SparklesIcon, PlusIcon, TrashIcon } from './Icons.tsx';
+import { useAppContext } from '../contexts/AppContext.tsx';
+import { rewriteScriptScene } from '../services/geminiService.ts';
+import { getErrorMessage } from '../utils.ts';
 
 interface ScriptEditorProps {
     project: Project;
@@ -102,7 +102,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ project, onScriptSaved }) =
     const copilotActions = [
         { key: 'action_concise', label: t('script_editor.copilot.action_concise') },
         { key: 'action_engaging', label: t('script_editor.copilot.action_engaging') },
-        { key: 'action_visual', label: t('script_editor.copilot.action_visual') },
+        { key: 'action_visual', label: t('script_editor.copilot.action_visual') }
     ];
 
     return (

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Subtitle, TimelineState } from '../types';
-import { PaintBrushIcon } from './Icons';
+import { Subtitle, TimelineState } from '../types.ts';
+import { PaintBrushIcon } from './Icons.tsx';
 
 interface SubtitleTrackProps {
     timeline: TimelineState;
