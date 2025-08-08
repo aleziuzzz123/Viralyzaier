@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { Analysis } from '../types';
 import {
@@ -18,9 +19,9 @@ import {
 import { useAppContext } from '../contexts/AppContext';
 
 interface AnalysisResultProps {
-  result: Analysis;
+  result: Analysis | null;
   onReset: () => void;
-  videoPreviewUrl: string;
+  videoPreviewUrl: string | null;
   onProceedToLaunchpad: () => void;
 }
 
@@ -177,6 +178,16 @@ const ImprovementItem: React.FC<ImprovementItemProps> = ({ suggestion, reason, t
 
 const AnalysisResult: React.FC<AnalysisResultProps> = ({ result, onReset, videoPreviewUrl, onProceedToLaunchpad }) => {
   const { t } = useAppContext();
+  
+  if (!result) {
+    return (
+        <div className="text-center py-16 px-6 bg-gray-800/50 rounded-2xl">
+            <h2 className="text-2xl font-bold text-white mb-3">Analysis Not Available</h2>
+            <p className="text-gray-400 mb-6 max-w-md mx-auto">The virality analysis for this project has not been generated yet or could not be loaded.</p>
+        </div>
+    );
+  }
+
   const { scores, summary, goldenNugget, strengths, improvements } = result;
   const overallScore = scores.overall;
   const isGoodScore = overallScore >= 70;

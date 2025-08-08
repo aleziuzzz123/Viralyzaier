@@ -1,7 +1,10 @@
+
+
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Project, Blueprint, Platform, BrandIdentity, ClonedVoice, VideoStyle } from '../types';
 import { FilePlusIcon, SparklesIcon, LightBulbIcon, YouTubeIcon, TikTokIcon, InstagramIcon, CheckCircleIcon, PlayIcon, StopCircleIcon, FilmIcon, TypeIcon } from './Icons';
-import TutorialCallout from './TutorialCallout';
 import KanbanBoard from './KanbanBoard';
 import { PLANS } from '../services/paymentService';
 import { useAppContext } from '../contexts/AppContext';
@@ -26,7 +29,6 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) =>
     const [topicOrUrl, setTopicOrUrl] = useState('');
     const [platform, setPlatform] = useState<Platform | null>(null);
     const [voiceoverVoiceId, setVoiceoverVoiceId] = useState<string>('pNInz6obpgDQGcFmaJgB');
-    const [activeBrandIdentityId, setActiveBrandIdentityId] = useState<string>('');
     const [error, setError] = useState<string | null>(null);
     const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
     const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -56,7 +58,6 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) =>
         setError(null);
         setPlatform(null);
         setVoiceoverVoiceId('pNInz6obpgDQGcFmaJgB');
-        setActiveBrandIdentityId('');
         onClose();
     };
     
@@ -141,36 +142,27 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) =>
                            className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                        />
                    </div>
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <h3 className="text-lg font-semibold text-white text-left mb-3">3. Select a Narrator</h3>
-                            <div className="flex items-center gap-2">
-                                <select value={voiceoverVoiceId} onChange={e => setVoiceoverVoiceId(e.target.value)} className="flex-grow w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white">
-                                    <optgroup label="Your Voices">
-                                        {userVoices.map(v => <option key={v.id} value={v.id} disabled={v.status !== 'ready'}>{v.name} ({v.status})</option>)}
-                                    </optgroup>
-                                    <optgroup label="Standard Voices">
-                                        {ELEVENLABS_VOICES.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-                                    </optgroup>
-                                </select>
-                                <button
-                                    onClick={() => handlePreviewVoice(voiceoverVoiceId)}
-                                    title="Preview Voice (1 Credit)"
-                                    className="p-3 bg-gray-700 rounded-lg text-white hover:bg-indigo-600 transition-colors flex-shrink-0"
-                                >
-                                    {previewingVoiceId === voiceoverVoiceId ? <StopCircleIcon className="w-5 h-5" /> : <PlayIcon className="w-5 h-5" />}
-                                </button>
-                            </div>
-                             <p className="text-xs text-gray-500 text-center mt-2">Previewing a voice costs 1 AI credit.</p>
+                   <div>
+                        <h3 className="text-lg font-semibold text-white text-left mb-3">3. Select a Narrator</h3>
+                        <div className="flex items-center gap-2">
+                            <select value={voiceoverVoiceId} onChange={e => setVoiceoverVoiceId(e.target.value)} className="flex-grow w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white">
+                                <optgroup label="Your Voices">
+                                    {userVoices.map(v => <option key={v.id} value={v.id} disabled={v.status !== 'ready'}>{v.name} ({v.status})</option>)}
+                                </optgroup>
+                                <optgroup label="Standard Voices">
+                                    {ELEVENLABS_VOICES.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                                </optgroup>
+                            </select>
+                            <button
+                                onClick={() => handlePreviewVoice(voiceoverVoiceId)}
+                                title="Preview Voice (1 Credit)"
+                                className="p-3 bg-gray-700 rounded-lg text-white hover:bg-indigo-600 transition-colors flex-shrink-0"
+                            >
+                                {previewingVoiceId === voiceoverVoiceId ? <StopCircleIcon className="w-5 h-5" /> : <PlayIcon className="w-5 h-5" />}
+                            </button>
                         </div>
-                        <div>
-                           <h3 className="text-lg font-semibold text-white text-left mb-3">4. Select Brand Identity</h3>
-                           <select value={activeBrandIdentityId} onChange={e => setActiveBrandIdentityId(e.target.value)} className="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white">
-                               <option value="">{t('new_project_modal.no_identity')}</option>
-                               {brandIdentities.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                           </select>
-                       </div>
-                   </div>
+                         <p className="text-xs text-gray-500 text-center mt-2">Previewing a voice costs 1 AI credit.</p>
+                    </div>
                </div>
                <div className="pt-6 border-t border-gray-700/50 mt-6 flex-shrink-0">
                    <button
@@ -235,12 +227,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelectProject }) => {
                     {t('dashboard.new_blueprint')}
                 </button>
             </header>
-
-            {projects.length === 0 && !dismissedTutorials.includes('welcome') && (
-                <TutorialCallout id="welcome">
-                    {t('dashboard.tutorial_callout_new')}
-                </TutorialCallout>
-            )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-gray-800/50 p-4 rounded-lg text-center">

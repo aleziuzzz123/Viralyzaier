@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Project, Script as ScriptType, WorkflowStep, Platform, Blueprint } from '../types';
-import { TitleIcon, ScriptIcon, SparklesIcon, TrashIcon, PhotoIcon, CtaIcon, LockClosedIcon, CheckIcon, YouTubeIcon, TikTokIcon, InstagramIcon, MusicNoteIcon, RocketLaunchIcon, CheckBadgeIcon, LightBulbIcon, MagicWandIcon } from './Icons';
+import { ScriptIcon, SparklesIcon, TrashIcon, PhotoIcon, CtaIcon, CheckIcon, YouTubeIcon, TikTokIcon, InstagramIcon, MusicNoteIcon, RocketLaunchIcon, CheckBadgeIcon, LightBulbIcon, MagicWandIcon, ChartPieIcon } from './Icons';
 import ScriptGenerator from './ScriptGenerator';
 import Launchpad from './Launchpad';
-import TutorialCallout from './TutorialCallout';
 import { useAppContext } from '../contexts/AppContext';
 import BlueprintStep from './BlueprintStep';
 import FinalEditStep from './FinalEditStep';
 import * as supabaseService from '../services/supabaseService';
 import { getErrorMessage } from '../utils';
+import AnalysisResult from './AnalysisResult';
+import AnalysisLoader from './AnalysisLoader';
 
 interface ProjectViewProps {
     project: Project;
@@ -21,88 +22,72 @@ const platformIcons: { [key in Platform]: React.FC<{className?: string}> } = {
     instagram: InstagramIcon,
 };
 
-interface ProjectStepperProps {
-    steps: { name: string; icon: React.ElementType }[];
+interface ProjectWorkflowGuideProps {
     currentStep: number;
     unlockedStep: number;
     onStepSelect: (step: number) => void;
     t: (key: string) => string;
 }
 
-const ProjectStepper: React.FC<ProjectStepperProps> = ({ steps, currentStep, unlockedStep, onStepSelect, t }) => {
+const ProjectWorkflowGuide: React.FC<ProjectWorkflowGuideProps> = ({ currentStep, unlockedStep, onStepSelect, t }) => {
+    const steps = [
+        { nameKey: 'project_view.stepper_blueprint', icon: LightBulbIcon, description: "Start with a topic and generate a complete strategic plan with a script and visuals." },
+        { nameKey: 'project_view.stepper_script_editor', icon: ScriptIcon, description: "Refine your AI-generated script, edit scenes, and choose the perfect hook." },
+        { nameKey: 'project_view.stepper_creative_studio', icon: PhotoIcon, description: "Assemble your video, generate assets, add music, captions, and effects." },
+        { nameKey: 'project_view.virality_engine', icon: ChartPieIcon, description: "Get a data-driven analysis of your video's viral potential before you publish." },
+        { nameKey: 'project_view.stepper_launch', icon: RocketLaunchIcon, description: "Generate thumbnails, SEO, and publish your final video." },
+    ];
+
     return (
-        <nav aria-label="Progress">
-            <ol role="list" className="flex items-center">
-                {steps.map((step, stepIdx) => {
-                    const stepNumber = stepIdx + 1;
-                    const isCompleted = stepNumber < unlockedStep;
-                    const isCurrentWorkflowStep = stepNumber === unlockedStep;
-                    const isLocked = stepNumber > unlockedStep;
-                    const isSelected = stepNumber === currentStep;
+        <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50 mb-8">
+            <h2 className="text-xl font-bold text-white mb-1">Your Project Workflow</h2>
+            <p className="text-sm text-gray-400 mb-6">Follow the stages to develop your video. Start with The Spark, refine The Script, then head to the Creative Studio before heading to the Launchpad.</p>
+            <nav>
+                <ol className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                    {steps.map((step, index) => {
+                        const stepNumber = index + 1;
+                        const isUnlocked = stepNumber <= unlockedStep;
+                        const isCurrent = stepNumber === currentStep;
+                        const isCompleted = stepNumber < unlockedStep;
 
-                    let bubbleContent;
-                    let bubbleClasses = 'relative w-9 h-9 flex items-center justify-center rounded-full transition-colors';
-                    let labelClasses = `absolute top-10 w-max -translate-x-1/2 left-1/2 text-xs font-semibold`;
-
-                    if (isCompleted) {
-                        bubbleContent = <CheckIcon className="w-5 h-5 text-white" aria-hidden="true" />;
-                        bubbleClasses += ' bg-indigo-600 hover:bg-indigo-500';
-                        labelClasses += ' text-indigo-400';
-                    } else if (isCurrentWorkflowStep) {
-                        const IconComponent = step.icon;
-                        bubbleContent = <IconComponent className="w-5 h-5 text-indigo-400" aria-hidden="true" />;
-                        bubbleClasses += ' bg-gray-800 border-2 border-indigo-600';
-                        labelClasses += ' text-indigo-400';
-                    } else { // Locked
-                        bubbleContent = <LockClosedIcon className="w-5 h-5 text-gray-500" aria-hidden="true" />;
-                        bubbleClasses += ' bg-gray-800 border-2 border-gray-600 cursor-not-allowed';
-                        labelClasses += ' text-gray-400';
-                    }
-                    
-                    if (isSelected) {
-                        bubbleClasses += ' ring-2 ring-offset-2 ring-offset-gray-900 ring-pink-500';
-                        labelClasses = labelClasses.replace('text-indigo-400', 'text-pink-400').replace('text-gray-400', 'text-pink-400');
-                    }
-
-                    return (
-                        <li key={step.name} className={`relative ${stepIdx !== steps.length - 1 ? 'pr-8 sm:pr-20' : ''}`}>
-                            {/* Connector line */}
-                            {stepIdx < steps.length - 1 && (
-                                <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                                    <div className={`h-0.5 w-full ${isCompleted ? 'bg-indigo-600' : 'bg-gray-700'}`} />
-                                </div>
-                            )}
-
-                             <button
-                                onClick={() => !isLocked && onStepSelect(stepNumber as WorkflowStep)}
-                                disabled={isLocked}
-                                className={bubbleClasses}
-                                aria-current={isSelected ? 'step' : undefined}
-                            >
-                                {bubbleContent}
-                                <span className="sr-only">{t(step.name)}</span>
-                            </button>
-                            
-                            <span className={labelClasses}>{t(step.name)}</span>
-                        </li>
-                    );
-                })}
-            </ol>
-        </nav>
+                        return (
+                            <li key={step.nameKey}>
+                                <button
+                                    onClick={() => isUnlocked && onStepSelect(stepNumber)}
+                                    disabled={!isUnlocked}
+                                    className={`w-full p-4 rounded-lg border-2 text-left transition-all duration-200 h-full flex flex-col ${
+                                        isCurrent ? 'bg-indigo-900/50 border-indigo-500' :
+                                        isUnlocked ? 'bg-gray-700/50 border-transparent hover:border-indigo-600' :
+                                        'bg-gray-800/30 border-gray-700/50 cursor-not-allowed opacity-60'
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div className={`p-2 rounded-full ${
+                                            isCompleted ? 'bg-green-500/20 text-green-400' :
+                                            isUnlocked ? 'bg-indigo-500/20 text-indigo-400' : 'bg-gray-600/50 text-gray-500'
+                                        }`}>
+                                            {isCompleted ? <CheckIcon className="w-5 h-5" /> : <step.icon className="w-5 h-5" />}
+                                        </div>
+                                        {isCompleted && <span className="text-xs font-bold text-green-400">DONE</span>}
+                                    </div>
+                                    <p className="mt-3 font-bold text-white">{t(step.nameKey as any)}</p>
+                                    <p className="text-xs text-gray-400 mt-1 flex-grow">{step.description}</p>
+                                    <p className="text-xs text-gray-500 mt-2 font-bold">STAGE {stepNumber}</p>
+                                </button>
+                            </li>
+                        );
+                    })}
+                </ol>
+            </nav>
+        </div>
     );
 };
 
-const workflowSteps = [
-    { name: 'project_view.stepper_blueprint', icon: LightBulbIcon },
-    { name: 'project_view.stepper_script_editor', icon: ScriptIcon },
-    { name: 'project_view.stepper_creative_studio', icon: PhotoIcon },
-    { name: 'project_view.stepper_launch', icon: RocketLaunchIcon },
-];
 
 const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
     const { 
         handleUpdateProject, handleDeleteProject, 
-        dismissedTutorials, addToast, t, user
+        addToast, t, user
     } = useAppContext();
     
     const [projectName, setProjectName] = useState(project.name);
@@ -156,10 +141,6 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
                 name: selectedTitle, // Also update project name
                 script: blueprint.script,
                 moodboard: moodboardUrls,
-                competitorAnalysis: { // Placeholder since it's part of the same step now
-                    ...project.competitorAnalysis,
-                    videoTitle: project.topic,
-                }
             });
 
             addToast(t('toast.brief_complete'), 'success');
@@ -184,11 +165,16 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
             case 2:
                 return <ScriptGenerator project={project} onScriptSaved={handleScriptSaved} />;
             case 3:
-                return <FinalEditStep project={project} onProceed={() => advanceWorkflow(4)} />;
+                return <FinalEditStep project={project} onProceedToNextStage={() => advanceWorkflow(4)} />;
             case 4:
+                if (project.status === 'Rendering' || !project.analysis) {
+                    return <div className="min-h-[80vh] flex items-center justify-center"><AnalysisLoader frames={project.moodboard || []} /></div>;
+                }
+                return <AnalysisResult result={project.analysis} onReset={() => setActiveStep(3)} videoPreviewUrl={project.publishedUrl} onProceedToLaunchpad={() => advanceWorkflow(5)} />;
+            case 5:
                 return <Launchpad project={project} />;
             default:
-                return <div>Something went wrong.</div>;
+                return <div>Something went wrong. Current Step: {activeStep}</div>;
         }
     }
 
@@ -213,23 +199,12 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
                 </button>
             </header>
             
-            <div className="flex justify-center mb-12 pt-4">
-               <ProjectStepper 
-                    steps={workflowSteps} 
-                    currentStep={activeStep} 
-                    unlockedStep={project.workflowStep} 
-                    onStepSelect={(step) => { if(step <= project.workflowStep) setActiveStep(step as WorkflowStep) }}
-                    t={t}
-                />
-            </div>
-
-            {!dismissedTutorials.includes('workflow') && (
-                 <div className="mb-8">
-                    <TutorialCallout id="workflow">
-                        {t('project_view.tutorial_callout_new')}
-                    </TutorialCallout>
-                 </div>
-             )}
+            <ProjectWorkflowGuide 
+                currentStep={activeStep}
+                unlockedStep={project.workflowStep}
+                onStepSelect={(step) => setActiveStep(step as WorkflowStep)}
+                t={t}
+            />
 
             <div className="p-1 sm:p-4 bg-black/10 rounded-lg min-h-[60vh]">
                 {renderActiveStep()}
