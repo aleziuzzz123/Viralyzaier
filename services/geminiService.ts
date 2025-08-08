@@ -1,10 +1,10 @@
 import { Type } from "@google/genai";
-import { Analysis, Blueprint, CompetitorAnalysisResult, Platform, Script, TitleAnalysis, ContentGapSuggestion, VideoPerformance, PerformanceReview, SceneAssets, SoundDesign, LaunchPlan, ChannelAudit, Opportunity, ScriptOptimization, AIMusic, ScriptGoal, Subtitle, BrandIdentity, VideoStyle, Scene, StockAsset, SubtitleWord } from '../types';
-import * as supabase from './supabaseService';
+import { Analysis, Blueprint, CompetitorAnalysisResult, Platform, Script, TitleAnalysis, ContentGapSuggestion, VideoPerformance, PerformanceReview, SceneAssets, SoundDesign, LaunchPlan, ChannelAudit, Opportunity, ScriptOptimization, ScriptGoal, Subtitle, BrandIdentity, VideoStyle, Scene, StockAsset, SubtitleWord, NormalizedStockAsset } from '../types.js';
+import * as supabase from './supabaseService.js';
 
 const parseGeminiJson = <T>(res: { text: string | null | undefined }, fallback: T | null = null): T => {
     try {
-        const rawText = res.text || '';
+        const rawText = (res.text ?? '');
         if (!rawText.trim()) {
             if (fallback) return fallback;
             throw new Error("AI returned an empty response.");
@@ -721,6 +721,43 @@ export const getSchedulingSuggestion = async (topic: string): Promise<string> =>
     return response.text ?? '';
 };
 
+export const getAiBrollSuggestion = async (scriptText: string): Promise<{ type: 'stock' | 'ai_video'; query?: string; prompt?: string }> => {
+    return await supabase.invokeEdgeFunction('ai-broll-generator', { scriptText });
+};
+
+const mapPexelsAsset = (asset: StockAsset, type: 'videos' | 'photos'): NormalizedStockAsset => {
+    const isVideo = type === 'videos' && 'video_files' in asset;
+    return {
+        id: asset.id,
+        previewImageUrl: isVideo ? asset.image! : asset.src!.medium,
+        downloadUrl: isVideo ? asset.video_files!.find(f => f.quality === 'hd')?.link || asset.video_files![0].link : asset.src!.original,
+        type: isVideo ? 'video' : 'image',
+        description: isVideo ? `Video by ${asset.photographer}` : asset.alt || `Photo by ${asset.photographer}`,
+        provider: 'pexels',
+        duration: asset.duration
+    };
+};
+
+export const searchStockMedia = async (query: string, type: 'videos' | 'photos'): Promise<NormalizedStockAsset[]> => {
+    if (!query.trim()) return [];
+    const response = await supabase.invokeEdgeFunction<{ videos?: StockAsset[], photos?: StockAsset[] }>('pexels-proxy', { query, type });
+    const assets = (type === 'videos' ? response.videos : response.photos) || [];
+    return assets.map(asset => mapPexelsAsset(asset, type));
+};
+
+export const generateTextGraphic = async (text: string): Promise<string> => {
+    const prompt = `Create a high-contrast, visually appealing graphic with transparent background featuring the text: "${text}". The style should be bold, modern, and suitable for a viral video overlay. The text should be the main focus.`;
+    const imageResult = await supabase.invokeEdgeFunction<{ generatedImages: { image: { imageBytes: string } }[] }>('gemini-proxy', {
+        type: 'generateImages',
+        params: {
+            model: 'imagen-3.0-generate-002',
+            prompt: prompt,
+            config: { numberOfImages: 1, outputMimeType: 'image/png' } // PNG for transparency
+        }
+    });
+    return `data:image/png;base64,${imageResult.generatedImages[0].image.imageBytes}`;
+};
+
 export const generateSeo = async (title: string, script: Script, platform: Platform): Promise<NonNullable<LaunchPlan['seo']>> => {
     const scriptSummary = script.scenes.map(s => s.voiceover).join(' ');
     const prompt = `You are a YouTube SEO expert. Generate an optimized description and relevant tags for a video.
@@ -829,7 +866,7 @@ export const generateAnimatedSubtitles = async (script: Script): Promise<Subtitl
 
     const allText = script.scenes.map(s => s.voiceover).join(' ');
     // Split into reasonable lines for subtitles
-    const lines = allText.match(/.{1,50}(\s|$)/g) || [];
+    const lines: string[] = allText.match(/.{1,50}(\s|$)/g) || [];
 
     lines.forEach((line, index) => {
         const text = line.trim();
@@ -932,7 +969,7 @@ export const suggestSfxForScript = async (script: Script): Promise<{ time: numbe
     Script:
     ${scriptSummary}
 
-    Your output MUST be a JSON array of objects, each with "time" (the precise time in seconds for the SFX to start, inferred from scene progression) and "prompt" (a short text description for an SFX generation AI, e.g., "a subtle whoosh", "a camera shutter click", "a gentle pop").`;
+    Your output MUST be a JSON array of objects, each with "time" (the precise time in seconds for the SFX to start, inferred from scene progression) and "prompt" (a short text description for an SFX generation AI, e.g., "a subtle whoosh", "a camera shutter click", "a gentle notification ping").`;
     
     const response = await supabase.invokeEdgeFunction<{ text: string }>('gemini-proxy', {
         type: 'generateContent',
@@ -957,21 +994,4 @@ export const suggestSfxForScript = async (script: Script): Promise<{ time: numbe
     });
 
     return parseGeminiJson<{ time: number, prompt: string }[]>(response);
-};
-
-export const searchStockMedia = async (query: string, type: 'videos' | 'photos'): Promise<{videos?: StockAsset[], photos?: StockAsset[]}> => {
-    return supabase.invokeEdgeFunction('pexels-proxy', { query, type });
-};
-
-export const generateTextGraphic = async (text: string): Promise<string> => {
-    const prompt = `Create a visually appealing graphic with the following text prominently displayed: "${text}". The style should be modern, clean, and suitable for a YouTube video. High contrast is important.`;
-    const imageResult = await supabase.invokeEdgeFunction<{ generatedImages: { image: { imageBytes: string } }[] }>('gemini-proxy', {
-        type: 'generateImages',
-        params: {
-            model: 'imagen-3.0-generate-002',
-            prompt: prompt,
-            config: { numberOfImages: 1, outputMimeType: 'image/png', aspectRatio: '16:9' }
-        }
-    });
-    return `data:image/png;base64,${imageResult.generatedImages[0].image.imageBytes}`;
 };

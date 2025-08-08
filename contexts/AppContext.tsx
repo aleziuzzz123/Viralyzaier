@@ -1,13 +1,13 @@
-
 import React, { createContext, useState, useEffect, useCallback, useContext, ReactNode, useRef } from 'react';
-import { Project, User, PlanId, Blueprint, Toast, Platform, Opportunity, ContentGapSuggestion, PerformanceReview, Notification, ProjectStatus, Database, UserAsset, BrandIdentity, TimelineState, VideoStyle } from '../types';
-import * as supabaseService from '../services/supabaseService';
-import { supabase } from '../services/supabaseClient'; // Import client directly
+import { Project, User, PlanId, Blueprint, Toast, Platform, Opportunity, ContentGapSuggestion, PerformanceReview, Notification, ProjectStatus, Database, UserAsset, BrandIdentity, TimelineState, VideoStyle } from '../types.js';
+import * as supabaseService from '../services/supabaseService.js';
+import { supabase } from '../services/supabaseClient.js'; // Import client directly
 import { type AuthSession } from '@supabase/supabase-js';
-import { createCheckoutSession, PLANS } from '../services/paymentService';
-import { fetchVideoPerformance } from '../services/youtubeService';
-import { translations, Language, TranslationKey } from '../translations';
-import { getErrorMessage } from '../utils';
+import { createCheckoutSession, PLANS } from '../services/paymentService.js';
+import { fetchVideoPerformance } from '../services/youtubeService.js';
+import { translations, Language, TranslationKey } from '../translations.js';
+import { getErrorMessage } from '../utils.js';
+import { GoogleFont, fetchGoogleFonts } from '../services/fontService.js';
 
 interface AppContextType {
     session: AuthSession | null;
@@ -26,6 +26,7 @@ interface AppContextType {
     projectToSchedule: string | null;
     backendError: { title: string; message: string } | null;
     brandIdentities: BrandIdentity[];
+    fonts: GoogleFont[];
     
     setLanguage: (lang: Language) => void;
     t: (key: TranslationKey, replacements?: { [key: string]: string | number }) => string;
@@ -92,6 +93,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     const [projects, setProjects] = useState<Project[]>([]);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [brandIdentities, setBrandIdentities] = useState<BrandIdentity[]>([]);
+    const [fonts, setFonts] = useState<GoogleFont[]>([]);
     const [isInitialLoading, setIsInitialLoading] = useState(true);
     
     const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
@@ -184,12 +186,14 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
 
                     if (profile) {
                         setUser(profile);
-                        const [userProjects, userNotifications] = await Promise.all([
+                        const [userProjects, userNotifications, googleFonts] = await Promise.all([
                             supabaseService.getProjectsForUser(session.user.id),
                             supabaseService.getNotifications(session.user.id),
+                            fetchGoogleFonts(),
                         ]);
                         setProjects(userProjects);
                         setNotifications(userNotifications);
+                        setFonts(googleFonts.slice(0, 50));
                         
                         // Gracefully handle missing brand_identities table
                         try {
@@ -226,6 +230,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             setProjects([]);
             setNotifications([]);
             setBrandIdentities([]);
+            setFonts([]);
             setIsInitialLoading(false);
         }
     }, [session, addToast, t]);
@@ -583,7 +588,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             isUpgradeModalOpen, upgradeReason, confirmation, language,
             prefilledBlueprintPrompt, notifications, isInitialLoading,
             isScheduleModalOpen, projectToSchedule, backendError,
-            brandIdentities,
+            brandIdentities, fonts,
             
             setLanguage, t, addToast, dismissToast, dismissTutorial,
             handleLogout, consumeCredits, requirePermission,

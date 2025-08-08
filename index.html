@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,13 +9,14 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- Google Fonts will be injected here by the app -->
     <script>
       // This script exposes client-safe environment variables from Vercel.
       // All other API keys (Gemini, RunwayML, Stripe, etc.) are handled securely by backend Supabase Edge Functions.
       window.__env = {
         VITE_SUPABASE_URL: "https://wpgrfukcnpcoyruymxdd.supabase.co",
         VITE_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndwZ3JmdWtjbnBjb3lydXlteGRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3MzQ5MjgsImV4cCI6MjA2OTMxMDkyOH0.-b5KHzKWk2N3VEY_K5CzYZfszRRL6GY-MivOVUAL1Z4",
-        VITE_GOOGLE_CLIENT_ID: "YOUR_GOOGLE_CLIENT_ID_HERE", // Used for YouTube OAuth flow.
+        VITE_GOOGLE_CLIENT_ID: "YOUR_GOOGLE_CLIENT_ID_HERE" // Used for YouTube OAuth flow.
       };
     </script>
     <style>
@@ -106,10 +108,13 @@
     "@google/genai": "https://esm.sh/@google/genai@^1.11.0",
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.44.4",
     "jszip": "https://esm.sh/jszip@3.10.1",
-    "uuid": "https://esm.sh/uuid@9.0.1"
+    "uuid": "https://esm.sh/uuid@9.0.1",
+    "vite": "https://esm.sh/vite@^7.1.1",
+    "path": "https://esm.sh/path@^0.12.7"
   }
 }
 </script>
-    <script type="module" src="/index.tsx"></script>
+    <script type="module" src="/index.js"></script>
+<script type="module" src="/index.tsx"></script>
 </body>
 </html>
