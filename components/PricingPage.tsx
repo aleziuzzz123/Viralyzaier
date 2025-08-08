@@ -1,10 +1,8 @@
-
-
 import React from 'react';
-import { Plan, PlanId } from '../types';
-import { PLANS } from '../services/paymentService';
-import { CheckBadgeIcon, CrownIcon } from './Icons';
-import { useAppContext } from '../contexts/AppContext';
+import { Plan, PlanId } from '../types.ts';
+import { PLANS } from '../services/paymentService.ts';
+import { CheckBadgeIcon, CrownIcon } from './Icons.tsx';
+import { useAppContext } from '../contexts/AppContext.tsx';
 
 interface PlanCardProps {
     plan: Plan;

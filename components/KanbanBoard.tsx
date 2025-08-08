@@ -1,13 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Project, ProjectStatus, Platform } from '../types';
-import { YouTubeIcon, TikTokIcon, InstagramIcon, PlusIcon, PencilIcon, RocketLaunchIcon, SparklesIcon } from './Icons';
-import { useAppContext } from '../contexts/AppContext';
+import { Project, ProjectStatus, Platform } from '../types.ts';
+import { YouTubeIcon, TikTokIcon, InstagramIcon, PlusIcon, PencilIcon, RocketLaunchIcon, SparklesIcon } from './Icons.tsx';
+import { useAppContext } from '../contexts/AppContext.tsx';
 
 const platformIcons: { [key in Platform]: React.FC<{className?: string}> } = {
     youtube_long: YouTubeIcon,
     youtube_short: YouTubeIcon,
     tiktok: TikTokIcon,
-    instagram: InstagramIcon,
+    instagram: InstagramIcon
 };
 
 const statusConfig: { [key in ProjectStatus]: { color: string; bg: string; } } = {
@@ -16,7 +16,7 @@ const statusConfig: { [key in ProjectStatus]: { color: string; bg: string; } } =
     'Scripting': { color: 'border-amber-500', bg: 'bg-amber-900/20' },
     'Rendering': { color: 'border-pink-500', bg: 'bg-pink-900/20' },
     'Scheduled': { color: 'border-indigo-500', bg: 'bg-indigo-900/20' },
-    'Published': { color: 'border-green-500', bg: 'bg-green-900/20' },
+    'Published': { color: 'border-green-500', bg: 'bg-green-900/20' }
 };
 
 interface ProjectCardProps {

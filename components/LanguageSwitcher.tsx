@@ -1,15 +1,15 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useAppContext } from '../contexts/AppContext';
-import { Language } from '../translations';
-import { GlobeIcon, ChevronDownIcon } from './Icons';
+import { useAppContext } from '../contexts/AppContext.tsx';
+import { Language } from '../translations.ts';
+import { GlobeIcon, ChevronDownIcon } from './Icons.tsx';
 
 const languageOptions: { code: Language, name: string }[] = [
     { code: 'en', name: 'English' },
     { code: 'fr', name: 'Français' },
     { code: 'es', name: 'Español' },
     { code: 'pt', name: 'Português' },
-    { code: 'hi', name: 'हिन्दी' },
+    { code: 'hi', name: 'हिन्दी' }
 ];
 
 interface LanguageSwitcherProps {

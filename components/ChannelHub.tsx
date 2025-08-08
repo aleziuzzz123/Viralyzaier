@@ -1,10 +1,12 @@
+
+
 import React, { useState } from 'react';
-import { Opportunity, Platform } from '../types';
-import { fetchChannelVideos } from '../services/youtubeService';
-import { performChannelAudit } from '../services/geminiService';
-import * as supabase from '../services/supabaseService';
-import { SparklesIcon, ChartPieIcon, YouTubeIcon } from './Icons';
-import { useAppContext } from '../contexts/AppContext';
+import { Opportunity, Platform } from '../types.ts';
+import { fetchChannelVideos } from '../services/youtubeService.ts';
+import { performChannelAudit } from '../services/geminiService.ts';
+import * as supabase from '../services/supabaseService.ts';
+import { SparklesIcon, ChartPieIcon, YouTubeIcon } from './Icons.tsx';
+import { useAppContext } from '../contexts/AppContext.tsx';
 
 interface ChannelHubProps {}
 
@@ -46,7 +48,7 @@ const ChannelHub: React.FC<ChannelHubProps> = () => {
         try {
             // Now fetches REAL videos from the user's connected channel
             const videos = await fetchChannelVideos();
-            const auditResult = await performChannelAudit(videos);
+            const auditResult = await performChannelAudit(videos.map(v => ({ title: v.title, views: v.views, likes: v.likes, comments: v.comments })));
             const updatedUser = await supabase.updateUserProfile(user.id, { channelAudit: auditResult });
             setUser(updatedUser);
             addToast("Channel audit complete! Your growth plan is ready.", 'success');

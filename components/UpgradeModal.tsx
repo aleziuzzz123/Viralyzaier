@@ -1,78 +1,51 @@
-
 import React from 'react';
-import type { Plan } from '../types.ts';
-import { CrownIcon } from './icons/CrownIcon.tsx';
+import { CrownIcon, XCircleIcon } from './Icons.tsx';
+import { useAppContext } from '../contexts/AppContext.tsx';
 
-interface UpgradeModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onUpgrade: () => void;
-  requiredPlan: Plan;
-  featureName: string;
-}
+const UpgradeModal: React.FC = () => {
+    const { isUpgradeModalOpen, setUpgradeModalOpen, upgradeReason, setActiveProjectId, t } = useAppContext();
 
-const planDetails: Record<Plan, { name: string; description: string }> = {
-    basic: { name: 'Basic', description: 'Access to core features.' },
-    unlimited: { name: 'Unlimited', description: 'Unlock advanced tools like the Trend Forecaster and advanced tonal styles.' },
-    dfy: { name: 'DFY Content Vault', description: 'Get access to our library of professionally written, ready-to-use scripts and assets.' },
-    agency: { name: 'Agency License', description: 'Manage client accounts and run your own script-writing service.' },
-};
+    if (!isUpgradeModalOpen) return null;
 
-export const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, onUpgrade, requiredPlan, featureName }) => {
-  if (!isOpen) return null;
+    const handleUpgrade = () => {
+        setUpgradeModalOpen(false);
+        setActiveProjectId(null); // This will navigate to pricing page via App.tsx logic if current view is project
+        // A more direct navigation method would be better, but this works with current setup
+    };
 
-  const details = planDetails[requiredPlan];
-
-  return (
-    <div
-      className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="upgrade-title"
-    >
-      <div
-        className="bg-gradient-to-br from-[#2A1A5E] to-[#1A0F3C] rounded-xl border-2 border-[#DAFF00]/80 shadow-2xl shadow-[#DAFF00]/10 w-full max-w-md p-8 relative text-center"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 text-purple-300 hover:text-white transition-colors duration-200"
+    return (
+        <div 
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in-up" 
+            style={{ animationDuration: '0.3s' }}
+            onClick={() => setUpgradeModalOpen(false)}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="upgrade-modal-title"
         >
-          <i className="fa-solid fa-times text-xl"></i>
-        </button>
-        
-        <CrownIcon className="w-16 h-16 text-yellow-400 mx-auto mb-4" />
-
-        <h2 id="upgrade-title" className="text-2xl font-bold text-white mb-2">
-          Unlock This Premium Feature
-        </h2>
-        <p className="text-purple-200 mb-6">
-          To use <strong className="text-white">"{featureName}"</strong>, please upgrade to the <strong className="text-[#DAFF00]">{details.name}</strong> plan.
-        </p>
-        
-        <div className="bg-black/20 p-4 rounded-lg mb-6 text-left">
-            <p className="text-white font-semibold">By upgrading, you will unlock:</p>
-            <p className="text-purple-200 text-sm mt-1">{details.description}</p>
-        </div>
-
-        <div className="flex flex-col gap-3">
-            <button
-                type="button"
-                onClick={onUpgrade}
-                className="w-full px-6 py-3 text-base font-bold bg-[#DAFF00] text-[#1A0F3C] rounded-md hover:bg-opacity-90 transition-all transform hover:scale-105"
+            <div 
+                className="bg-gray-800 border border-indigo-500/50 rounded-2xl shadow-2xl w-full max-w-md m-4 p-8 text-center transform transition-all"
+                onClick={(e) => e.stopPropagation()}
             >
-                Upgrade to {details.name}
-            </button>
-            <button
-                type="button"
-                onClick={onClose}
-                className="w-full px-6 py-2 text-sm font-medium text-purple-300 rounded-md hover:text-white"
-            >
-                Maybe Later
-            </button>
+                <button onClick={() => setUpgradeModalOpen(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white">
+                    <XCircleIcon className="w-8 h-8"/>
+                </button>
+                
+                <div className="mx-auto bg-gradient-to-br from-indigo-500 to-purple-600 p-4 rounded-full w-fit mb-6">
+                   <CrownIcon className="w-12 h-12 text-white" />
+                </div>
+                
+                <h2 id="upgrade-modal-title" className="text-3xl font-bold text-white mb-3">{upgradeReason.title}</h2>
+                <p className="text-gray-300 mb-8">{upgradeReason.description}</p>
+                
+                <button
+                    onClick={handleUpgrade}
+                    className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
+                >
+                    {t('upgrade_modal.button')}
+                </button>
+            </div>
         </div>
-      </div>
-    </div>
-  );
+    );
 };
+
+export default UpgradeModal;

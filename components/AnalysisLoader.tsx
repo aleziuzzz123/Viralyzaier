@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useAppContext } from '../contexts/AppContext';
-import ViralityGauge from './ViralityGauge';
-import { SparklesIcon } from './Icons';
-import Loader from './Loader';
+import { useAppContext } from '../contexts/AppContext.tsx';
+import ViralityGauge from './ViralityGauge.tsx';
+import { SparklesIcon } from './Icons.tsx';
+import Loader from './Loader.tsx';
 
 interface AnalysisLoaderProps {
     frames: string[];
