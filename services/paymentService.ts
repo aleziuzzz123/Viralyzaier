@@ -1,5 +1,5 @@
-import { Plan, PlanId } from '../types';
-import * as supabase from './supabaseService';
+import { Plan, PlanId } from '../types.js';
+import * as supabase from './supabaseService.js';
 
 export const PLANS: Plan[] = [
     {
@@ -44,7 +44,7 @@ export const PLANS: Plan[] = [
             'pricing.feature_true_voice_cloning',
             'pricing.feature_priority_support',
         ],
-    },
+    }
 ];
 
 // This function now calls a Supabase Edge Function to create a Stripe checkout session

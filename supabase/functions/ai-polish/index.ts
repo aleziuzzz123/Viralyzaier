@@ -1,3 +1,4 @@
+
 // supabase/functions/ai-polish/index.ts
 declare const Deno: any;
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
@@ -18,14 +19,14 @@ const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
 const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
 
 // Helper to parse Gemini JSON robustly
-const parseGeminiJson = (text: string | undefined | null) => {
+const parseGeminiJson = (res: { text: string | undefined | null }) => {
     try {
-        const rawText = text || '';
+        const rawText = res.text || '';
         const cleanText = rawText.trim().replace(/^```json/, '').replace(/```$/, '').trim();
         if (!cleanText) throw new Error("AI returned empty or invalid JSON content.");
         return JSON.parse(cleanText);
     } catch (e) {
-        console.error("Failed to parse Gemini JSON:", text, e);
+        console.error("Failed to parse Gemini JSON:", res.text, e);
         throw new Error("AI returned invalid data format.");
     }
 };
@@ -85,7 +86,7 @@ serve(async (req: Request) => {
         }
     });
 
-    const sfxSuggestions = parseGeminiJson(sfxSuggestionsResponse.text);
+    const sfxSuggestions = parseGeminiJson(sfxSuggestionsResponse);
 
     // --- 2. Generate, Upload, and Add SFX clips to timeline ---
     const sfxTrack = timeline.tracks.find((t: any) => t.type === 'sfx');
