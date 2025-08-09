@@ -5,7 +5,8 @@ import SubtitleTrack from './SubtitleTrack.tsx';
 
 interface TimelineProps {
     timeline: TimelineState;
-    onUpdate: (newTimeline: TimelineState) => void;
+    onUpdatePreview: (newTimeline: TimelineState, addToHistory: boolean) => void;
+    onUpdateCommit: (newTimeline: TimelineState) => void;
     currentTime: number;
     onSeek: (time: number) => void;
     onClipSelect: (clipId: string | null) => void;
@@ -13,7 +14,6 @@ interface TimelineProps {
     selectedClipId: string | null;
     selectedSubtitleId: string | null;
     onAddMediaClick: (trackId: string, sceneIndex: number, startTime: number) => void;
-    onGenerateVoiceover: () => void;
     onGenerateAiBroll: (sceneIndex: number) => void;
     activeSceneIndex: number;
 }
@@ -35,175 +35,187 @@ const TransitionPicker: React.FC<{onSelect: (type: TimelineClip['transition']['t
             {transitions.map(t => (
                 <button key={t} onClick={() => onSelect(t)} className="p-2 text-xs text-white bg-gray-700 rounded hover:bg-indigo-600">{t}</button>
             ))}
-             <button onClick={onClose} className="p-2 text-xs text-white bg-red-700 rounded hover:bg-red-600"><XIcon className="w-4 h-4"/></button>
+             <button onClick={() => onClose()} className="p-2 text-xs text-white bg-red-700 rounded hover:bg-red-600"><XIcon className="w-4 h-4"/></button>
         </div>
     );
 };
 
-const Timeline: React.FC<TimelineProps> = ({ timeline, onUpdate, currentTime, onSeek, onClipSelect, onSubtitleSelect, selectedClipId, selectedSubtitleId, onAddMediaClick, onGenerateVoiceover, onGenerateAiBroll, activeSceneIndex }) => {
+const Timeline: React.FC<TimelineProps> = ({ timeline, onUpdatePreview, onUpdateCommit, currentTime, onSeek, onClipSelect, onSubtitleSelect, selectedClipId, selectedSubtitleId, onAddMediaClick, onGenerateAiBroll, activeSceneIndex }) => {
     const timelineContainerRef = useRef<HTMLDivElement>(null);
-    const isDraggingPlayheadRef = useRef(false);
+    const animationFrameRef = useRef<number | null>(null);
     
-    const [draggingClip, setDraggingClip] = useState<{ clipId: string; trackId: string; initialX: number; initialStartTime: number; ghostLeft: number; ghostWidth: number; } | null>(null);
-    const [resizingClip, setResizingClip] = useState<{ clipId: string; trackId: string; edge: 'start' | 'end'; initialX: number; initialTime: number; } | null>(null);
-    const [transitionPicker, setTransitionPicker] = useState<{ clipId: string; left: number } | null>(null);
+    const [interaction, setInteraction] = useState<{ type: 'drag' | 'resizeStart' | 'resizeEnd' | 'playhead', clipId: string, trackId: string, initialX: number, initialTime: number, initialWidth: number, snapTargets: number[] } | null>(null);
+    const [ghost, setGhost] = useState<{left: number, width: number} | null>(null);
+    const [snapLine, setSnapLine] = useState<number | null>(null);
 
     const handleSeekFromEvent = (e: MouseEvent | React.MouseEvent) => {
-        if (!timelineContainerRef.current) return;
+        if (!timelineContainerRef.current || timeline.totalDuration === 0) return;
         const rect = timelineContainerRef.current.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const percentage = Math.max(0, Math.min(1, x / rect.width));
         onSeek(percentage * timeline.totalDuration);
     };
 
-    const handleDragPlayheadMove = useCallback((e: MouseEvent) => {
-        if (isDraggingPlayheadRef.current) handleSeekFromEvent(e);
-    }, [onSeek, timeline.totalDuration]);
+    const handleInteractionEnd = useCallback(() => {
+        if (!interaction) return;
 
-    const handleDragPlayheadEnd = useCallback(() => {
-        isDraggingPlayheadRef.current = false;
-        document.removeEventListener('mousemove', handleDragPlayheadMove);
-        document.removeEventListener('mouseup', handleDragPlayheadEnd);
-    }, [handleDragPlayheadMove]);
+        const { type, clipId, trackId } = interaction;
+        if ((type === 'drag' || type.startsWith('resize')) && ghost) {
+            const newTimeline = JSON.parse(JSON.stringify(timeline));
+            const track = newTimeline.tracks.find((t: any) => t.id === trackId);
+            const clip = track?.clips.find((c: any) => c.id === clipId);
+            if (clip) {
+                const newStartTime = (ghost.left / 100) * timeline.totalDuration;
+                const newEndTime = newStartTime + (ghost.width / 100) * timeline.totalDuration;
+                clip.startTime = newStartTime;
+                clip.endTime = newEndTime;
+                onUpdateCommit(newTimeline);
+            }
+        }
+        
+        setInteraction(null);
+        setGhost(null);
+        setSnapLine(null);
+        window.removeEventListener('mousemove', handleInteractionMove);
+        window.removeEventListener('mouseup', handleInteractionEnd);
+        if (animationFrameRef.current) window.cancelAnimationFrame(animationFrameRef.current);
+    }, [interaction, ghost, timeline, onUpdateCommit]);
 
-    const handleDragPlayheadStart = useCallback((e: React.MouseEvent) => {
+    const handleInteractionMove = useCallback((e: MouseEvent) => {
+        if (!interaction || !timelineContainerRef.current) return;
+
         e.preventDefault();
-        isDraggingPlayheadRef.current = true;
-        document.addEventListener('mousemove', handleDragPlayheadMove);
-        document.addEventListener('mouseup', handleDragPlayheadEnd);
-    }, [handleDragPlayheadMove, handleDragPlayheadEnd]);
-    
-    const handleClipInteractionMove = useCallback((e: MouseEvent) => {
-        if (!timelineContainerRef.current || timeline.totalDuration === 0) return;
-        const rect = timelineContainerRef.current.getBoundingClientRect();
-        const pixelsPerSecond = rect.width / timeline.totalDuration;
         
-        if (draggingClip) {
-            const track = timeline.tracks.find((t: any) => t.id === draggingClip.trackId);
-            if (!track) return;
-            const clip = track.clips.find((c: any) => c.id === draggingClip.clipId);
-            if (!clip) return;
-            const duration = clip.endTime - clip.startTime;
-            const deltaX = e.clientX - draggingClip.initialX;
-            const deltaTime = deltaX / pixelsPerSecond;
-            let newStartTime = draggingClip.initialStartTime + deltaTime;
-            newStartTime = Math.max(0, Math.min(newStartTime, timeline.totalDuration - duration));
-            
-            setDraggingClip(prev => prev ? {...prev, ghostLeft: (newStartTime / timeline.totalDuration) * 100 } : null);
+        if (animationFrameRef.current) window.cancelAnimationFrame(animationFrameRef.current);
 
-        } else if (resizingClip) {
-            const newTimeline = JSON.parse(JSON.stringify(timeline));
-            const track = newTimeline.tracks.find((t: any) => t.id === resizingClip.trackId);
-            const clip = track.clips.find((c: any) => c.id === resizingClip.clipId);
-            const deltaX = e.clientX - resizingClip.initialX;
-            const deltaTime = deltaX / pixelsPerSecond;
-            let newTime = resizingClip.initialTime + deltaTime;
+        animationFrameRef.current = requestAnimationFrame(() => {
+            if (!interaction || !timelineContainerRef.current) return; // Re-check inside rAF
 
-            if (resizingClip.edge === 'start') {
-                newTime = Math.max(0, Math.min(newTime, clip.endTime - 0.5));
-                clip.startTime = newTime;
-            } else {
-                newTime = Math.max(clip.startTime + 0.5, Math.min(newTime, timeline.totalDuration));
-                clip.endTime = newTime;
+            if (interaction.type === 'playhead') {
+                handleSeekFromEvent(e);
+                return;
             }
-            onUpdate(newTimeline);
-        }
-    }, [timeline, onUpdate, draggingClip, resizingClip]);
 
-    const handleClipInteractionEnd = useCallback((e: MouseEvent) => {
-        if (draggingClip) {
-            const rect = timelineContainerRef.current!.getBoundingClientRect();
+            const rect = timelineContainerRef.current.getBoundingClientRect();
             const pixelsPerSecond = rect.width / timeline.totalDuration;
-            const deltaX = e.clientX - draggingClip.initialX;
+            const deltaX = e.clientX - interaction.initialX;
             const deltaTime = deltaX / pixelsPerSecond;
-            
-            const newTimeline = JSON.parse(JSON.stringify(timeline));
-            const track = newTimeline.tracks.find((t: any) => t.id === draggingClip.trackId);
-            const clip = track.clips.find((c: any) => c.id === draggingClip.clipId);
-            const duration = clip.endTime - clip.startTime;
-            let newStartTime = draggingClip.initialStartTime + deltaTime;
-            newStartTime = Math.max(0, Math.min(newStartTime, timeline.totalDuration - duration));
-            clip.startTime = newStartTime;
-            clip.endTime = newStartTime + duration;
-            onUpdate(newTimeline);
+
+            const { type, clipId, trackId, snapTargets, initialTime } = interaction;
+            let currentSnap: number | null = null;
+
+            if (type === 'drag') {
+                const track = timeline.tracks.find(t => t.id === trackId);
+                const clip = track?.clips.find(c => c.id === clipId);
+                if (!clip) return;
+
+                const duration = clip.endTime - clip.startTime;
+                let newStartTime = initialTime + deltaTime;
+                newStartTime = Math.max(0, Math.min(newStartTime, timeline.totalDuration - duration));
+                let newEndTime = newStartTime + duration;
+
+                for (const snapPos of snapTargets) {
+                    if (Math.abs(snapPos - newStartTime) < 0.2) { newStartTime = snapPos; currentSnap = snapPos; break; }
+                    if (Math.abs(snapPos - newEndTime) < 0.2) { newStartTime = snapPos - duration; currentSnap = snapPos; break; }
+                }
+
+                setGhost({ left: (newStartTime / timeline.totalDuration) * 100, width: (duration / timeline.totalDuration) * 100 });
+            } else if (type.startsWith('resize')) {
+                const track = timeline.tracks.find(t => t.id === trackId);
+                const clip = track?.clips.find(c => c.id === clipId);
+                if (!clip) return;
+                
+                let newTime = initialTime + deltaTime;
+
+                for (const snapPos of snapTargets) {
+                    if (Math.abs(snapPos - newTime) < 0.2) { newTime = snapPos; currentSnap = snapPos; break; }
+                }
+
+                if (type === 'resizeStart') {
+                    const constrainedTime = Math.max(0, Math.min(newTime, clip.endTime - 0.5));
+                    const newWidth = ((clip.endTime - constrainedTime) / timeline.totalDuration) * 100;
+                    setGhost({ left: (constrainedTime / timeline.totalDuration) * 100, width: newWidth });
+                } else { // resizeEnd
+                    const constrainedTime = Math.max(clip.startTime + 0.5, Math.min(newTime, timeline.totalDuration));
+                    const newWidth = ((constrainedTime - clip.startTime) / timeline.totalDuration) * 100;
+                    setGhost({ left: (clip.startTime / timeline.totalDuration) * 100, width: newWidth });
+                }
+            }
+
+            setSnapLine(currentSnap !== null ? (currentSnap / timeline.totalDuration) * 100 : null);
+        });
+    }, [interaction, timeline]);
+
+    const startInteraction = (type: 'drag' | 'resizeStart' | 'resizeEnd' | 'playhead', e: React.MouseEvent, clip?: TimelineClip, trackId?: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (type === 'playhead') {
+            setInteraction({ type } as any);
+        } else if (clip && trackId) {
+            const snapTargets = timeline.tracks
+                .flatMap(t => t.clips)
+                .filter(c => c.id !== clip.id)
+                .flatMap(c => [c.startTime, c.endTime]);
+            snapTargets.push(currentTime);
+
+            setInteraction({
+                type,
+                clipId: clip.id,
+                trackId,
+                initialX: e.clientX,
+                initialTime: type === 'resizeEnd' ? clip.endTime : clip.startTime,
+                initialWidth: e.currentTarget.getBoundingClientRect().width,
+                snapTargets,
+            });
+            setGhost({ left: (clip.startTime / timeline.totalDuration) * 100, width: ((clip.endTime - clip.startTime) / timeline.totalDuration) * 100 });
         }
         
-        document.removeEventListener('mousemove', handleClipInteractionMove);
-        document.removeEventListener('mouseup', handleClipInteractionEnd);
-        setDraggingClip(null);
-        setResizingClip(null);
-    }, [handleClipInteractionMove, draggingClip, onUpdate, timeline]);
-
-    useEffect(() => {
-      if (draggingClip || resizingClip) {
-          document.addEventListener('mousemove', handleClipInteractionMove);
-          document.addEventListener('mouseup', handleClipInteractionEnd);
-      }
-      return () => {
-        document.removeEventListener('mousemove', handleClipInteractionMove);
-        document.removeEventListener('mouseup', handleClipInteractionEnd);
-      };
-    }, [draggingClip, resizingClip, handleClipInteractionMove, handleClipInteractionEnd]);
-
-    const handleClipDragStart = (e: React.MouseEvent, clip: TimelineClip, trackId: string) => {
-        e.stopPropagation();
-        const width = ((clip.endTime - clip.startTime) / timeline.totalDuration) * 100;
-        const left = (clip.startTime / timeline.totalDuration) * 100;
-        setDraggingClip({ clipId: clip.id, trackId, initialX: e.clientX, initialStartTime: clip.startTime, ghostLeft: left, ghostWidth: width });
+        window.addEventListener('mousemove', handleInteractionMove);
+        window.addEventListener('mouseup', handleInteractionEnd);
     };
-
-    const handleClipResizeStart = (e: React.MouseEvent, clip: TimelineClip, trackId: string, edge: 'start' | 'end') => {
-        e.stopPropagation();
-        setResizingClip({ clipId: clip.id, trackId, edge, initialX: e.clientX, initialTime: edge === 'start' ? clip.startTime : clip.endTime });
-    };
-
-    const handleSetTransition = (type: NonNullable<TimelineClip['transition']>['type']) => {
-        if (!transitionPicker) return;
-        const newTimeline = JSON.parse(JSON.stringify(timeline));
-        let updated = false;
-        for (const track of newTimeline.tracks) {
-            const clip = track.clips.find((c:any) => c.id === transitionPicker.clipId);
-            if(clip) {
-                clip.transition = { type, duration: 0.5 };
-                updated = true;
-                break;
-            }
-        }
-        if(updated) onUpdate(newTimeline);
-        setTransitionPicker(null);
+    
+    const handleDropOnTrack = (e: React.DragEvent, trackId: string) => {
+        e.preventDefault();
+        const assetData = JSON.parse(e.dataTransfer.getData('application/json-asset'));
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const dropTime = (x / rect.width) * timeline.totalDuration;
+        
+        onAddMediaClick(trackId, -1, dropTime);
     };
 
     const playheadPosition = `${(currentTime / timeline.totalDuration) * 100}%`;
     const allKeyframes = (clip: TimelineClip) => Object.values(clip.keyframes || {}).flat();
 
     return (
-        <div className="flex select-none">
+        <div className="flex select-none h-full">
             {/* Track Headers */}
             <div className="w-40 flex-shrink-0 space-y-1">
                 <div className="h-8"></div>
-                <div className="h-10"></div>
+                <div className="h-12"></div> {/* Subtitle Track Spacer */}
                 {timeline.tracks.map(track => (
-                    <div key={track.id} className="h-10 flex items-center justify-between bg-gray-700/50 rounded-l p-2 text-xs font-bold text-gray-300 gap-2">
+                    <div key={track.id} className="h-12 flex items-center justify-between bg-gray-700/50 rounded-l p-2 text-xs font-bold text-gray-300 gap-2">
                         <div className="flex items-center gap-2 truncate">
                             {trackConfig[track.type] && React.createElement(trackConfig[track.type].icon, { className: 'w-4 h-4 text-gray-400'})}
                             <span className="truncate">{trackConfig[track.type]?.name || track.type}</span>
                         </div>
-                        {track.type === 'voiceover' && (
-                            <button onClick={onGenerateVoiceover} title="Generate full script voiceover (1 credit per scene)" className="p-1 text-gray-400 hover:text-indigo-400"><SparklesIcon className="w-4 h-4"/></button>
-                        )}
                         {track.type === 'b-roll' && (
                             <button onClick={() => onGenerateAiBroll(activeSceneIndex)} title="Generate AI B-Roll for current scene (costs vary)" className="p-1 text-gray-400 hover:text-indigo-400"><SparklesIcon className="w-4 h-4"/></button>
                         )}
-                        {['overlay', 'music', 'sfx'].includes(track.type) && (
-                            <button onClick={() => onAddMediaClick(track.id, -1, currentTime)} className="text-gray-400 hover:text-white"><PlusCircleIcon className="w-4 h-4" /></button>
+                        {['overlay', 'music', 'sfx', 'text'].includes(track.type) && (
+                            <button onClick={() => onAddMediaClick(track.id, -1, currentTime)} className="text-gray-400 hover:text-white flex items-center gap-1">
+                                <PlusCircleIcon className="w-4 h-4" /> 
+                                <span className="text-xs">{track.type === 'text' ? "Add Text" : "Add"}</span>
+                            </button>
                         )}
                     </div>
                 ))}
             </div>
 
              {/* Timeline Tracks */}
-            <div className="flex-grow flex flex-col space-y-1">
-                <div ref={timelineContainerRef} className="h-8 bg-gray-800 rounded-t-lg relative cursor-pointer" onClick={(e) => handleSeekFromEvent(e)}>
+            <div className="flex-grow flex flex-col space-y-1 overflow-y-auto overflow-x-hidden pr-2 relative">
+                <div ref={timelineContainerRef} className="h-8 bg-gray-800 rounded-t-lg relative cursor-pointer" onMouseDown={(e) => startInteraction('playhead', e)}>
                     <div className="absolute inset-0 flex justify-between px-2">
                         {[...Array(Math.floor(timeline.totalDuration / 5) + 1)].map((_, i) => (
                             <div key={i} style={{ left: `${(i * 5 / timeline.totalDuration) * 100}%` }} className="absolute h-full flex flex-col items-start">
@@ -212,69 +224,57 @@ const Timeline: React.FC<TimelineProps> = ({ timeline, onUpdate, currentTime, on
                             </div>
                         ))}
                     </div>
-                    <div 
-                        className="absolute top-0 h-full w-1 bg-red-500 cursor-ew-resize z-20" 
-                        style={{ left: playheadPosition, transform: 'translateX(-50%)' }}
-                        onMouseDown={handleDragPlayheadStart}
-                    >
-                        <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-red-500 rounded-full border-2 border-white" />
-                    </div>
                 </div>
             
-                <SubtitleTrack timeline={timeline} onUpdate={(updates) => onUpdate({...timeline, ...updates})} duration={timeline.totalDuration} currentTime={currentTime} onSelectSubtitle={onSubtitleSelect} selectedSubtitleId={selectedSubtitleId} />
+                <SubtitleTrack timeline={timeline} onUpdate={(updates) => onUpdateCommit({...timeline, ...updates})} duration={timeline.totalDuration} currentTime={currentTime} onSelectSubtitle={onSubtitleSelect} selectedSubtitleId={selectedSubtitleId} />
                 {timeline.tracks.map((track) => (
-                    <div key={track.id} className="h-10 relative bg-gray-800/50 rounded-r">
-                        {track.clips.map((clip, clipIndex) => {
-                            const showTransitionHandle = (track.type === 'a-roll' || track.type === 'b-roll') && clipIndex > 0;
-                            const leftPos = (clip.startTime / timeline.totalDuration) * 100;
-
+                    <div key={track.id} className="h-12 relative bg-gray-800/50 rounded-r" onDragOver={(e) => e.preventDefault()} onDrop={(e) => handleDropOnTrack(e, track.id)}>
+                        {track.clips.map((clip) => {
                             if (!clip.url && (track.type === 'a-roll' || track.type === 'b-roll')) {
                                 return (
-                                    <div key={clip.id} style={{ left: `${leftPos}%`, width: `${((clip.endTime - clip.startTime) / timeline.totalDuration) * 100}%` }} className="absolute h-full p-1">
+                                    <div key={clip.id} style={{ left: `${(clip.startTime / timeline.totalDuration) * 100}%`, width: `${((clip.endTime - clip.startTime) / timeline.totalDuration) * 100}%` }} className="absolute h-full p-1">
                                         <button onClick={() => onAddMediaClick(track.id, clip.sceneIndex, clip.startTime)} className="w-full h-full bg-gray-700/30 rounded border-2 border-dashed border-gray-600 hover:bg-gray-700/50 hover:border-indigo-500 flex items-center justify-center">
                                             <PlusCircleIcon className="w-5 h-5 text-gray-500" />
                                         </button>
                                     </div>
                                 )
                             }
-
                             return (
-                            <React.Fragment key={clip.id}>
-                            {showTransitionHandle && (
-                                <div className="absolute top-1/2 -translate-y-1/2 h-5 w-5 z-20" style={{ left: `${leftPos}%`, transform: 'translate(-50%, -50%)' }}>
-                                    <button onClick={() => setTransitionPicker({ clipId: clip.id, left: leftPos })} className="w-full h-full flex items-center justify-center bg-gray-600 rounded-full border-2 border-gray-800 hover:bg-indigo-500">
-                                        <TransitionIcon className="w-3 h-3 text-white"/>
-                                    </button>
-                                    {transitionPicker?.clipId === clip.id && <TransitionPicker onSelect={handleSetTransition} onClose={() => setTransitionPicker(null)} />}
+                                <div 
+                                    key={clip.id}
+                                    onMouseDown={(e) => startInteraction('drag', e, clip, track.id)}
+                                    onClick={(e) => { e.stopPropagation(); onClipSelect(selectedClipId === clip.id ? null : clip.id); }}
+                                    className={`absolute h-full rounded flex items-center px-2 overflow-hidden text-xs text-white transition-opacity group ${trackConfig[track.type]?.color || 'bg-gray-600'} ${selectedClipId === clip.id ? 'ring-2 ring-pink-500 z-10' : ''} ${interaction?.clipId === clip.id ? 'opacity-0' : 'opacity-100'} cursor-grab`}
+                                    style={{ left: `${(clip.startTime / timeline.totalDuration) * 100}%`, width: `${((clip.endTime - clip.startTime) / timeline.totalDuration) * 100}%` }}
+                                >
+                                    <span className="truncate">{clip.text || (clip.type === 'image' || clip.type === 'video' ? `Scene ${clip.sceneIndex + 1}` : clip.id)}</span>
+                                    {allKeyframes(clip).map((kf, i) => (
+                                        <div key={i} className="absolute top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-pink-400 rounded-full z-30" style={{left: `${(kf.time - clip.startTime) / (clip.endTime - clip.startTime) * 100}%`}}></div>
+                                    ))}
+                                    <div onMouseDown={(e) => startInteraction('resizeStart', e, clip, track.id)} className="absolute left-0 top-0 w-2 h-full cursor-ew-resize z-10 group-hover:bg-white/20"/>
+                                    <div onMouseDown={(e) => startInteraction('resizeEnd', e, clip, track.id)} className="absolute right-0 top-0 w-2 h-full cursor-ew-resize z-10 group-hover:bg-white/20"/>
                                 </div>
-                            )}
-                            <div 
-                                onMouseDown={(e) => handleClipDragStart(e, clip, track.id)}
-                                onClick={(e) => { e.stopPropagation(); onClipSelect(selectedClipId === clip.id ? null : clip.id); }}
-                                className={`absolute h-full rounded flex items-center px-2 overflow-hidden text-xs text-white transition-all group ${trackConfig[track.type]?.color || 'bg-gray-600'} ${selectedClipId === clip.id ? 'ring-2 ring-pink-500 z-10' : ''} ${draggingClip?.clipId === clip.id ? 'opacity-50' : ''} ${resizingClip ? 'cursor-ew-resize' : 'cursor-grab'}`}
-                                style={{ left: `${leftPos}%`, width: `${((clip.endTime - clip.startTime) / timeline.totalDuration) * 100}%` }}
-                            >
-                                <span className="truncate">{clip.type === 'image' || clip.type === 'video' ? `Scene ${clip.sceneIndex + 1}` : clip.id}</span>
-                                {allKeyframes(clip).map((kf, i) => (
-                                    <div key={i} className="absolute top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-pink-400 rounded-full" style={{left: `${(kf.time - clip.startTime) / (clip.endTime - clip.startTime) * 100}%`}}></div>
-                                ))}
-                                <div onMouseDown={(e) => handleClipResizeStart(e, clip, track.id, 'start')} className="absolute left-0 top-0 w-2 h-full cursor-ew-resize z-10 group-hover:bg-white/20"/>
-                                <div onMouseDown={(e) => handleClipResizeStart(e, clip, track.id, 'end')} className="absolute right-0 top-0 w-2 h-full cursor-ew-resize z-10 group-hover:bg-white/20"/>
-                                {clip.transition && (
-                                    <div className="absolute -left-2 top-1/2 -translate-y-1/2 bg-indigo-500 p-1 rounded-full z-20">
-                                        <TransitionIcon className="w-3 h-3 text-white"/>
-                                    </div>
-                                )}
-                            </div>
-                            </React.Fragment>
-                        )})}
-                        {draggingClip && (
-                            <div className={`absolute h-full rounded flex items-center px-2 overflow-hidden text-xs text-white bg-gray-500/50 border-2 border-dashed border-white`} style={{ left: `${draggingClip.ghostLeft}%`, width: `${draggingClip.ghostWidth}%`}}>
-                                <span className="truncate">{draggingClip.clipId}</span>
+                            );
+                        })}
+                        {interaction && interaction.clipId && ghost && (
+                            <div className={`absolute h-full rounded flex items-center px-2 overflow-hidden text-xs text-white bg-gray-500/50 border-2 border-dashed border-white pointer-events-none z-20`} style={{ left: `${ghost.left}%`, width: `${ghost.width}%`}}>
+                                <span className="truncate">{interaction.clipId}</span>
                             </div>
                         )}
                     </div>
                 ))}
+                
+                {/* Playhead and Snapline */}
+                <div 
+                    className="absolute top-0 bottom-0 w-1 bg-red-500 cursor-ew-resize z-20" 
+                    style={{ left: playheadPosition, transform: 'translateX(-50%)' }}
+                    onMouseDown={(e) => startInteraction('playhead', e)}
+                >
+                    <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-red-500 rounded-full border-2 border-white" />
+                </div>
+                 {snapLine !== null && (
+                    <div className="absolute top-0 bottom-0 w-0.5 bg-red-400 z-20 pointer-events-none" style={{ left: `${snapLine}%` }}></div>
+                )}
             </div>
         </div>
     );

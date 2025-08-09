@@ -42,7 +42,7 @@ const SubtitleTrack: React.FC<SubtitleTrackProps> = ({ timeline, onUpdate, durat
     if (duration === 0) return null; // Prevent division by zero
 
     return (
-        <div className="w-full h-10 bg-gray-900/50 rounded relative">
+        <div className="w-full h-12 bg-gray-900/50 rounded relative">
             {timeline.subtitles.map(sub => (
                 <div 
                     key={sub.id} 
@@ -53,7 +53,7 @@ const SubtitleTrack: React.FC<SubtitleTrackProps> = ({ timeline, onUpdate, durat
                     className="absolute h-full p-1 group" 
                 >
                     <div 
-                        className={`w-full h-full bg-indigo-500/80 rounded text-white text-[10px] px-1 overflow-hidden flex items-center cursor-pointer transition-all ${selectedSubtitleId === sub.id ? 'ring-2 ring-pink-500' : ''}`} 
+                        className={`w-full h-full bg-indigo-500/80 rounded text-white text-xs px-2 overflow-hidden flex items-center cursor-pointer transition-all ${selectedSubtitleId === sub.id ? 'ring-2 ring-pink-500' : ''}`} 
                         onClick={(e) => handleSubtitleClick(e, sub.id)}
                         onDoubleClick={() => handleStartEditing(sub)}
                     >
@@ -68,7 +68,7 @@ const SubtitleTrack: React.FC<SubtitleTrackProps> = ({ timeline, onUpdate, durat
                                     if(e.key === 'Enter') handleSaveEdit();
                                     if(e.key === 'Escape') setEditingId(null);
                                 }}
-                                className="w-full h-full bg-transparent outline-none text-[10px]" 
+                                className="w-full h-full bg-transparent outline-none text-xs" 
                             />
                         ) : ( 
                             <span className="truncate">{sub.text}</span>

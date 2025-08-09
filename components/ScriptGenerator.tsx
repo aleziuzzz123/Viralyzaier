@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Project, Script, Platform } from '../types.ts';
-import { PencilIcon, CheckBadgeIcon, MagicWandIcon, SparklesIcon, PlusIcon, TrashIcon } from './Icons.tsx';
+import { Project, Script, Platform, Scene } from '../types.ts';
+import { PencilIcon, CheckBadgeIcon, MagicWandIcon, SparklesIcon, PlusIcon, TrashIcon, CheckCircleIcon, PhotoIcon } from './Icons.tsx';
 import { useAppContext } from '../contexts/AppContext.tsx';
-import { rewriteScriptScene } from '../services/geminiService.ts';
+import { rewriteScriptScene, generateStoryboardImage } from '../services/geminiService.ts';
 import { getErrorMessage } from '../utils.ts';
 
 interface ScriptEditorProps {
@@ -11,10 +11,11 @@ interface ScriptEditorProps {
 }
 
 const ScriptEditor: React.FC<ScriptEditorProps> = ({ project, onScriptSaved }) => {
-    const { t, consumeCredits } = useAppContext();
+    const { t, consumeCredits, lockAndExecute, addToast } = useAppContext();
     const [script, setScript] = useState<Script | null>(project.script);
     const [activeCopilot, setActiveCopilot] = useState<number | null>(null);
     const [isRewriting, setIsRewriting] = useState(false);
+    const [isGeneratingStoryboard, setIsGeneratingStoryboard] = useState<number | null>(null);
     const copilotRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -34,7 +35,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ project, onScriptSaved }) =
     const handleScriptChange = (
         type: 'hook' | 'scene' | 'cta',
         index: number,
-        field: 'visual' | 'voiceover' | 'onScreenText',
+        field: 'visual' | 'voiceover' | 'onScreenText' | 'storyboardImageUrl',
         value: string
     ) => {
         if (!script) return;
@@ -52,6 +53,11 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ project, onScriptSaved }) =
         setScript(newScript);
     };
     
+    const handleSelectHook = (index: number) => {
+        if (!script) return;
+        setScript({ ...script, selectedHookIndex: index });
+    };
+    
     const addHook = () => {
         if (!script) return;
         const newHooks = [...script.hooks, ''];
@@ -61,7 +67,10 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ project, onScriptSaved }) =
     const removeHook = (index: number) => {
         if (!script || script.hooks.length <= 1) return;
         const newHooks = script.hooks.filter((_, i) => i !== index);
-        setScript({ ...script, hooks: newHooks });
+        const newSelectedHookIndex = script.selectedHookIndex === index 
+            ? 0 
+            : (script.selectedHookIndex && script.selectedHookIndex > index ? script.selectedHookIndex - 1 : script.selectedHookIndex);
+        setScript({ ...script, hooks: newHooks, selectedHookIndex: newSelectedHookIndex });
     };
 
     const handleCopilotAction = async (sceneIndex: number, action: string) => {
@@ -83,6 +92,25 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ project, onScriptSaved }) =
             setIsRewriting(false);
         }
     };
+
+    const handleGenerateStoryboard = (sceneIndex: number) => lockAndExecute(async () => {
+        if (!script || !await consumeCredits(1)) return;
+        const visualDescription = script.scenes[sceneIndex].visual;
+        if (!visualDescription) {
+            addToast("Please write a visual description for the scene first.", "error");
+            return;
+        }
+
+        setIsGeneratingStoryboard(sceneIndex);
+        try {
+            const imageUrl = await generateStoryboardImage(visualDescription);
+            handleScriptChange('scene', sceneIndex, 'storyboardImageUrl', imageUrl);
+        } catch (e) {
+            addToast(`Storyboard generation failed: ${getErrorMessage(e)}`, 'error');
+        } finally {
+            setIsGeneratingStoryboard(null);
+        }
+    });
 
     const handleSave = () => {
         if (script) {
@@ -106,19 +134,25 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ project, onScriptSaved }) =
     ];
 
     return (
-        <div className="max-w-4xl mx-auto space-y-8 animate-fade-in-up">
+        <div className="max-w-6xl mx-auto space-y-8 animate-fade-in-up">
             <header className="text-center">
                 <h1 className="text-4xl font-bold text-white">{t('script_editor.title')}</h1>
                 <p className="mt-2 text-lg text-gray-400">{t('script_editor.subtitle')}</p>
             </header>
 
-            <div className="bg-gray-900/40 p-8 rounded-2xl space-y-6">
+            <div className="bg-gray-900/40 p-8 rounded-2xl space-y-8">
                 <div>
                     <h4 className="font-bold text-indigo-400 mb-2">{t('script_generator.hooks_title')}</h4>
                      <div className="space-y-3">
                         {script?.hooks.map((hook, index) => (
-                            <div key={index} className="flex items-center gap-3 bg-gray-800/50 p-3 rounded-lg border border-gray-700">
-                                <span className="text-sm font-bold text-gray-400">{index + 1}.</span>
+                            <div key={index} className={`flex items-center gap-3 p-1 rounded-lg border transition-all ${script.selectedHookIndex === index ? 'bg-indigo-900/30 border-indigo-500' : 'bg-gray-800/50 border-gray-700'}`}>
+                                <button 
+                                    onClick={() => handleSelectHook(index)}
+                                    className={`p-2 rounded-md ${script.selectedHookIndex === index ? 'text-green-400' : 'text-gray-500 hover:text-white'}`}
+                                    title="Select this hook"
+                                >
+                                    {script.selectedHookIndex === index ? <CheckCircleIcon className="w-5 h-5"/> : <div className="w-5 h-5 border-2 border-current rounded-full" />}
+                                </button>
                                 <input
                                     type="text"
                                     value={hook}
@@ -138,11 +172,12 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ project, onScriptSaved }) =
                         </button>
                     </div>
                 </div>
+                
                 <div>
                     <h4 className="font-bold text-indigo-400 mb-2">{t('script_generator.script_title')}</h4>
-                    <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                    <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-4 -mr-4">
                         {script?.scenes.map((scene, i) => (
-                            <div key={i} className="p-4 bg-gray-800/50 rounded-lg space-y-2 relative">
+                            <div key={i} className="p-4 bg-gray-800/50 rounded-lg border border-gray-700 space-y-4">
                                 <div className="flex justify-between items-center">
                                     <p className="font-bold text-gray-200">Scene {i+1} ({scene.timecode})</p>
                                     <div className="relative" ref={activeCopilot === i ? copilotRef : null}>
@@ -161,13 +196,28 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ project, onScriptSaved }) =
                                         )}
                                     </div>
                                 </div>
-                                <div>
-                                    <label className="text-xs font-bold text-gray-400">{t('script_generator.table_visual')}</label>
-                                    <textarea value={scene.visual} onChange={e => handleScriptChange('scene', i, 'visual', e.target.value)} rows={2} className="w-full text-sm bg-gray-700/50 rounded p-2 mt-1 text-gray-300 border border-gray-600 focus:ring-indigo-500 focus:border-indigo-500"/>
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-gray-400">{t('script_generator.table_voiceover')}</label>
-                                    <textarea value={scene.voiceover} onChange={e => handleScriptChange('scene', i, 'voiceover', e.target.value)} rows={3} className="w-full text-sm bg-gray-700/50 rounded p-2 mt-1 text-gray-300 border border-gray-600 focus:ring-indigo-500 focus:border-indigo-500"/>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                     <div className="space-y-2">
+                                        {scene.storyboardImageUrl || isGeneratingStoryboard === i ? (
+                                            <div className="w-full aspect-video bg-black rounded-lg flex items-center justify-center">
+                                                {isGeneratingStoryboard === i 
+                                                    ? <SparklesIcon className="w-8 h-8 text-indigo-400 animate-pulse"/> 
+                                                    : <img src={scene.storyboardImageUrl} alt={`Storyboard for scene ${i+1}`} className="w-full h-full object-cover rounded-lg"/>
+                                                }
+                                            </div>
+                                        ) : null}
+                                        <div className="flex justify-between items-center">
+                                            <label className="text-sm font-bold text-gray-400">{t('script_generator.table_visual')}</label>
+                                            <button onClick={() => handleGenerateStoryboard(i)} disabled={isGeneratingStoryboard === i} className="p-1 text-indigo-400 hover:text-indigo-300 disabled:opacity-50 text-xs flex items-center gap-1 font-semibold">
+                                                <PhotoIcon className="w-4 h-4"/> Generate Storyboard
+                                            </button>
+                                        </div>
+                                        <textarea value={scene.visual} onChange={e => handleScriptChange('scene', i, 'visual', e.target.value)} rows={4} className="w-full text-sm bg-gray-700/50 rounded p-2 mt-1 text-gray-300 border border-gray-600 focus:ring-indigo-500 focus:border-indigo-500"/>
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-bold text-gray-400">{t('script_generator.table_voiceover')}</label>
+                                        <textarea value={scene.voiceover} onChange={e => handleScriptChange('scene', i, 'voiceover', e.target.value)} rows={4} className="w-full text-sm bg-gray-700/50 rounded p-2 mt-1 text-gray-300 border border-gray-600 focus:ring-indigo-500 focus:border-indigo-500"/>
+                                    </div>
                                 </div>
                             </div>
                         ))}

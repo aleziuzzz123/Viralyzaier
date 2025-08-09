@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { TimelineState, TimelineClip, Subtitle, SubtitleWord, KeyframeableProperty } from '../types.ts';
 import { useAppContext } from '../contexts/AppContext.tsx';
-import { WarningIcon } from './Icons.tsx';
+import { WarningIcon, PlusCircleIcon } from './Icons.tsx';
 
 // Helper to interpolate keyframe values
 const interpolateKeyframes = (keyframes: { time: number; value: number }[] | undefined, currentTime: number, defaultValue: number): number => {
@@ -32,6 +32,7 @@ interface LivePreviewPlayerProps {
     children?: React.ReactNode;
     selectedClipId: string | null;
     onClipUpdate: (clipId: string, updates: Partial<TimelineClip>) => void;
+    onPlaceholderClick: (trackId: string, sceneIndex: number, startTime: number) => void;
 }
 
 const renderSubtitleStyle = (style: Subtitle['style']): React.CSSProperties => {
@@ -97,7 +98,7 @@ const getClipFilterStyle = (clip: TimelineClip): string => {
 };
 
 const LivePreviewPlayer: React.FC<LivePreviewPlayerProps> = ({
-    timeline, isPlaying, currentTime, onTimeUpdate, onEnded, aspectRatio = '16/9', children, selectedClipId, onClipUpdate
+    timeline, isPlaying, currentTime, onTimeUpdate, onEnded, aspectRatio = '16/9', children, selectedClipId, onClipUpdate, onPlaceholderClick
 }) => {
     const mediaRefs = useRef<Record<string, HTMLMediaElement | null>>({});
     const playerContainerRef = useRef<HTMLDivElement>(null);
@@ -105,28 +106,81 @@ const LivePreviewPlayer: React.FC<LivePreviewPlayerProps> = ({
 
     const handleMediaError = useCallback((e: React.SyntheticEvent<HTMLMediaElement | HTMLImageElement, Event>, clipId: string) => {
         const media = e.currentTarget as HTMLMediaElement;
-        let errorMsg = 'Unknown media error.';
+        let errorMsg = 'An unknown media error occurred.';
         if (media.error) {
             switch (media.error.code) {
-                case media.error.MEDIA_ERR_SRC_NOT_SUPPORTED: errorMsg = 'Media format not supported or file not found.'; break;
+                case 1: // MEDIA_ERR_ABORTED
+                    errorMsg = 'The media download was aborted.';
+                    break;
+                case 2: // MEDIA_ERR_NETWORK
+                    errorMsg = 'A network error occurred while fetching the media.';
+                    break;
+                case 3: // MEDIA_ERR_DECODE
+                    errorMsg = 'A corruption error was detected in the media file.';
+                    break;
+                case 4: // MEDIA_ERR_SRC_NOT_SUPPORTED
+                    errorMsg = 'Media format not supported or file not found.';
+                    break;
+                default:
+                    errorMsg = `An unknown error occurred (code: ${media.error.code}).`;
+                    break;
             }
         }
-        setMediaErrors(prev => ({ ...prev, [clipId]: errorMsg }));
+        setMediaErrors(prev => ({ ...prev, [clipId]: `${errorMsg} URL: ${media.src.substring(0, 100)}...` }));
     }, []);
 
     const allClips = useMemo(() => timeline.tracks.flatMap(t => t.clips), [timeline.tracks]);
 
     useEffect(() => {
+        let animationFrameId: number;
+        const loop = () => {
+            if (!isPlaying) return;
+
+            const timeSource = Object.values(mediaRefs.current).find(media => media && !media.paused && media.id);
+
+            if (timeSource) {
+                const clip = allClips.find(c => c.id === timeSource.id);
+                if (clip) {
+                    const newTime = timeSource.currentTime + clip.startTime;
+                     if (newTime >= timeline.totalDuration) {
+                        onEnded();
+                        onTimeUpdate(timeline.totalDuration);
+                    } else {
+                        onTimeUpdate(newTime);
+                    }
+                }
+            }
+            animationFrameId = requestAnimationFrame(loop);
+        };
+
+        if (isPlaying) {
+            animationFrameId = requestAnimationFrame(loop);
+        }
+
+        return () => {
+            cancelAnimationFrame(animationFrameId);
+        };
+    }, [isPlaying, onTimeUpdate, onEnded, allClips, timeline.totalDuration]);
+
+
+    useEffect(() => {
         Object.values(mediaRefs.current).forEach(media => {
             if (media) {
-                const clip = allClips.find(c => c.id === media?.id);
+                const clip = allClips.find(c => c.id === media.id);
                 if (!clip || mediaErrors[clip.id]) return;
                 
-                const isMediaActive = currentTime >= clip.startTime && currentTime <= clip.endTime;
+                const isMediaActive = currentTime >= clip.startTime && currentTime < clip.endTime;
                 if (isPlaying && isMediaActive) {
-                    if (media.paused) media.play().catch(e => {});
+                    if (media.paused) {
+                        const playPromise = media.play();
+                        if (playPromise !== undefined) {
+                            playPromise.catch(_ => {});
+                        }
+                    }
                 } else {
-                    if (!media.paused) media.pause();
+                    if (!media.paused) {
+                        media.pause();
+                    }
                 }
             }
         });
@@ -135,7 +189,7 @@ const LivePreviewPlayer: React.FC<LivePreviewPlayerProps> = ({
     useEffect(() => {
         Object.values(mediaRefs.current).forEach(media => {
              if (media) {
-                const clip = allClips.find(c => c.id === media?.id);
+                const clip = allClips.find(c => c.id === media.id);
                 if (!clip) return;
                 const localTime = currentTime - clip.startTime;
                 if (localTime >= 0 && localTime < clip.sourceDuration && Math.abs(media.currentTime - localTime) > 0.2) {
@@ -156,8 +210,8 @@ const LivePreviewPlayer: React.FC<LivePreviewPlayerProps> = ({
 
                 // Keyframe Interpolation
                 const scale = interpolateKeyframes(clip.keyframes?.scale, currentTime, clip.positioning?.scale ?? 1);
-                const x = interpolateKeyframes(clip.keyframes?.x, currentTime, clip.positioning?.x ?? 0);
-                const y = interpolateKeyframes(clip.keyframes?.y, currentTime, clip.positioning?.y ?? 0);
+                const x = interpolateKeyframes(clip.keyframes?.x, currentTime, clip.positioning?.x ?? 50);
+                const y = interpolateKeyframes(clip.keyframes?.y, currentTime, clip.positioning?.y ?? 50);
                 const rotation = interpolateKeyframes(clip.keyframes?.rotation, currentTime, clip.positioning?.rotation ?? 0);
                 const opacity = interpolateKeyframes(clip.keyframes?.opacity, currentTime, clip.opacity ?? 1);
 
@@ -179,6 +233,17 @@ const LivePreviewPlayer: React.FC<LivePreviewPlayerProps> = ({
                             <WarningIcon className="w-8 h-8" /><p className="text-sm font-bold text-center mt-2">Media Error</p><p className="text-xs text-center mt-1">{mediaErrors[clip.id]}</p>
                         </div>
                     );
+                }
+                
+                if (!clip.url?.trim() && (track.id === 'a-roll' || track.id === 'b-roll')) {
+                    return (
+                        <div key={clip.id} style={positionStyle} className={`${baseClasses} flex items-center justify-center`}>
+                             <button onClick={() => onPlaceholderClick(track.id, clip.sceneIndex, clip.startTime)} className="w-full h-full bg-gray-900/50 rounded border-2 border-dashed border-gray-600 hover:bg-gray-800/50 hover:border-indigo-500 flex flex-col items-center justify-center text-gray-500">
+                                <PlusCircleIcon className="w-10 h-10" />
+                                <span className="font-bold mt-2">Scene {clip.sceneIndex + 1}</span>
+                            </button>
+                        </div>
+                    )
                 }
                 
                 if (!clip.url?.trim() && clip.type !== 'text') return null;

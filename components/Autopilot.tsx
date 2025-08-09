@@ -2,6 +2,7 @@
 
 
 
+
 import React, { useState, useRef } from 'react';
 import { useAppContext } from '../contexts/AppContext.tsx';
 import { generateAutopilotBacklog } from '../services/geminiService.ts';
@@ -68,6 +69,7 @@ const Autopilot: React.FC = () => {
                     name: title,
                     status: 'Autopilot',
                     platform: bp.platform,
+                    videoSize: bp.platform === 'youtube_long' ? '16:9' : '9:16',
                     topic: bp.strategicSummary,
                     title: title,
                     script: bp.script,

@@ -153,7 +153,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     };
 
     return (
-        <div className="fixed inset-0 modal-overlay flex items-center justify-center animate-fade-in-up" style={{ animationDuration: '0.3s' }} onClick={handleClose} role="dialog" aria-modal="true" aria-labelledby="login-modal-title">
+        <div className="fixed inset-0 modal-overlay flex items-center justify-center animate-fade-in-up z-50" style={{ animationDuration: '0.3s' }} onClick={handleClose} role="dialog" aria-modal="true" aria-labelledby="login-modal-title">
             <div className="bg-gray-800 border border-indigo-500/50 rounded-2xl shadow-2xl w-full max-w-md m-4 p-8 text-center transform transition-all relative" onClick={(e) => e.stopPropagation()}>
                 <button onClick={handleClose} className="absolute top-4 right-4 text-gray-500 hover:text-white">
                     <XCircleIcon className="w-8 h-8"/>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Project, LaunchPlan } from '../types.ts';
-import { generateSeo, analyzeAndGenerateThumbnails, generatePromotionPlan, getSchedulingSuggestion } from '../services/geminiService.ts';
+import { Project, LaunchPlan, Script } from '../types.ts';
+import { generateSeo, analyzeAndGenerateThumbnails, getSchedulingSuggestion, repurposeProject } from '../services/geminiService.ts';
 import { publishVideo } from '../services/youtubeService.ts';
 import { SparklesIcon, ClipboardCopyIcon, DownloadIcon, RocketLaunchIcon, YouTubeIcon, CheckCircleIcon, CalendarIcon } from './Icons.tsx';
 import { useAppContext } from '../contexts/AppContext.tsx';
@@ -11,8 +11,8 @@ interface LaunchpadProps {
 }
 
 const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
-    const { user, consumeCredits, addToast, handleUpdateProject, t, setActiveProjectId, lockAndExecute } = useAppContext();
-    const [loading, setLoading] = useState<{ seo?: boolean, thumbnails?: boolean, promotion?: boolean, schedule?: boolean }>({});
+    const { user, consumeCredits, addToast, handleUpdateProject, t, setActiveProjectId, lockAndExecute, openScheduleModal, handleCreateProjectFromIdea } = useAppContext();
+    const [loading, setLoading] = useState<{ seo?: boolean, thumbnails?: boolean, promotion?: boolean, schedule?: boolean, repurpose?: boolean }>({});
     const [isPublishing, setIsPublishing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [scheduleSuggestion, setScheduleSuggestion] = useState<string | null>(null);
@@ -70,24 +70,6 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
             setLoading({});
         }
     });
-
-    const handleGeneratePromotion = () => lockAndExecute(async () => {
-        if (!project.title) return;
-        if (!await consumeCredits(1)) return;
-        setLoading({ promotion: true });
-        try {
-            const promotionPlan = await generatePromotionPlan(project.title, project.platform);
-            const updatedLaunchPlan: LaunchPlan = { 
-                ...(project.launchPlan || { seo: { description: '', tags: [] }, thumbnails: null, promotionPlan: null }),
-                promotionPlan 
-            };
-            await handleUpdateProject({ id: project.id, launchPlan: updatedLaunchPlan });
-        } catch (e) {
-            setError(e instanceof Error ? e.message : 'Failed to generate promotion plan.');
-        } finally {
-            setLoading({});
-        }
-    });
     
     const handleGetScheduleSuggestion = () => lockAndExecute(async () => {
         if (!project.topic) return;
@@ -132,6 +114,28 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
             addToast(`YouTube publish failed: ${getErrorMessage(e)}`, 'error');
         } finally {
             setIsPublishing(false);
+        }
+    });
+    
+     const handleRepurpose = (targetPlatform: 'youtube_short' | 'tiktok') => lockAndExecute(async () => {
+        if (!project.script || !project.title) return;
+        if (!await consumeCredits(5)) return;
+        setLoading({ repurpose: true });
+        addToast(`Repurposing for ${targetPlatform}... this may take a moment.`, 'info');
+        try {
+            const newScript = await repurposeProject(project.script, project.title, project.platform, targetPlatform);
+            // Re-using this context function is a clean way to create a new project
+            await handleCreateProjectFromIdea({
+                idea: `Repurposed: ${project.topic}`,
+                reason: `Repurposed from ${project.platform} video.`,
+                suggestedTitle: `Shorts Cut: ${project.title}`,
+                type: 'Experimental'
+            }, targetPlatform);
+            addToast('Repurposed project created! You can find it on your dashboard.', 'success');
+        } catch (e) {
+            addToast(`Repurposing failed: ${getErrorMessage(e)}`, 'error');
+        } finally {
+            setLoading({ repurpose: false });
         }
     });
 
@@ -186,23 +190,18 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
                             </button>
                         )}
                     </div>
-                    <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700 space-y-4">
-                         <h3 className="text-2xl font-bold text-white">{t('launchpad.promotion_title')}</h3>
-                         {project.launchPlan?.promotionPlan ? (
-                             <ul className="space-y-3 animate-fade-in-up">
-                                {project.launchPlan.promotionPlan.map((item, i) => (
-                                    <li key={i} className="bg-gray-900/50 p-3 rounded-lg">
-                                        <p className="font-bold text-indigo-400">{item.platform}</p>
-                                        <p className="text-sm text-gray-300">{item.action}</p>
-                                    </li>
-                                ))}
-                             </ul>
-                         ) : (
-                             <button onClick={handleGeneratePromotion} disabled={loading.promotion} className="w-full inline-flex items-center justify-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-full transition-colors disabled:bg-gray-600">
-                                 <SparklesIcon className="w-5 h-5 mr-2" />
-                                {loading.promotion ? t('launchpad.promotion_strategizing') : t('launchpad.promotion_button')}
-                             </button>
+                     <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700 space-y-4">
+                        <h3 className="text-2xl font-bold text-white">Content Repurposing Engine</h3>
+                        <p className="text-sm text-gray-400">Turn this video into multiple pieces of content with one click.</p>
+                         {project.platform === 'youtube_long' && (
+                              <button onClick={() => handleRepurpose('youtube_short')} disabled={loading.repurpose} className="w-full inline-flex items-center justify-center px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-full transition-colors disabled:bg-gray-600">
+                                <SparklesIcon className="w-5 h-5 mr-2" />
+                                {loading.repurpose ? "Repurposing..." : "Create YouTube Short (5 Credits)"}
+                            </button>
                          )}
+                         {project.platform.includes('short') || project.platform === 'tiktok' ? (
+                             <p className="text-sm text-center text-gray-500">Repurposing is available for long-form videos.</p>
+                         ) : null}
                     </div>
                 </div>
 
@@ -253,10 +252,16 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
                                     </a>
                                 </div>
                             ) : (
-                                <button onClick={handlePublishToYouTube} disabled={isPublishingDisabled} className="w-full inline-flex items-center justify-center px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-full transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed" title={isPublishingDisabled ? "Assemble video, generate SEO & Thumbnails to enable" : ""}>
-                                    <YouTubeIcon className="w-5 h-5 mr-2" />
-                                    {isPublishing ? "Publishing..." : "Publish to YouTube"}
-                                </button>
+                                <div className="flex gap-2">
+                                    <button onClick={handlePublishToYouTube} disabled={isPublishingDisabled} className="w-full inline-flex items-center justify-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-full transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed" title={isPublishingDisabled ? "Assemble video, generate SEO & Thumbnails to enable" : ""}>
+                                        <YouTubeIcon className="w-5 h-5 mr-2" />
+                                        {isPublishing ? "Publishing..." : "Publish"}
+                                    </button>
+                                     <button onClick={() => openScheduleModal(project.id)} className="w-full inline-flex items-center justify-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-full transition-colors">
+                                        <CalendarIcon className="w-5 h-5 mr-2" />
+                                        Schedule
+                                    </button>
+                                </div>
                             )
                         ) : (
                             <div className="text-center">

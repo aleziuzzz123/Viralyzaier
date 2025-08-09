@@ -1,12 +1,12 @@
 import React from 'react';
 import { Project, Blueprint, Script as ScriptType, WorkflowStep } from '../types.ts';
 import { useAppContext } from '../contexts/AppContext.tsx';
-import BlueprintStep from './BlueprintStep.tsx';
 import ScriptGenerator from './ScriptGenerator.tsx';
 import FinalEditStep from './FinalEditStep.tsx';
 import Launchpad from './Launchpad.tsx';
 import TutorialCallout from './TutorialCallout.tsx';
 import { TranslationKey } from '../translations.ts';
+import AnalysisStep from './AnalysisStep.tsx';
 
 interface ProjectViewProps {
     project: Project;
@@ -14,17 +14,6 @@ interface ProjectViewProps {
 
 export const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
     const { handleUpdateProject, t, dismissedTutorials, addToast } = useAppContext();
-
-    const handleBlueprintAccepted = (blueprint: Blueprint, selectedTitle: string) => {
-        handleUpdateProject({
-            id: project.id,
-            script: blueprint.script,
-            title: selectedTitle,
-            moodboard: blueprint.moodboard,
-            workflowStep: 2,
-        });
-        addToast(t('toast.brief_complete'));
-    };
 
     const handleScriptSaved = (script: ScriptType) => {
         handleUpdateProject({
@@ -34,26 +23,41 @@ export const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
         });
     };
 
-    const handleProceedToLaunchpad = () => {
+    const handleProceedToAnalysis = () => {
         handleUpdateProject({
             id: project.id,
             workflowStep: 4,
         });
     };
     
+    const handleProceedToLaunchpad = () => {
+        handleUpdateProject({
+            id: project.id,
+            workflowStep: 5,
+        });
+    };
+
+    const handleReturnToStudio = () => {
+        handleUpdateProject({
+            id: project.id,
+            workflowStep: 3
+        });
+    };
+    
     const renderContent = () => {
+        // Since blueprint creation is now a separate view, the project view starts at step 2.
+        // If a project somehow ends up at step 1, we show a message.
         switch (project.workflowStep) {
-            case 1:
-                return <BlueprintStep project={project} onBlueprintAccepted={handleBlueprintAccepted} />;
             case 2:
                 return <ScriptGenerator project={project} onScriptSaved={handleScriptSaved} />;
             case 3:
-                return <FinalEditStep project={project} onProceedToNextStage={handleProceedToLaunchpad} />;
+                return <FinalEditStep project={project} onProceedToNextStage={handleProceedToAnalysis} />;
             case 4:
+                return <AnalysisStep project={project} onProceedToLaunchpad={handleProceedToLaunchpad} onReturnToStudio={handleReturnToStudio} />;
             case 5:
                 return <Launchpad project={project} />;
             default:
-                return <div className="text-center text-gray-500">Invalid project state. Please contact support.</div>;
+                return <div className="text-center text-gray-500">This project's blueprint has not been generated. Please start a new project.</div>;
         }
     };
     
@@ -61,7 +65,8 @@ export const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
         { nameKey: 'project_view.stepper_blueprint', step: 1 },
         { nameKey: 'project_view.stepper_script_editor', step: 2 },
         { nameKey: 'project_view.stepper_creative_studio', step: 3 },
-        { nameKey: 'project_view.stepper_launch', step: 4 },
+        { nameKey: 'project_view.stepper_analysis', step: 4 },
+        { nameKey: 'project_view.stepper_launchpad', step: 5 },
     ];
 
     return (
@@ -86,7 +91,7 @@ export const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
                 </ol>
             </nav>
             
-            {project.workflowStep === 1 && !dismissedTutorials.includes('project_view_new') && (
+            {project.workflowStep === 2 && !dismissedTutorials.includes('project_view_new') && (
                  <TutorialCallout id="project_view_new">
                     {t('project_view.tutorial_callout_new')}
                 </TutorialCallout>
