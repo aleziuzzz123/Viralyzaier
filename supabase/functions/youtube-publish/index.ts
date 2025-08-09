@@ -61,7 +61,18 @@ serve(async (req: Request) => {
         }
 
         // --- Process Request Body ---
-        const { videoFileUrl, title, description, tags, thumbnailUrl } = await req.json();
+        let body;
+        try {
+            body = await req.json();
+        } catch (e) {
+            return new Response(JSON.stringify({ error: `Invalid JSON body: ${e.message}` }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 400
+            });
+        }
+
+        const { videoFileUrl, title, description, tags, thumbnailUrl } = body;
+
         if (!videoFileUrl || !title || !description || !tags || !thumbnailUrl) {
             throw new Error("Missing required fields: videoFileUrl, title, description, tags, thumbnailUrl.");
         }

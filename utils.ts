@@ -45,16 +45,93 @@ export const getErrorMessage = (error: unknown): string => {
 
 // Converts a base64 string to a Blob object, which is safer for uploads.
 export const base64ToBlob = (base64: string, contentType: string = ''): Blob => {
-    const byteCharacters = atob(base64);
-    const byteArrays = [];
-    for (let offset = 0; offset < byteCharacters.length; offset += 512) {
-        const slice = byteCharacters.slice(offset, offset + 512);
-        const byteNumbers = new Array(slice.length);
-        for (let i = 0; i < slice.length; i++) {
-            byteNumbers[i] = slice.charCodeAt(i);
+    // Handle data URL format (e.g., "data:image/jpeg;base64,...")
+    if (base64.includes(',')) {
+        const parts = base64.split(',');
+        const mimeType = parts[0].match(/:(.*?);/)?.[1];
+        base64 = parts[1];
+        if (mimeType && !contentType) {
+            contentType = mimeType;
         }
-        const byteArray = new Uint8Array(byteNumbers);
-        byteArrays.push(byteArray);
     }
-    return new Blob(byteArrays, { type: contentType });
+    
+    try {
+        const byteCharacters = atob(base64);
+        const byteArrays = [];
+        for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+            const slice = byteCharacters.slice(offset, offset + 512);
+            const byteNumbers = new Array(slice.length);
+            for (let i = 0; i < slice.length; i++) {
+                byteNumbers[i] = slice.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            byteArrays.push(byteArray);
+        }
+        return new Blob(byteArrays, { type: contentType });
+    } catch (e) {
+        console.error("Failed to decode base64 string. It might be corrupted or not properly formatted.", e);
+        throw new Error("Invalid base64 string provided for blob conversion.");
+    }
+};
+
+// --- IndexedDB Cache Utilities ---
+
+const DB_NAME = 'ViralyzerDB';
+const DB_VERSION = 1;
+const STORE_NAME = 'timelineCache';
+
+let db: IDBDatabase | null = null;
+
+const getDB = (): Promise<IDBDatabase> => {
+  return new Promise((resolve, reject) => {
+    if (db) {
+      return resolve(db);
+    }
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onerror = () => reject(new Error("Failed to open IndexedDB."));
+    request.onsuccess = (event) => {
+      db = (event.target as IDBOpenDBRequest).result;
+      resolve(db);
+    };
+    request.onupgradeneeded = (event) => {
+      const dbInstance = (event.target as IDBOpenDBRequest).result;
+      if (!dbInstance.objectStoreNames.contains(STORE_NAME)) {
+        dbInstance.createObjectStore(STORE_NAME);
+      }
+    };
+  });
+};
+
+export const saveTimelineToCache = async (projectId: string, timeline: any): Promise<void> => {
+  try {
+    const dbInstance = await getDB();
+    const transaction = dbInstance.transaction(STORE_NAME, 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    store.put(JSON.parse(JSON.stringify(timeline)), projectId); // Ensure data is cloneable
+    return new Promise((resolve, reject) => {
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(new Error('Failed to save timeline to cache.'));
+    });
+  } catch (error) {
+    console.error("IndexedDB save error:", error);
+  }
+};
+
+export const loadTimelineFromCache = async (projectId: string): Promise<any | null> => {
+  try {
+    const dbInstance = await getDB();
+    const transaction = dbInstance.transaction(STORE_NAME, 'readonly');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.get(projectId);
+    return new Promise((resolve, reject) => {
+        request.onsuccess = () => resolve(request.result || null);
+        request.onerror = () => {
+            console.error("IndexedDB load error:", request.error);
+            reject(new Error('Failed to load timeline from cache.'));
+        };
+    });
+  } catch (error) {
+    console.error("IndexedDB setup error:", error);
+    return null;
+  }
 };

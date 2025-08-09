@@ -35,41 +35,36 @@ serve(async (req: Request) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) throw new Error('Authentication failed.');
 
-    const body = await req.json();
-    const { type, clipUrl, objectDescription, aspectRatio } = body;
+    let body;
+    try {
+        body = await req.json();
+    } catch (e) {
+        return new Response(JSON.stringify({ error: `Invalid JSON body: ${e.message}` }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+        });
+    }
 
+    const { type, mediaUrl } = body;
 
-    if (!type || !clipUrl) {
-        throw new Error("Request requires 'type' and 'clipUrl'.");
+    if (!type || !mediaUrl) {
+        throw new Error("Request requires 'type' and 'mediaUrl'.");
     }
 
     // ** SIMULATION LOGIC **
-    // In a real application, this is where you would call a third-party AI VFX API
-    // with a secret API key. For this demo, we simulate a delay and return the
-    // original URL, as if the operation was an in-place modification or we
-    // don't have a visual way to show the change.
+    // In a real application, this would call a third-party AI VFX API.
+    // For this demo, we simulate a delay and return the original URL.
     
-    let processedUrl = clipUrl; // Default to original URL
+    let processedUrl = mediaUrl; // Default to original URL
 
     switch(type) {
         case 'removeBackground':
+            await delay(5000); // Simulate processing time
+            console.log(`Simulating background removal for user ${user.id} on media ${mediaUrl}`);
+            break;
+        case 'retouch':
             await delay(3000); // Simulate processing time
-            console.log(`Simulating background removal for user ${user.id} on clip ${clipUrl}`);
-            // In a real app, you'd upload to a new location and return that URL
-            break;
-        case 'applyRetouch':
-            await delay(2000);
-            console.log(`Simulating retouch for user ${user.id} on clip ${clipUrl}`);
-            break;
-        case 'removeObject':
-            if (!objectDescription) throw new Error("Object removal requires 'objectDescription'.");
-            await delay(4000);
-            console.log(`Simulating removal of '${objectDescription}' for user ${user.id} on clip ${clipUrl}`);
-            break;
-        case 'reframe':
-            if (!aspectRatio) throw new Error("Reframe requires 'aspectRatio'.");
-            await delay(1500);
-            console.log(`Simulating reframe to ${aspectRatio} for user ${user.id} on clip ${clipUrl}`);
+            console.log(`Simulating AI retouching for user ${user.id} on media ${mediaUrl}`);
             break;
         default:
             throw new Error(`Invalid VFX type: ${type}`);

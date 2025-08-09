@@ -37,24 +37,18 @@ serve(async (req: Request) => {
       throw new Error(`Authentication failed: ${authError?.message}`);
     }
 
-    const bodyText = await req.text();
-    if (!bodyText) {
-        return new Response(JSON.stringify({ error: 'Request body is empty.' }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400,
-        });
-    }
-    let parsedBody;
+    let body;
     try {
-        parsedBody = JSON.parse(bodyText);
+        body = await req.json();
     } catch (e) {
-        return new Response(JSON.stringify({ error: `Invalid JSON in request body: ${e.message}` }), {
+        return new Response(JSON.stringify({ error: `Invalid JSON body: ${e.message}` }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400,
+            status: 400
         });
     }
 
-    const { type, params } = parsedBody;
+    const { type, params } = body;
+
     if (!type || !params) {
       throw new Error('Request body must include "type" and "params".');
     }
@@ -63,12 +57,22 @@ serve(async (req: Request) => {
     let result: any;
 
     switch (type) {
-      case 'generateContent':
-        result = await ai.models.generateContent(params);
+      case 'generateContent': {
+        const { model, contents, config } = params;
+        if (!model || !contents) {
+            throw new Error('generateContent requires "model" and "contents" in params.');
+        }
+        result = await ai.models.generateContent({ model, contents, config });
         break;
-      case 'generateImages':
-        result = await ai.models.generateImages(params);
+      }
+      case 'generateImages': {
+        const { model, prompt, config } = params;
+        if (!model || !prompt) {
+            throw new Error('generateImages requires "model" and "prompt" in params.');
+        }
+        result = await ai.models.generateImages({ model, prompt, config });
         break;
+      }
       default:
         throw new Error(`Invalid proxy type: ${type}`);
     }

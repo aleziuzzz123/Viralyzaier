@@ -1,4 +1,3 @@
-
 // supabase/functions/giphy-proxy/index.ts
 declare const Deno: any;
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
@@ -33,7 +32,18 @@ serve(async (req: Request) => {
     if (authError || !user) throw new Error('Authentication failed.');
     
     // Parse request body
-    const { query, type = 'stickers' } = await req.json(); // default to stickers
+    let body;
+    try {
+        body = await req.json();
+    } catch (e) {
+        return new Response(JSON.stringify({ error: `Invalid JSON body: ${e.message}` }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+        });
+    }
+
+    const { query, type = 'stickers' } = body;
+
     if (!query) {
       throw new Error("Missing 'query' in request body.");
     }

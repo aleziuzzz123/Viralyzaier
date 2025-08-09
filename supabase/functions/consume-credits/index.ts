@@ -52,26 +52,19 @@ serve(async (req: Request) => {
       });
     }
     
-    // 2. Process the request body more robustly.
-    const bodyText = await req.text();
-    if (!bodyText) {
-        return new Response(JSON.stringify({ error: 'Request body is empty.' }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400,
-        });
-    }
-    let parsedBody;
+    // 2. Process the request body robustly using req.json().
+    let body;
     try {
-        parsedBody = JSON.parse(bodyText);
+        body = await req.json();
     } catch (e) {
-        return new Response(JSON.stringify({ error: `Invalid JSON in request body: ${e.message}` }), {
+        // This will catch empty body, malformed JSON, etc.
+        return new Response(JSON.stringify({ error: `Invalid JSON body: ${e.message}` }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 400,
         });
     }
 
-    const { amount_to_consume } = parsedBody;
-
+    const { amount_to_consume } = body;
 
     if (typeof amount_to_consume !== 'number' || amount_to_consume <= 0) {
         return new Response(JSON.stringify({ error: 'Invalid or missing consumption amount.' }), {
@@ -87,11 +80,35 @@ serve(async (req: Request) => {
         .eq('id', user.id)
         .single();
     
-    if (profileError || !profile) {
-        throw new Error(profileError?.message || `Profile not found for user ${user.id}`);
+    if (profileError && profileError.code !== 'PGRST116') {
+      throw new Error(`Database error fetching profile: ${profileError.message}`);
     }
 
-    const currentCredits = profile.ai_credits;
+    let currentCredits: number;
+
+    if (!profile) {
+        // Profile not found, create it as a fallback to prevent app failure.
+        console.warn(`Profile not found for user ${user.id}. Creating a fallback profile.`);
+        const freePlanCreditLimit = 10; // Default value from paymentService.ts
+        const { data: newProfile, error: createError } = await supabaseAdmin
+            .from('profiles')
+            .upsert({
+                id: user.id,
+                email: user.email || `user_${user.id.split('-')[0]}@viralyzaier.app`, // Use a fallback email to prevent crash
+                subscription: { planId: 'free', status: 'active', endDate: null },
+                ai_credits: freePlanCreditLimit,
+            })
+            .select('ai_credits')
+            .single();
+        
+        if (createError || !newProfile) {
+            throw new Error(createError?.message || `Failed to create fallback profile for user ${user.id}.`);
+        }
+        currentCredits = newProfile.ai_credits;
+    } else {
+        currentCredits = profile.ai_credits;
+    }
+
 
     if (currentCredits < amount_to_consume) {
         return new Response(JSON.stringify({ success: false, message: 'insufficient_credits', newCredits: currentCredits }), {

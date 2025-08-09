@@ -35,7 +35,17 @@ serve(async (req: Request) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) throw new Error('Authentication failed.');
 
-    const { type, clipUrl, preset } = await req.json();
+    let body;
+    try {
+        body = await req.json();
+    } catch (e) {
+        return new Response(JSON.stringify({ error: `Invalid JSON body: ${e.message}` }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+        });
+    }
+
+    const { type, clipUrl, preset } = body;
 
     if (!type || !clipUrl) {
         throw new Error("Request requires 'type' and 'clipUrl'.");

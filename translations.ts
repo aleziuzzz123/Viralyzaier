@@ -1,4 +1,3 @@
-
 // @ts-nocheck
 export type Language = 'en' | 'fr' | 'es' | 'pt' | 'hi';
 
@@ -165,7 +164,8 @@ export const translations = {
     "project_view.stepper_blueprint": "Stage 1: The Spark",
     "project_view.stepper_script_editor": "Stage 2: The Script",
     "project_view.stepper_creative_studio": "Stage 3: The Creative Studio",
-    "project_view.stepper_launch": "Stage 4 & 5: The Launchpad",
+    "project_view.stepper_analysis": "Stage 4: Analysis & Report",
+    "project_view.stepper_launchpad": "Stage 5: The Launchpad",
     "project_view.strategy.from_topic": "From Topic",
     "project_view.strategy.from_competitor": "From Competitor",
     "project_view.strategy.from_trend": "From Trend",
@@ -528,6 +528,14 @@ export const translations = {
     "layout_toolkit.layout_pip_br": "PiP Bottom-Right",
     "layout_toolkit.layout_reaction": "Reaction",
     "layout_toolkit.auto_reframing": "Aspect Ratio Preview",
-    "layout_toolkit.guides_zones": "Show Guides & Safe Zones"
+    "layout_toolkit.guides_zones": "Show Guides & Safe Zones",
+    "platform.youtube_long_name": "YouTube Video",
+    "platform.youtube_long_desc": "Standard horizontal video for education, entertainment, and vlogs.",
+    "platform.youtube_short_name": "YouTube Short",
+    "platform.youtube_short_desc": "Vertical video under 60s to capture attention quickly.",
+    "platform.tiktok_name": "TikTok",
+    "platform.tiktok_desc": "Short, engaging vertical videos with a focus on trends.",
+    "platform.instagram_name": "Instagram",
+    "platform.instagram_desc": "Vertical Reels or square feed posts for visual storytelling."
   }
 }

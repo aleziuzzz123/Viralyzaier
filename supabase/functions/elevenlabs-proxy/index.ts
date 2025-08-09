@@ -32,7 +32,17 @@ serve(async (req: Request) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) throw new Error('Authentication failed.');
 
-    const { type, text, voiceId } = await req.json();
+    let body;
+    try {
+        body = await req.json();
+    } catch (e) {
+        return new Response(JSON.stringify({ error: `Invalid JSON body: ${e.message}` }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+        });
+    }
+
+    const { type, text, voiceId } = body;
 
     if (!type || !text) {
       throw new Error("Request body must include 'type' and 'text'.");
@@ -71,9 +81,6 @@ serve(async (req: Request) => {
 
     const contentType = elevenLabsResponse.headers.get('Content-Type');
 
-    // ** CRITICAL FIX **
-    // A successful response MUST have the 'audio/mpeg' content type.
-    // APIs sometimes return 200 OK with a JSON or HTML error body. This catches that.
     if (!elevenLabsResponse.ok || !contentType || !contentType.includes('audio/mpeg')) {
       let errorBodyText = await elevenLabsResponse.text();
       let errorMessage = `ElevenLabs API Error: ${elevenLabsResponse.statusText}. Response: ${errorBodyText.substring(0, 200)}`;
@@ -89,7 +96,6 @@ serve(async (req: Request) => {
     
     const audioBlob = await elevenLabsResponse.blob();
 
-    // Robustness check: Ensure the blob is not empty.
     if (audioBlob.size < 100) {
         console.error("ElevenLabs returned a very small/empty audio file. Size:", audioBlob.size);
         throw new Error("AI audio generation failed: The returned file was empty or invalid.");

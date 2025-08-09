@@ -18,9 +18,10 @@ import Settings from './components/Settings.js';
 import ScheduleModal from './components/ScheduleModal.js';
 import UpgradeModal from './components/UpgradeModal.js';
 import ConfirmationModal from './components/ConfirmationModal.js';
+import ProjectKickoff from './components/ProjectKickoff.js';
 
 
-type View = 'dashboard' | 'project' | 'calendar' | 'pricing' | 'channel' | 'assetLibrary' | 'autopilot' | 'settings';
+type View = 'dashboard' | 'project' | 'calendar' | 'pricing' | 'channel' | 'assetLibrary' | 'autopilot' | 'settings' | 'kickoff';
 
 const BackendErrorModal: React.FC = () => {
     const { backendError, clearBackendError, t } = useAppContext();
@@ -115,7 +116,7 @@ const MainApp = () => {
         session, user, projects,
         toasts, dismissToast, activeProjectId, setActiveProjectId,
         t, notifications,
-        confirmation, handleConfirmation, handleCancelConfirmation
+        confirmation, handleConfirmation, handleCancelConfirmation,
     } = useAppContext();
     const [currentView, setCurrentView] = useState<View>('dashboard');
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -136,7 +137,7 @@ const MainApp = () => {
         } else {
             setCurrentView(view);
         }
-        if (view !== 'project') {
+        if (view !== 'project' && view !== 'kickoff') {
             setActiveProjectId(null);
         }
     };
@@ -144,6 +145,10 @@ const MainApp = () => {
     const handleSelectProject = (projectId: string) => {
         setActiveProjectId(projectId);
         setCurrentView('project');
+    };
+    
+    const handleNewProject = () => {
+        handleSetView('kickoff');
     };
 
     const renderCurrentView = () => {
@@ -154,6 +159,8 @@ const MainApp = () => {
             case 'project':
                 if (activeProject) return <ProjectView project={activeProject} />;
                 handleSetView('dashboard'); return null;
+            case 'kickoff':
+                return <ProjectKickoff onProjectCreated={handleSelectProject} onExit={() => handleSetView('dashboard')} />;
             case 'calendar':
                 return <ContentCalendar />;
             case 'pricing':
@@ -168,7 +175,7 @@ const MainApp = () => {
                 return <Settings />;
             case 'dashboard':
             default:
-                return <Dashboard onSelectProject={handleSelectProject} />;
+                return <Dashboard onSelectProject={handleSelectProject} onNewProject={handleNewProject} />;
         }
     };
     
@@ -232,7 +239,7 @@ const MainApp = () => {
                     {confirmation.message}
                 </ConfirmationModal>
             )}
-            
+
             <BackendErrorModal />
     
             {document.getElementById('toast-container') && createPortal(toasts.map(toast => <ToastComponent key={toast.id} toast={toast} onDismiss={dismissToast} />), document.getElementById('toast-container')!)}

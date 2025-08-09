@@ -1,13 +1,14 @@
 import React, { createContext, useState, useEffect, useCallback, useContext, ReactNode, useRef } from 'react';
-import { Project, User, PlanId, Blueprint, Toast, Platform, Opportunity, ContentGapSuggestion, PerformanceReview, Notification, ProjectStatus, Database, UserAsset, BrandIdentity, TimelineState, VideoStyle } from '../types.js';
-import * as supabaseService from '../services/supabaseService.js';
+import { Project, User, PlanId, Blueprint, Toast, Platform, Opportunity, ContentGapSuggestion, PerformanceReview, Notification, ProjectStatus, Database, UserAsset, BrandIdentity, TimelineState, VideoStyle, TimelineClip } from '../types.ts';
+import * as supabaseService from '../services/supabaseService.ts';
 import { supabase } from '../services/supabaseClient.js'; // Import client directly
 import { type AuthSession } from '@supabase/supabase-js';
-import { createCheckoutSession, PLANS } from '../services/paymentService.js';
-import { fetchVideoPerformance } from '../services/youtubeService.js';
-import { translations, Language, TranslationKey } from '../translations.js';
-import { getErrorMessage } from '../utils.js';
+import { createCheckoutSession, PLANS } from '../services/paymentService.ts';
+import { fetchVideoPerformance } from '../services/youtubeService.ts';
+import { translations, Language, TranslationKey } from '../translations.ts';
+import { getErrorMessage, saveTimelineToCache, loadTimelineFromCache } from '../utils.ts';
 import { GoogleFont, fetchGoogleFonts } from '../services/fontService.js';
+import { v4 as uuidv4 } from 'uuid';
 
 interface AppContextType {
     session: AuthSession | null;
@@ -28,6 +29,15 @@ interface AppContextType {
     brandIdentities: BrandIdentity[];
     fonts: GoogleFont[];
     
+    // Editor State
+    activeTimeline: TimelineState | null;
+    canUndo: boolean;
+    canRedo: boolean;
+    updateActiveTimeline: (newTimeline: TimelineState, addToHistory: boolean) => void;
+    commitTimelineChange: (finalTimeline: TimelineState) => void;
+    undo: () => void;
+    redo: () => void;
+
     setLanguage: (lang: Language) => void;
     t: (key: TranslationKey, replacements?: { [key: string]: string | number }) => string;
     addToast: (message: string, type?: Toast['type']) => void;
@@ -40,7 +50,7 @@ interface AppContextType {
     handleSubscriptionChange: (planId: PlanId) => Promise<void>;
 
     handleUpdateProject: (updatedProjectData: Partial<Project> & { id: string }) => Promise<Project | null>;
-    handleCreateProjectForBlueprint: (topic: string, platform: Platform, title: string, voiceoverVoiceId: string) => Promise<void>;
+    handleCreateProjectForBlueprint: (topic: string, platform: Platform, title: string, voiceoverVoiceId: string, videoSize: Project['videoSize'], blueprint: Blueprint) => Promise<string | void>;
     handleCreateProjectFromIdea: (suggestion: Opportunity | ContentGapSuggestion, platform: Platform) => Promise<void>;
     handleCreateProjectFromInsights: (review: PerformanceReview, originalProject: Project) => void;
     handleDeleteProject: (projectId: string) => void;
@@ -77,6 +87,41 @@ interface ConfirmationState {
     onConfirm: () => void;
 }
 
+// Helper to initialize timeline state from script
+const initializeTimelineFromScript = (script: Project['script']): TimelineState => {
+    if (!script) return { rev: 1, tracks: [], subtitles: [], voiceoverVolume: 1, musicVolume: 0.5, isDuckingEnabled: true, totalDuration: 0 };
+    let currentTime = 0;
+    const voiceoverClips: TimelineClip[] = [];
+    const aRollClips: TimelineClip[] = [];
+
+    script.scenes.forEach((scene, index) => {
+        const wordCount = scene.voiceover.split(/\s+/).filter(Boolean).length;
+        const estimatedDuration = Math.max(3, wordCount / 2.5); // Min 3s, avg 2.5 words/sec
+
+        voiceoverClips.push({ id: `vo_${index}`, type: 'audio', url: '', sceneIndex: index, startTime: currentTime, endTime: currentTime + estimatedDuration, sourceDuration: estimatedDuration, opacity: 1, volume: 1, keyframes: {} } as TimelineClip);
+        aRollClips.push({ id: `ar_${index}`, type: 'image', url: '', sceneIndex: index, startTime: currentTime, endTime: currentTime + estimatedDuration, sourceDuration: estimatedDuration, opacity: 1, volume: 1, effects: {}, aiEffects: {}, animation: {}, color: { adjustments: { exposure: 0, contrast: 0, saturation: 0, temperature: 0 }}, keyframes: {} } as TimelineClip);
+        currentTime += estimatedDuration;
+    });
+
+    return {
+        rev: 1,
+        tracks: [
+            { id: 'overlay', type: 'overlay', clips: [] },
+            { id: 'text', type: 'text', clips: [] },
+            { id: 'b-roll', type: 'b-roll', clips: [] },
+            { id: 'a-roll', type: 'a-roll', clips: aRollClips },
+            { id: 'voiceover', type: 'voiceover', clips: voiceoverClips },
+            { id: 'music', type: 'music', clips: [] },
+            { id: 'sfx', type: 'sfx', clips: [] },
+        ],
+        subtitles: [],
+        voiceoverVolume: 1,
+        musicVolume: 0.5,
+        isDuckingEnabled: true,
+        totalDuration: currentTime,
+    };
+};
+
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const useAppContext = () => {
@@ -96,8 +141,13 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     const [fonts, setFonts] = useState<GoogleFont[]>([]);
     const [isInitialLoading, setIsInitialLoading] = useState(true);
     
-    const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
-    
+    // --- Editor State ---
+    const [activeProjectId, _setActiveProjectId] = useState<string | null>(null);
+    const [activeTimeline, setActiveTimeline] = useState<TimelineState | null>(null);
+    const [history, setHistory] = useState<TimelineState[]>([]);
+    const [historyIndex, setHistoryIndex] = useState(-1);
+    const autosaveTimer = useRef<number | null>(null);
+
     const [isUpgradeModalOpen, setUpgradeModalOpen] = useState(false);
     const [upgradeReason, setUpgradeReason] = useState<{title: string, description: string}>({title: '', description: ''});
     
@@ -111,7 +161,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     const [backendError, setBackendError] = useState<{ title: string; message: string } | null>(null);
     const clearBackendError = () => setBackendError(null);
     
-    const isOperationLocked = useRef(false); // Global lock for all major AI operations
+    const isOperationLocked = useRef(false);
 
     const [language, setLanguageState] = useState<Language>(() => {
         const savedLang = localStorage.getItem('viralyzaier-lang');
@@ -168,206 +218,165 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         };
 
     }, [addToast]);
-
+    
+    // --- Data loading for authenticated user ---
     useEffect(() => {
         if (session?.user) {
             setIsInitialLoading(true);
             const loadData = async () => {
                 try {
                     let profile = await supabaseService.getUserProfile(session.user.id);
-
-                    if (!profile) {
-                        console.warn("Profile not found for logged-in user. Attempting to create one as a fallback.");
-                        profile = await supabaseService.createProfileForUser(session.user.id, session.user.email!);
-                        if (profile) {
-                             addToast("Welcome! Your profile has been set up.", "success");
-                        }
-                    }
-
+                    if (!profile) profile = await supabaseService.createProfileForUser(session.user.id, session.user.email);
                     if (profile) {
                         setUser(profile);
-                        const [userProjects, userNotifications, googleFonts] = await Promise.all([
+                        const [projects, notifications, fonts, identities] = await Promise.all([
                             supabaseService.getProjectsForUser(session.user.id),
                             supabaseService.getNotifications(session.user.id),
                             fetchGoogleFonts(),
+                            supabaseService.getBrandIdentitiesForUser(session.user.id)
                         ]);
-                        setProjects(userProjects);
-                        setNotifications(userNotifications);
-                        setFonts(googleFonts.slice(0, 50));
-                        
-                        // Gracefully handle missing brand_identities table
-                        try {
-                            const userBrandIdentities = await supabaseService.getBrandIdentitiesForUser(session.user.id);
-                            setBrandIdentities(userBrandIdentities);
-                        } catch (err) {
-                            const errorMessage = getErrorMessage(err);
-                            if (errorMessage.includes('relation "public.brand_identities" does not exist')) {
-                                console.warn(
-                                    "Warning: 'brand_identities' table not found. Brand Identity features will be disabled. To enable this, please run the required SQL migration in your Supabase project."
-                                );
-                                setBrandIdentities([]); // Handle missing table gracefully
-                            } else {
-                                // For any other error, re-throw it to be caught by the outer catch block
-                                throw err;
-                            }
-                        }
-
-                    } else {
-                        console.error("Critical error: User is logged in but profile does not exist and could not be created.");
-                        addToast(t('toast.loading_user_error'), "error");
-                        await supabaseService.signOut();
-                    }
-                } catch (err) {
-                    console.error('Failed to load user data:', err);
-                    addToast(`${t('toast.failed_fetch_profile')}: ${getErrorMessage(err)}`, 'error');
-                } finally {
-                    setIsInitialLoading(false);
-                }
+                        setProjects(projects);
+                        setNotifications(notifications);
+                        setFonts(fonts.slice(0, 50));
+                        setBrandIdentities(identities);
+                    } else { throw new Error(t('toast.loading_user_error')); }
+                } catch (err) { addToast(`${t('toast.failed_fetch_profile')}: ${getErrorMessage(err)}`, 'error'); } 
+                finally { setIsInitialLoading(false); }
             };
             loadData();
         } else {
-            setUser(null);
-            setProjects([]);
-            setNotifications([]);
-            setBrandIdentities([]);
-            setFonts([]);
-            setIsInitialLoading(false);
+            setUser(null); setProjects([]); setNotifications([]); setBrandIdentities([]); setFonts([]); setIsInitialLoading(false);
+            setActiveTimeline(null); setHistory([]); setHistoryIndex(-1); _setActiveProjectId(null);
         }
     }, [session, addToast, t]);
     
-     // Real-time subscriptions
+     // --- Real-time subscriptions ---
     useEffect(() => {
         if (!session?.user?.id) return;
-
-        const notificationsChannel = supabase
-            .channel(`realtime:notifications:${session.user.id}`)
-            .on<Database['public']['Tables']['notifications']['Row']>(
-                'postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${session.user.id}` },
-                (payload) => {
-                    const newNotification = supabaseService.notificationRowToNotification(payload.new);
-                    setNotifications(prev => [newNotification, ...prev]);
-                    addToast(t('toast.new_notification'), 'success');
-                }
-            ).subscribe();
-            
-        const profileChannel = supabase
-            .channel(`realtime:profiles:${session.user.id}`)
-            .on<Database['public']['Tables']['profiles']['Row']>(
-                'postgres_changes',
-                { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${session.user.id}` },
-                (payload) => {
-                    setUser(currentUser => {
-                        if (currentUser) {
-                             const updatedProfile = supabaseService.profileRowToUser(payload.new, currentUser.youtubeConnected);
-                             if (updatedProfile.aiCredits > currentUser.aiCredits) {
-                                addToast(`Your plan has been renewed! You now have ${updatedProfile.aiCredits} AI credits.`, 'success');
-                             }
-                             if (updatedProfile.subscription.planId !== currentUser.subscription.planId) {
-                                addToast(`Your subscription has been updated to the ${updatedProfile.subscription.planId} plan!`, 'success');
-                             }
-                             return updatedProfile;
+        const sub = supabase.channel(`public:projects:user_id=eq.${session.user.id}`).on<Project>(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'projects' },
+            (payload) => {
+                const updatedProject = supabaseService.projectRowToProject(payload.new as any);
+                setProjects(current => {
+                    const existing = current.find(p => p.id === updatedProject.id);
+                    if (existing) {
+                        if (existing.status === 'Rendering' && updatedProject.status !== 'Rendering') {
+                            addToast(`Video for "${updatedProject.name}" finished rendering!`, 'success');
                         }
-                        return null;
-                    });
-                }
-            ).subscribe();
-
-        const projectsChannel = supabase
-            .channel(`realtime:projects:${session.user.id}`)
-            .on<Database['public']['Tables']['projects']['Row']>(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'projects', filter: `user_id=eq.${session.user.id}` },
-                (payload) => {
-                    const updatedProject = supabaseService.projectRowToProject(payload.new as any);
-                    setProjects(currentProjects => {
-                        const existingIndex = currentProjects.findIndex(p => p.id === updatedProject.id);
-                        if(existingIndex > -1) {
-                            // If the project status changed from 'Rendering' to something else, it's done.
-                            const oldStatus = currentProjects[existingIndex].status;
-                            if(oldStatus === 'Rendering' && updatedProject.status !== 'Rendering') {
-                                addToast(`Video for "${updatedProject.name}" has finished rendering!`, 'success');
-                            }
-                            const newProjects = [...currentProjects];
-                            newProjects[existingIndex] = updatedProject;
-                            return newProjects;
-                        }
-                        return [updatedProject, ...currentProjects]; // Add new if not found
-                    });
-                }
-            ).subscribe();
-
-        return () => {
-            supabase.removeChannel(notificationsChannel);
-            supabase.removeChannel(profileChannel);
-            supabase.removeChannel(projectsChannel);
-        };
-    }, [session, addToast, t]);
+                        return current.map(p => p.id === updatedProject.id ? updatedProject : p);
+                    }
+                    return [updatedProject, ...current];
+                });
+            }
+        ).subscribe();
+        return () => { supabase.removeChannel(sub); };
+    }, [session?.user?.id, addToast]);
     
-    // Immediate feedback after Stripe or OAuth redirect
+    // --- Immediate feedback after Stripe or OAuth redirect ---
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.has('payment_success')) {
             addToast('Payment successful! Your plan has been upgraded.', 'success');
-            window.history.replaceState({}, document.title, window.location.pathname); // Clean URL
+            window.history.replaceState({}, document.title, window.location.pathname);
         }
-        if (urlParams.has('payment_canceled')) {
-            addToast('Payment was canceled. You can try again from the pricing page.', 'info');
-            window.history.replaceState({}, document.title, window.location.pathname); // Clean URL
-        }
-         if (urlParams.has('youtube_connected')) {
+        if (urlParams.has('youtube_connected')) {
             addToast('YouTube channel connected successfully!', 'success');
-            if(user) supabaseService.getUserProfile(user.id).then(setUser); // Refresh user profile
-            window.history.replaceState({}, document.title, window.location.pathname); // Clean URL
-        }
-        if (urlParams.has('youtube_error')) {
-            addToast(`Failed to connect YouTube channel: ${urlParams.get('youtube_error')}`, 'error');
-            window.history.replaceState({}, document.title, window.location.pathname); // Clean URL
+            if(user) supabaseService.getUserProfile(user.id).then(setUser);
+            window.history.replaceState({}, document.title, window.location.pathname);
         }
     }, [addToast, user]);
-    
-    const requestConfirmation = (title: string, message: string, onConfirm: () => void) => { setConfirmation({ isOpen: true, title, message, onConfirm }); };
-    const handleConfirmation = () => { 
-        if(confirmation.isOpen) {
-            confirmation.onConfirm(); 
-        }
-        setConfirmation({ isOpen: false, title: '', message: '', onConfirm: () => {} }); 
-    };
-    const handleCancelConfirmation = () => { setConfirmation({ isOpen: false, title: '', message: '', onConfirm: () => {} }); };
 
-    const handleLogout = () => {
-        requestConfirmation(t('confirmation_modal.logout_title'), t('confirmation_modal.logout_message'), async () => {
-            await supabaseService.signOut();
-            setActiveProjectId(null);
-            addToast(t('toast.logged_out'));
-        });
-    };
-    
-    const lockAndExecute = async (asyncOperation: () => Promise<any>) => {
-        if (isOperationLocked.current) {
-            addToast("Another AI operation is already in progress. Please wait.", "info");
+    // --- TIMELINE STATE MANAGEMENT ---
+    const setActiveProjectId = useCallback(async (id: string | null) => {
+        if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+        _setActiveProjectId(id);
+
+        if (!id) {
+            setActiveTimeline(null);
+            setHistory([]);
+            setHistoryIndex(-1);
             return;
         }
-        isOperationLocked.current = true;
-        try {
-            await asyncOperation();
-        } catch (error) {
-            console.error("Error during locked operation:", error);
-        } finally {
-            isOperationLocked.current = false;
-        }
-    };
-    
-    const dismissToast = (id: number) => { setToasts(t => t.filter(toast => toast.id !== id)); };
 
-    const dismissTutorial = (id: string) => {
-        setDismissedTutorials(prev => {
-            const newDismissed = [...prev, id];
-            localStorage.setItem('viralyzaier-tutorials', JSON.stringify(newDismissed));
-            return newDismissed;
-        });
-    };
+        const project = projects.find(p => p.id === id);
+        if (!project) return;
+        
+        // 1. Try to load from IndexedDB cache first for speed
+        const cachedTimeline = await loadTimelineFromCache(id);
+        if (cachedTimeline && cachedTimeline.rev >= (project.timeline?.rev || 0)) {
+            setActiveTimeline(cachedTimeline);
+            setHistory([cachedTimeline]);
+            setHistoryIndex(0);
+            return;
+        }
+
+        // 2. Fallback to project data from Supabase
+        const initialTimeline = project.timeline || initializeTimelineFromScript(project.script);
+        setActiveTimeline(initialTimeline);
+        setHistory([initialTimeline]);
+        setHistoryIndex(0);
+        await saveTimelineToCache(id, initialTimeline);
+
+    }, [projects]);
     
+    const saveTimelineToSupabase = useCallback(async (timelineToSave: TimelineState) => {
+        if (!activeProjectId) return;
+        handleUpdateProject({ id: activeProjectId, timeline: timelineToSave });
+    }, [activeProjectId]);
+
+    const updateActiveTimeline = useCallback((newTimeline: TimelineState, addToHistory: boolean) => {
+        if (!activeProjectId) return;
+
+        const updatedTimeline = { ...newTimeline, rev: (activeTimeline?.rev || 0) + 1 };
+        setActiveTimeline(updatedTimeline);
+        saveTimelineToCache(activeProjectId, updatedTimeline);
+
+        if (addToHistory) {
+            const newHistory = history.slice(0, historyIndex + 1);
+            setHistory([...newHistory, updatedTimeline]);
+            setHistoryIndex(newHistory.length);
+        } else {
+            const newHistory = [...history];
+            newHistory[historyIndex] = updatedTimeline;
+            setHistory(newHistory);
+        }
+
+        if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+        autosaveTimer.current = window.setTimeout(() => saveTimelineToSupabase(updatedTimeline), 10000); // 10-second autosave
+    }, [activeProjectId, activeTimeline, history, historyIndex, saveTimelineToSupabase]);
+    
+    const commitTimelineChange = useCallback((finalTimeline: TimelineState) => {
+        updateActiveTimeline(finalTimeline, true);
+        saveTimelineToSupabase(finalTimeline); // Save immediately on commit
+    }, [updateActiveTimeline, saveTimelineToSupabase]);
+
+    const undo = useCallback(() => {
+        if (historyIndex > 0) {
+            const newIndex = historyIndex - 1;
+            setHistoryIndex(newIndex);
+            setActiveTimeline(history[newIndex]);
+            saveTimelineToSupabase(history[newIndex]);
+        }
+    }, [history, historyIndex, saveTimelineToSupabase]);
+    
+    const redo = useCallback(() => {
+        if (historyIndex < history.length - 1) {
+            const newIndex = historyIndex + 1;
+            setHistoryIndex(newIndex);
+            setActiveTimeline(history[newIndex]);
+            saveTimelineToSupabase(history[newIndex]);
+        }
+    }, [history, historyIndex, saveTimelineToSupabase]);
+
+    // --- OTHER CONTEXT FUNCTIONS ---
+    const requestConfirmation = (title: string, message: string, onConfirm: () => void) => { setConfirmation({ isOpen: true, title, message, onConfirm }); };
+    const handleConfirmation = () => { if(confirmation.isOpen) { confirmation.onConfirm(); } setConfirmation({ isOpen: false, title: '', message: '', onConfirm: () => {} }); };
+    const handleCancelConfirmation = () => { setConfirmation({ isOpen: false, title: '', message: '', onConfirm: () => {} }); };
+    const handleLogout = () => { requestConfirmation(t('confirmation_modal.logout_title'), t('confirmation_modal.logout_message'), async () => { await supabaseService.signOut(); setActiveProjectId(null); addToast(t('toast.logged_out')); }); };
+    const lockAndExecute = async (asyncOperation: () => Promise<any>) => { if (isOperationLocked.current) { addToast("Another AI operation is already in progress. Please wait.", "info"); return; } isOperationLocked.current = true; try { await asyncOperation(); } catch (error) { console.error("Error during locked operation:", error); } finally { isOperationLocked.current = false; } };
+    const dismissToast = (id: number) => { setToasts(t => t.filter(toast => toast.id !== id)); };
+    const dismissTutorial = (id: string) => { setDismissedTutorials(prev => { const newDismissed = [...prev, id]; localStorage.setItem('viralyzaier-tutorials', JSON.stringify(newDismissed)); return newDismissed; }); };
     const consumeCredits = useCallback(async (amount: number) => {
         if (!user) return false;
         if (user.subscription.planId === 'free' && user.aiCredits < amount) {
@@ -375,7 +384,6 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             setUpgradeModalOpen(true);
             return false;
         }
-
         try {
             const { success, newCredits, message } = await supabaseService.invokeEdgeFunction<{ success: boolean; newCredits: number; message?: string; }>('consume-credits', { amount_to_consume: amount });
             if (success) {
@@ -385,17 +393,10 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
                 if (message === 'insufficient_credits') {
                     setUpgradeReason({ title: t('upgrade_modal.credits_title'), description: t('upgrade_modal.credits_description') });
                     setUpgradeModalOpen(true);
-                } else {
-                     addToast(message || t('toast.insufficient_credits_error'), 'error');
-                }
+                } else { addToast(message || t('toast.insufficient_credits_error'), 'error'); }
                 return false;
             }
-        } catch (error) {
-            const errorMessage = getErrorMessage(error);
-            console.error("Credit consumption error:", errorMessage);
-            setBackendError({ title: t('backend_error.title'), message: errorMessage });
-            return false;
-        }
+        } catch (error) { setBackendError({ title: t('backend_error.title'), message: getErrorMessage(error) }); return false; }
     }, [user, addToast, t]);
 
     const requirePermission = (requiredPlan: PlanId) => {
@@ -403,7 +404,6 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         const userPlan = PLANS.findIndex(p => p.id === user.subscription.planId);
         const requiredPlanIndex = PLANS.findIndex(p => p.id === requiredPlan);
         if (userPlan >= requiredPlanIndex) return true;
-        
         const planName = PLANS.find(p => p.id === requiredPlan)?.name || 'a higher';
         setUpgradeReason({ title: t('upgrade_modal.default_title'), description: `${t('upgrade_modal.default_description')} This feature requires the ${planName} plan.` });
         setUpgradeModalOpen(true);
@@ -412,20 +412,8 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     
     const handleSubscriptionChange = async (planId: PlanId) => {
         if (!user) return;
-        if (user.subscription.planId === planId && user.subscription.status === 'active') {
-            addToast(t('toast.already_on_plan'), 'info');
-            return;
-        }
-        try {
-            if (planId === 'free') {
-                 addToast("Freed plan selected. Manage cancellations in your Stripe portal.", 'info');
-            } else {
-                const { checkoutUrl } = await createCheckoutSession(planId);
-                window.location.href = checkoutUrl;
-            }
-        } catch (error) {
-            addToast(t('toast.subscription_failed', {error: getErrorMessage(error)}), 'error');
-        }
+        if (user.subscription.planId === planId && user.subscription.status === 'active') { addToast(t('toast.already_on_plan'), 'info'); return; }
+        try { if (planId !== 'free') { const { checkoutUrl } = await createCheckoutSession(planId); window.location.href = checkoutUrl; } } catch (error) { addToast(t('toast.subscription_failed', {error: getErrorMessage(error)}), 'error'); }
     };
     
     const handleUpdateProject = async (updatedProjectData: Partial<Project> & { id: string }): Promise<Project | null> => {
@@ -433,60 +421,26 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             const updatedProject = await supabaseService.updateProject(updatedProjectData.id, updatedProjectData);
             setProjects(p => p.map(proj => proj.id === updatedProjectData.id ? updatedProject : proj));
             return updatedProject;
-        } catch (err) {
-            addToast(`${t('toast.failed_update_project')}: ${getErrorMessage(err)}`, 'error');
-            return null;
-        }
+        } catch (err) { addToast(`${t('toast.failed_update_project')}: ${getErrorMessage(err)}`, 'error'); return null; }
     };
     
-    const createProjectFromData = async (projectData: Partial<Project>) => {
-         if (!user) {
-            addToast("User not found.", "error");
-            return;
-        }
+    const createProjectFromData = async (projectData: Partial<Project>): Promise<string | void> => {
+         if (!user) { addToast("User not found.", "error"); return; }
         try {
             const baseProject: Omit<Project, 'id' | 'lastUpdated'> = {
-                name: projectData.name || 'New Project',
-                topic: projectData.topic || '',
-                platform: projectData.platform || 'youtube_long',
-                status: projectData.status || 'Idea',
-                workflowStep: projectData.workflowStep || 1,
-                title: projectData.title || null,
-                script: projectData.script || null,
-                analysis: null,
-                competitorAnalysis: null,
-                moodboard: null,
-                assets: {},
-                soundDesign: null,
-                launchPlan: null,
-                performance: null,
-                scheduledDate: null,
-                publishedUrl: null,
-                voiceoverVoiceId: projectData.voiceoverVoiceId || null,
-                last_performance_check: null,
-                timeline: null,
+                name: projectData.name || 'New Project', topic: projectData.topic || '', platform: projectData.platform || 'youtube_long', videoSize: projectData.videoSize || '16:9', status: projectData.status || 'Idea', workflowStep: projectData.workflowStep || 1, title: projectData.title || null, script: projectData.script || null, analysis: null, competitorAnalysis: null, moodboard: projectData.moodboard || null, assets: {}, soundDesign: null, launchPlan: null, performance: null, scheduledDate: null, publishedUrl: null, voiceoverVoiceId: projectData.voiceoverVoiceId || null, last_performance_check: null, timeline: projectData.timeline || null,
             };
-
             const newProject = await supabaseService.createProject(baseProject, user.id);
             addProjects([newProject]);
             setActiveProjectId(newProject.id);
             addToast(t('toast.project_created'), 'success');
-
-        } catch (err) {
-            addToast(`${t('toast.failed_create_project')}: ${getErrorMessage(err)}`, 'error');
-        }
+            return newProject.id;
+        } catch (err) { addToast(`${t('toast.failed_create_project')}: ${getErrorMessage(err)}`, 'error'); }
     }
     
-    const handleCreateProjectForBlueprint = async (topic: string, platform: Platform, title: string, voiceoverVoiceId: string) => {
+    const handleCreateProjectForBlueprint = async (topic: string, platform: Platform, title: string, voiceoverVoiceId: string, videoSize: Project['videoSize'], blueprint: Blueprint): Promise<string | void> => {
         if (!user) return;
-        await createProjectFromData({ 
-            topic, 
-            platform, 
-            name: title || "New Blueprint Project", 
-            status: 'Idea', 
-            workflowStep: 1,
-            voiceoverVoiceId,
-        });
+        return await createProjectFromData({ topic, platform, videoSize, name: title || "New Blueprint Project", status: 'Scripting', workflowStep: 3, voiceoverVoiceId, script: blueprint.script, moodboard: blueprint.moodboard, title: title, timeline: initializeTimelineFromScript(blueprint.script) });
     };
 
     const handleCreateProjectFromIdea = async (suggestion: Opportunity | ContentGapSuggestion, platform: Platform) => {
@@ -500,87 +454,15 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         createProjectFromData({ topic: newTopic, platform: originalProject.platform, name: newName, status: 'Idea', workflowStep: 1 });
     };
 
-    const addProjects = (newProjects: Project[]) => {
-        setProjects(prev => [...newProjects, ...prev]);
-    };
-
-    const handleDeleteProject = (projectId: string) => {
-        requestConfirmation(t('confirmation_modal.delete_project_title'), t('confirmation_modal.delete_project_message'), async () => {
-            try {
-                await supabaseService.deleteProject(projectId);
-                setProjects(p => p.filter(proj => proj.id !== projectId));
-                if (activeProjectId === projectId) {
-                    setActiveProjectId(null);
-                }
-                addToast(t('toast.project_deleted'), 'success');
-            } catch (err) {
-                 addToast(`${t('toast.failed_delete_project')}: ${getErrorMessage(err)}`, 'error');
-            }
-        });
-    };
-    
-    const handleCreateBrandIdentity = async (identityData: Omit<BrandIdentity, 'id' | 'created_at' | 'user_id'>) => {
-        if (!user) return;
-        try {
-            const newIdentity = await supabaseService.createBrandIdentity(identityData, user.id);
-            setBrandIdentities(prev => [newIdentity, ...prev]);
-            addToast('Brand Identity created!', 'success');
-        } catch (err) {
-            addToast(`Failed to create identity: ${getErrorMessage(err)}`, 'error');
-        }
-    };
-
-    const handleUpdateBrandIdentity = async (identityId: string, updates: Partial<Omit<BrandIdentity, 'id' | 'created_at' | 'user_id'>>) => {
-        try {
-            const updatedIdentity = await supabaseService.updateBrandIdentity(identityId, updates);
-            setBrandIdentities(prev => prev.map(id => id.id === identityId ? updatedIdentity : id));
-            addToast('Brand Identity updated!', 'success');
-        } catch (err) {
-            addToast(`Failed to update identity: ${getErrorMessage(err)}`, 'error');
-        }
-    };
-
-    const handleDeleteBrandIdentity = (identityId: string) => {
-        requestConfirmation('Delete Brand Identity?', 'This action cannot be undone.', async () => {
-            try {
-                await supabaseService.deleteBrandIdentity(identityId);
-                setBrandIdentities(prev => prev.filter(id => id.id !== identityId));
-                addToast('Brand Identity deleted!', 'success');
-            } catch (err) {
-                addToast(`Failed to delete identity: ${getErrorMessage(err)}`, 'error');
-            }
-        });
-    };
-
-    // Notifications
-    const markNotificationAsRead = async (notificationId: string) => {
-        try {
-            await supabaseService.markNotificationAsRead(notificationId);
-            setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n));
-        } catch (err) {
-            console.error("Failed to mark notification as read:", err);
-        }
-    };
-
-    const markAllNotificationsAsRead = async () => {
-        if (!user) return;
-        try {
-            await supabaseService.markAllNotificationsAsRead(user.id);
-            setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-        } catch (err) {
-            console.error("Failed to mark all notifications as read:", err);
-        }
-    };
-    
-    const openScheduleModal = (projectId: string) => {
-        setProjectToSchedule(projectId);
-        setScheduleModalOpen(true);
-    };
-
-    const closeScheduleModal = () => {
-        setProjectToSchedule(null);
-        setScheduleModalOpen(false);
-    };
+    const addProjects = (newProjects: Project[]) => { setProjects(prev => [...newProjects, ...prev]); };
+    const handleDeleteProject = (projectId: string) => { requestConfirmation(t('confirmation_modal.delete_project_title'), t('confirmation_modal.delete_project_message'), async () => { try { await supabaseService.deleteProject(projectId); setProjects(p => p.filter(proj => proj.id !== projectId)); if (activeProjectId === projectId) { setActiveProjectId(null); } addToast(t('toast.project_deleted'), 'success'); } catch (err) { addToast(`${t('toast.failed_delete_project')}: ${getErrorMessage(err)}`, 'error'); } }); };
+    const handleCreateBrandIdentity = async (identityData: Omit<BrandIdentity, 'id' | 'created_at' | 'user_id'>) => { if (!user) return; try { const newIdentity = await supabaseService.createBrandIdentity(identityData, user.id); setBrandIdentities(prev => [newIdentity, ...prev]); addToast('Brand Identity created!', 'success'); } catch (err) { addToast(`Failed to create identity: ${getErrorMessage(err)}`, 'error'); } };
+    const handleUpdateBrandIdentity = async (identityId: string, updates: Partial<Omit<BrandIdentity, 'id' | 'created_at' | 'user_id'>>) => { try { const updatedIdentity = await supabaseService.updateBrandIdentity(identityId, updates); setBrandIdentities(prev => prev.map(id => id.id === identityId ? updatedIdentity : id)); addToast('Brand Identity updated!', 'success'); } catch (err) { addToast(`Failed to update identity: ${getErrorMessage(err)}`, 'error'); } };
+    const handleDeleteBrandIdentity = (identityId: string) => { requestConfirmation('Delete Brand Identity?', 'This action cannot be undone.', async () => { try { await supabaseService.deleteBrandIdentity(identityId); setBrandIdentities(prev => prev.filter(id => id.id !== identityId)); addToast('Brand Identity deleted!', 'success'); } catch (err) { addToast(`Failed to delete identity: ${getErrorMessage(err)}`, 'error'); } }); };
+    const markNotificationAsRead = async (notificationId: string) => { try { await supabaseService.markNotificationAsRead(notificationId); setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)); } catch (err) { console.error("Failed to mark notification as read:", err); } };
+    const markAllNotificationsAsRead = async () => { if (!user) return; try { await supabaseService.markAllNotificationsAsRead(user.id); setNotifications(prev => prev.map(n => ({ ...n, is_read: true }))); } catch (err) { console.error("Failed to mark all notifications as read:", err); } };
+    const openScheduleModal = (projectId: string) => { setProjectToSchedule(projectId); setScheduleModalOpen(true); };
+    const closeScheduleModal = () => { setProjectToSchedule(null); setScheduleModalOpen(false); };
 
     return (
         <AppContext.Provider value={{
@@ -590,6 +472,9 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             isScheduleModalOpen, projectToSchedule, backendError,
             brandIdentities, fonts,
             
+            activeTimeline, canUndo: historyIndex > 0, canRedo: historyIndex < history.length - 1,
+            updateActiveTimeline, commitTimelineChange, undo, redo,
+
             setLanguage, t, addToast, dismissToast, dismissTutorial,
             handleLogout, consumeCredits, requirePermission,
             handleSubscriptionChange, handleUpdateProject,

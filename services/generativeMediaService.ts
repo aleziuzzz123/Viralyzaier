@@ -1,6 +1,6 @@
-import { Platform, SceneAssets } from "../types.js";
+import { Platform, SceneAssets, AiVideoModel } from "../types.js";
 import { invokeEdgeFunction } from './supabaseService.js';
-import { base64ToBlob } from '../utils.js';
+import { base64ToBlob } from '../utils.ts';
 
 // This service is now secure. API keys are handled by backend proxy functions.
 // We only need to check if the function endpoints are available to the user.
@@ -36,34 +36,46 @@ export const generateVoiceover = async (text: string, voiceId: string = 'pNInz6o
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
 /**
- * Generates a single image for use as an animated visual.
+ * Generates a single static image from a text prompt with a retry mechanism.
  */
-export const generateAnimatedImage = async (prompt: string, platform: Platform): Promise<Blob> => {
+export const generateAiImage = async (prompt: string, platform: Platform): Promise<Blob> => {
     const aspectRatio = platform === 'youtube_long' ? '16:9' : '9:16';
-    const imagePrompt = `A cinematic, visually stunning image for a video scene: ${prompt}. IMPORTANT: The main subject must be perfectly centered to avoid being cropped.`;
     
-    const imageResponse = await invokeEdgeFunction<{ generatedImages: { image: { imageBytes: string } }[] }>('gemini-proxy', {
-        type: 'generateImages',
-        params: {
-            model: 'imagen-3.0-generate-002',
-            prompt: imagePrompt,
-            config: { 
-                numberOfImages: 1, 
-                outputMimeType: 'image/jpeg', 
-                aspectRatio: aspectRatio 
+    const attemptGeneration = async (p: string) => {
+        try {
+            const response = await invokeEdgeFunction<{ generatedImages: { image: { imageBytes: string } }[] }>('gemini-proxy', {
+                type: 'generateImages',
+                params: {
+                    model: 'imagen-3.0-generate-002',
+                    prompt: p,
+                    config: { numberOfImages: 1, outputMimeType: 'image/jpeg', aspectRatio }
+                }
+            });
+            if (!response.generatedImages || response.generatedImages.length === 0 || !response.generatedImages[0].image?.imageBytes) {
+                return null; // Failure
             }
+            const blob = base64ToBlob(response.generatedImages[0].image.imageBytes, 'image/jpeg');
+            if (blob.size < 1000) return null; // Failure
+            return blob;
+        } catch (e) {
+            console.error(`Image generation attempt failed for prompt "${p}":`, e);
+            return null; // Treat errors as failure for retry logic
         }
-    });
+    };
 
-    if (!imageResponse.generatedImages || imageResponse.generatedImages.length === 0 || !imageResponse.generatedImages[0].image?.imageBytes) {
-        throw new Error("AI image generation failed: The model returned an empty response, possibly due to safety filters.");
+    // Attempt 1: Full, detailed prompt
+    const fullPrompt = `A cinematic, visually stunning image for a video scene: ${prompt}. IMPORTANT: The main subject must be perfectly centered to avoid being cropped.`;
+    let imageBlob = await attemptGeneration(fullPrompt);
+
+    // Attempt 2: Simplified prompt if first fails (often due to safety filters)
+    if (!imageBlob) {
+        console.warn("Initial image generation failed, retrying with a simpler prompt...");
+        const simplePrompt = `A high-quality, safe-for-work photograph of: ${prompt}`;
+        imageBlob = await attemptGeneration(simplePrompt);
     }
-
-    const base64ImageBytes = imageResponse.generatedImages[0].image.imageBytes;
-    const imageBlob = base64ToBlob(base64ImageBytes, 'image/jpeg');
-
-    if (imageBlob.size < 1000) { // Check if the blob is too small (e.g., < 1KB)
-        throw new Error("AI image generation failed: The returned image file was empty or invalid.");
+    
+    if (!imageBlob) {
+        throw new Error("AI image generation failed after multiple attempts. This could be due to safety filters rejecting the prompt, or a temporary issue with the AI service.");
     }
 
     return imageBlob;

@@ -1,4 +1,3 @@
-
 // supabase/functions/ai-polish/index.ts
 declare const Deno: any;
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
@@ -50,7 +49,18 @@ serve(async (req: Request) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) throw new Error(authError?.message || 'Authentication failed.');
 
-    const { timeline, script, projectId } = await req.json();
+    let body;
+    try {
+        body = await req.json();
+    } catch (e) {
+        return new Response(JSON.stringify({ error: `Invalid JSON body: ${e.message}` }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+        });
+    }
+
+    const { timeline, script, projectId } = body;
+
     if (!timeline || !script || !projectId) {
       throw new Error("Missing 'timeline', 'script', or 'projectId' in request body.");
     }

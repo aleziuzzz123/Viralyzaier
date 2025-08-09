@@ -36,7 +36,17 @@ serve(async (req: Request) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const { projectId, timeline } = await req.json();
+    let body;
+    try {
+        body = await req.json();
+    } catch (e) {
+        return new Response(JSON.stringify({ error: `Invalid JSON body: ${e.message}` }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+        });
+    }
+
+    const { projectId, timeline } = body;
 
     if (!projectId || !timeline) {
         throw new Error("Invalid request body: 'projectId' and 'timeline' are required.");

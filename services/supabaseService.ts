@@ -17,14 +17,15 @@ import {
     Notification,
     ClonedVoice,
     Subscription,
-    Json,
     UserAsset,
     BrandIdentity,
     TimelineState,
     VideoStyle,
+    Json,
 } from '../types.js';
 import { type AuthSession, type FunctionInvokeOptions, type PostgrestError } from '@supabase/supabase-js';
 import { PLANS } from './paymentService.js';
+import { getErrorMessage } from '../utils.js';
 
 // --- Type Guards for Data Validation ---
 const isValidSubscription = (sub: any): sub is Subscription => {
@@ -33,12 +34,18 @@ const isValidSubscription = (sub: any): sub is Subscription => {
            ['active', 'canceled'].includes(sub.status);
 };
 
+// Helper to sanitize JSON before sending it to Supabase
+const sanitizeJson = (value: any): Json | null => {
+    // Simple deep-copy for safety. Prevents issues with complex objects.
+    return value ? JSON.parse(JSON.stringify(value)) : null;
+}
+
 
 // --- Mappers ---
 export const profileRowToUser = (row: Database['public']['Tables']['profiles']['Row'], youtubeConnected: boolean): User => ({
     id: row.id,
     email: row.email,
-    subscription: isValidSubscription(row.subscription) ? row.subscription as unknown as Subscription : { planId: 'free', status: 'active', endDate: null },
+    subscription: isValidSubscription(row.subscription) ? row.subscription as Subscription : { planId: 'free', status: 'active', endDate: null },
     aiCredits: row.ai_credits,
     channelAudit: row.channel_audit as unknown as ChannelAudit | null,
     youtubeConnected,
@@ -61,6 +68,7 @@ export const projectRowToProject = (row: Database['public']['Tables']['projects'
     name: row.name,
     topic: row.topic,
     platform: row.platform as Platform,
+    videoSize: (row.video_size as Project['videoSize']) || '16:9',
     status: row.status as ProjectStatus,
     title: row.title,
     script: row.script as unknown as Script | null,
@@ -86,56 +94,62 @@ export const invokeEdgeFunction = async <T>(
     body: object,
     responseType: 'json' | 'blob' = 'json'
   ): Promise<T> => {
-    // For FormData, we don't stringify the body
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !session) {
+        throw new Error('User not authenticated. Cannot invoke function.');
+    }
+    
     const isFormData = body instanceof FormData;
-  
-    const options: FunctionInvokeOptions = {
-      body: isFormData ? body : JSON.stringify(body),
+    const headers: HeadersInit = {
+        'Authorization': `Bearer ${session.access_token}`,
+        'apikey': supabaseAnonKey,
     };
-  
-    // For FormData, let the browser set the Content-Type header
     if (!isFormData) {
-      options.headers = { 'Content-Type': 'application/json' };
+        headers['Content-Type'] = 'application/json';
     }
-  
-    const { data, error } = await supabase.functions.invoke(functionName, options);
-    
-    if (error) {
-      // Attempt to parse a more specific error message from the function's response
-      if (error instanceof Error && error.message.includes('Function returned an error')) {
+
+    const response = await fetch(`${supabaseUrl}/functions/v1/${functionName}`, {
+        method: 'POST',
+        headers: headers,
+        body: isFormData ? body : JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+        let errorBodyText = await response.text();
+        let errorMessage = `Edge Function '${functionName}' failed with status ${response.status}: ${errorBodyText.substring(0, 500)}`;
         try {
-          const errBody = JSON.parse(error.message.substring(error.message.indexOf('{')));
-          if (errBody.error) {
-            throw new Error(errBody.error);
-          }
+            const errorJson = JSON.parse(errorBodyText);
+            const errorContent = errorJson.error || errorJson;
+            if (typeof errorContent === 'string') {
+                errorMessage = errorContent;
+            } else {
+                errorMessage = JSON.stringify(errorContent);
+            }
         } catch (e) {
-          // Fallback to original error if parsing fails
+            // Not JSON, use the raw text. The default errorMessage is fine.
         }
-      }
-      throw error;
-    }
-  
-    if (responseType === 'blob') {
-      return data as T;
+        throw new Error(errorMessage);
     }
     
-    // The edge function response might be a stringified JSON.
-    if (typeof data === 'string') {
-      try {
-        return JSON.parse(data) as T;
-      } catch {
-        // It might just be a plain string response
-        return data as T;
-      }
+    if (responseType === 'blob') {
+      return await response.blob() as T;
     }
-    return data as T;
+    
+    if (response.status === 204 || response.headers.get('content-length') === '0') {
+      if (responseType === 'json') {
+          throw new Error(`Edge Function '${functionName}' returned an empty successful response, but JSON was expected.`);
+      }
+      return null as T;
+    }
+
+    return await response.json() as T;
   };
 
 // --- Auth ---
 export const getSession = async () => {
     const { data, error } = await supabase.auth.getSession();
     if (error) throw error;
-    return data;
+    return { session: data.session };
 };
 
 export const onAuthStateChange = (callback: (event: string, session: AuthSession | null) => void) => {
@@ -150,12 +164,12 @@ export const signInWithPassword = async (email: string, password: string): Promi
 };
 
 export const signUp = async (email: string, password: string): Promise<void> => {
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
 };
 
 export const sendPasswordResetEmail = async (email: string): Promise<void> => {
-    const { data, error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
     if (error) throw error;
 };
 
@@ -186,15 +200,16 @@ export const getUserProfile = async (userId: string): Promise<User | null> => {
     return profileRowToUser(data, !!tokenData);
 };
 
-export const createProfileForUser = async (userId: string, email: string): Promise<User> => {
+export const createProfileForUser = async (userId: string, email: string | null | undefined): Promise<User> => {
     const freePlan = PLANS.find(p => p.id === 'free')!;
+    const fallbackEmail = email || `user_${userId.split('-')[0]}@viralyzaier.app`;
     const newUserProfile: Database['public']['Tables']['profiles']['Insert'] = {
         id: userId,
-        email: email,
+        email: fallbackEmail,
         subscription: { planId: 'free', status: 'active', endDate: null },
         ai_credits: freePlan.creditLimit,
     };
-    const { data, error } = await supabase.from('profiles').insert(newUserProfile).select().single();
+    const { data, error } = await supabase.from('profiles').insert(newUserProfile).select('*').single();
     if (error) throw error;
     if (!data) throw new Error("Failed to create profile: no data returned.");
     return profileRowToUser(data, false);
@@ -202,7 +217,7 @@ export const createProfileForUser = async (userId: string, email: string): Promi
 
 export const updateUserProfile = async (userId: string, updates: Partial<User>): Promise<User> => {
     const dbUpdates = userToProfileUpdate(updates);
-    const { data, error } = await supabase.from('profiles').update(dbUpdates).eq('id', userId).select().single();
+    const { data, error } = await supabase.from('profiles').update(dbUpdates).eq('id', userId).select('*').single();
     if (error) throw error;
     if (!data) throw new Error("Failed to update profile: no data returned.");
     const { data: tokenData } = await supabase.from('user_youtube_tokens').select('user_id').eq('user_id', userId).maybeSingle();
@@ -226,28 +241,29 @@ export const createProject = async (projectData: Omit<Project, 'id' | 'lastUpdat
         name: projectData.name,
         topic: projectData.topic,
         platform: projectData.platform,
+        video_size: projectData.videoSize,
         status: projectData.status,
         workflow_step: projectData.workflowStep,
         title: projectData.title,
-        script: projectData.script,
-        analysis: projectData.analysis,
-        competitor_analysis: projectData.competitorAnalysis,
+        script: sanitizeJson(projectData.script),
+        analysis: sanitizeJson(projectData.analysis),
+        competitor_analysis: sanitizeJson(projectData.competitorAnalysis),
         moodboard: projectData.moodboard,
-        assets: projectData.assets,
-        sound_design: projectData.soundDesign,
-        launch_plan: projectData.launchPlan,
-        performance: projectData.performance,
+        assets: sanitizeJson(projectData.assets),
+        sound_design: sanitizeJson(projectData.soundDesign),
+        launch_plan: sanitizeJson(projectData.launchPlan),
+        performance: sanitizeJson(projectData.performance),
         scheduled_date: projectData.scheduledDate,
         published_url: projectData.publishedUrl,
         last_performance_check: projectData.last_performance_check,
-        timeline: projectData.timeline,
-        voiceover_voice_id: projectData.voiceoverVoiceId
+        voiceover_voice_id: projectData.voiceoverVoiceId,
+        timeline: sanitizeJson(projectData.timeline),
     };
     
     const { data, error } = await supabase
         .from('projects')
         .insert(newProjectData)
-        .select()
+        .select('*')
         .single();
     if (error) throw error;
     if (!data) throw new Error("Failed to create project: no data returned.");
@@ -256,27 +272,32 @@ export const createProject = async (projectData: Omit<Project, 'id' | 'lastUpdat
 
 export const updateProject = async (projectId: string, updates: Partial<Project>): Promise<Project> => {
     const dbUpdates: Database['public']['Tables']['projects']['Update'] = { last_updated: new Date().toISOString() };
+    
     if (updates.name !== undefined) dbUpdates.name = updates.name;
     if (updates.topic !== undefined) dbUpdates.topic = updates.topic;
     if (updates.platform !== undefined) dbUpdates.platform = updates.platform;
+    if (updates.videoSize !== undefined) dbUpdates.video_size = updates.videoSize;
     if (updates.status !== undefined) dbUpdates.status = updates.status;
     if (updates.workflowStep !== undefined) dbUpdates.workflow_step = updates.workflowStep;
     if (updates.title !== undefined) dbUpdates.title = updates.title;
-    if (updates.script !== undefined) dbUpdates.script = updates.script;
-    if (updates.analysis !== undefined) dbUpdates.analysis = updates.analysis;
-    if (updates.competitorAnalysis !== undefined) dbUpdates.competitor_analysis = updates.competitorAnalysis;
+    if (updates.script !== undefined) dbUpdates.script = sanitizeJson(updates.script);
+    if (updates.analysis !== undefined) dbUpdates.analysis = sanitizeJson(updates.analysis);
+    if (updates.competitorAnalysis !== undefined) dbUpdates.competitor_analysis = sanitizeJson(updates.competitorAnalysis);
     if (updates.moodboard !== undefined) dbUpdates.moodboard = updates.moodboard;
-    if (updates.assets !== undefined) dbUpdates.assets = updates.assets;
-    if (updates.soundDesign !== undefined) dbUpdates.sound_design = updates.soundDesign;
-    if (updates.launchPlan !== undefined) dbUpdates.launch_plan = updates.launchPlan;
-    if (updates.performance !== undefined) dbUpdates.performance = updates.performance;
+    if (updates.assets !== undefined) dbUpdates.assets = sanitizeJson(updates.assets);
+    if (updates.soundDesign !== undefined) dbUpdates.sound_design = sanitizeJson(updates.soundDesign);
+    if (updates.launchPlan !== undefined) dbUpdates.launch_plan = sanitizeJson(updates.launchPlan);
+    if (updates.performance !== undefined) dbUpdates.performance = sanitizeJson(updates.performance);
     if (updates.scheduledDate !== undefined) dbUpdates.scheduled_date = updates.scheduledDate;
     if (updates.publishedUrl !== undefined) dbUpdates.published_url = updates.publishedUrl;
     if (updates.voiceoverVoiceId !== undefined) dbUpdates.voiceover_voice_id = updates.voiceoverVoiceId;
-    if (updates.timeline !== undefined) dbUpdates.timeline = updates.timeline;
+    if (updates.timeline !== undefined) dbUpdates.timeline = sanitizeJson(updates.timeline);
     
-    const { data, error } = await supabase.from('projects').update(dbUpdates).eq('id', projectId).select().single();
-    if (error) throw error;
+    const { data, error } = await supabase.from('projects').update(dbUpdates).eq('id', projectId).select('*').single();
+    if (error) {
+        console.error("Supabase update project error:", getErrorMessage(error));
+        throw error;
+    }
     if (!data) throw new Error("Failed to update project: no data returned.");
     return projectRowToProject(data);
 };
@@ -303,7 +324,7 @@ export const getNotifications = async (userId: string): Promise<Notification[]> 
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
     if (error) throw error;
-    return (data || []).map(notificationRowToNotification);
+    return (data || []).map(n => notificationRowToNotification(n));
 };
 
 export const markNotificationAsRead = async (notificationId: string): Promise<void> => {
@@ -326,7 +347,7 @@ const brandIdentityRowToBrandIdentity = (row: Database['public']['Tables']['bran
     name: row.name,
     toneOfVoice: row.tone_of_voice,
     writingStyleGuide: row.writing_style_guide,
-    colorPalette: row.color_palette as unknown as { primary: string, secondary: string, accent: string },
+    colorPalette: row.color_palette ? (row.color_palette as unknown as BrandIdentity['colorPalette']) : { primary: '#6366f1', secondary: '#ec4899', accent: '#f59e0b' },
     fontSelection: row.font_selection,
     thumbnailFormula: row.thumbnail_formula,
     visualStyleGuide: row.visual_style_guide,
@@ -340,8 +361,17 @@ export const getBrandIdentitiesForUser = async (userId: string): Promise<BrandId
         .from('brand_identities')
         .select('*')
         .eq('user_id', userId);
-    if (error) throw error;
-    return (data || []).map(brandIdentityRowToBrandIdentity);
+
+    if (error) {
+        // Specifically check for the "relation does not exist" error.
+        if (error.message.includes('relation "public.brand_identities" does not exist')) {
+            console.warn('Brand identities table not found, skipping. This may be expected if the feature is not enabled.');
+            return []; // Return empty array to allow the app to function.
+        }
+        // For other errors, still throw them.
+        throw error;
+    }
+    return (data || []).map(b => brandIdentityRowToBrandIdentity(b));
 };
 
 export const createBrandIdentity = async (identityData: Omit<BrandIdentity, 'id' | 'created_at' | 'user_id'>, userId: string): Promise<BrandIdentity> => {
@@ -358,7 +388,7 @@ export const createBrandIdentity = async (identityData: Omit<BrandIdentity, 'id'
         channel_mission: identityData.channelMission,
         logo_url: identityData.logoUrl ?? null
     };
-    const { data, error } = await supabase.from('brand_identities').insert(newIdentityData).select().single();
+    const { data, error } = await supabase.from('brand_identities').insert(newIdentityData).select('*').single();
     if (error) throw error;
     if (!data) throw new Error("Failed to create brand identity: no data returned.");
     return brandIdentityRowToBrandIdentity(data);
@@ -381,7 +411,7 @@ export const updateBrandIdentity = async (identityId: string, updates: Partial<O
         .from('brand_identities')
         .update(dbUpdates)
         .eq('id', identityId)
-        .select()
+        .select('*')
         .single();
         
     if (error) throw error;
@@ -405,7 +435,7 @@ export const uploadFile = async (file: Blob, path: string): Promise<string> => {
         });
 
     if (error) {
-        console.error("Supabase upload error:", error);
+        console.error("Supabase upload error:", getErrorMessage(error));
         throw new Error(`Failed to upload file to Supabase Storage: ${error.message}`);
     }
 

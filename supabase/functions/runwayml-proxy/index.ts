@@ -36,23 +36,17 @@ serve(async (req: Request) => {
         const runwayClient = new RunwayML({ apiKey: RUNWAYML_API_SECRET });
         const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
-        const bodyText = await req.text();
-        if (!bodyText) {
-            return new Response(JSON.stringify({ error: 'Request body is empty.' }), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 400,
-            });
-        }
-        let parsedBody;
+        let body;
         try {
-            parsedBody = JSON.parse(bodyText);
+            body = await req.json();
         } catch (e) {
-            return new Response(JSON.stringify({ error: `Invalid JSON in request body: ${e.message}` }), {
+            return new Response(JSON.stringify({ error: `Invalid JSON body: ${e.message}` }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 400,
+                status: 400
             });
         }
-        const { prompt, aspectRatio, uuid, imageUrl, motionPrompt } = parsedBody;
+        
+        const { prompt, aspectRatio, uuid, imageUrl, motionPrompt } = body;
 
         if (uuid) {
             // Mode: Check status of an existing task

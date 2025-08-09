@@ -1,6 +1,13 @@
 import { type PostgrestError } from '@supabase/supabase-js';
 
 // --- Core Types ---
+export type PlanId = 'free' | 'pro' | 'viralyzaier';
+export type ProjectStatus = 'Autopilot' | 'Idea' | 'Scripting' | 'Rendering' | 'Scheduled' | 'Published';
+export type Platform = 'youtube_long' | 'youtube_short' | 'tiktok' | 'instagram';
+export type WorkflowStep = 1 | 2 | 3 | 4 | 5;
+export type VideoStyle = 'High-Energy Viral' | 'Cinematic Documentary' | 'Clean & Corporate' | 'Animation' | 'Historical Documentary' | 'Vlog' | 'Whiteboard';
+export type AiVideoModel = 'runwayml' | 'kling' | 'minimax' | 'seedance';
+
 export type Json =
   | string
   | number
@@ -8,15 +15,6 @@ export type Json =
   | null
   | { [key: string]: Json | undefined }
   | Json[];
-export interface JsonObject {
-  [key: string]: Json | undefined;
-}
-export type PlanId = 'free' | 'pro' | 'viralyzaier';
-export type ProjectStatus = 'Autopilot' | 'Idea' | 'Scripting' | 'Rendering' | 'Scheduled' | 'Published';
-export type Platform = 'youtube_long' | 'youtube_short' | 'tiktok' | 'instagram';
-export type WorkflowStep = 1 | 2 | 3 | 4 | 5;
-export type VideoStyle = 'High-Energy Viral' | 'Cinematic Documentary' | 'Clean & Corporate';
-export type AiVideoModel = 'runwayml' | 'kling' | 'minimax' | 'seedance';
 
 // --- UI & System Types ---
 export interface Toast { id: number; message: string; type: 'success' | 'error' | 'info'; }
@@ -65,6 +63,7 @@ export interface Project {
   name: string;
   topic: string;
   platform: Platform;
+  videoSize: '16:9' | '9:16' | '1:1';
   status: ProjectStatus;
   lastUpdated: string;
   title: string | null;
@@ -84,8 +83,8 @@ export interface Project {
   timeline: TimelineState | null;
 }
 
-export interface Scene { timecode: string; visual: string; voiceover: string; onScreenText?: string; }
-export interface Script { hooks: string[]; scenes: Scene[]; cta: string; }
+export interface Scene { timecode: string; visual: string; voiceover: string; onScreenText?: string; storyboardImageUrl?: string; sceneIndex: number; }
+export interface Script { hooks: string[]; scenes: Scene[]; cta: string; selectedHookIndex?: number; }
 export interface MoodboardImage { prompt: string; url: string; }
 export interface Blueprint { suggestedTitles: string[]; script: Script; moodboard: string[]; strategicSummary: string; platform: Platform; }
 export interface SceneAssets { visualUrl: string | null; voiceoverUrl: string | null; }
@@ -147,7 +146,7 @@ export interface Notification {
 
 // --- Asset & Media Types ---
 export interface UserAsset { id: string; user_id: string; url: string; type: 'video' | 'audio' | 'image'; name: string; created_at: string; }
-export interface NormalizedStockAsset { id: string | number; previewImageUrl: string; downloadUrl: string; type: 'video' | 'image' | 'audio'; description: string; duration?: number; provider: 'pexels' | 'storyblocks' | 'jamendo'; }
+export interface NormalizedStockAsset { id: string | number; previewImageUrl: string; downloadUrl: string; type: 'video' | 'image' | 'audio'; description: string; duration?: number; provider: 'pexels' | 'storyblocks' | 'jamendo' | 'pixabay'; }
 export interface JamendoTrack { id: string; name: string; duration: number; artist_name: string; image: string; audio: string; }
 export interface GiphyAsset { id: string; title: string; images: { original: { url: string; }; fixed_width: { url: string; }; }; }
 export interface StoryblocksAsset { id: number; title: string; thumbnail_url: string; preview_url: string; type: string; duration?: number; }
@@ -185,6 +184,7 @@ export interface StockAsset {
 
 // --- Timeline & Editing Types ---
 export interface TimelineState {
+    rev: number; // Revision number for smart updates
     tracks: TimelineTrack[];
     subtitles: Subtitle[];
     voiceoverVolume: number;
@@ -276,7 +276,7 @@ export type Database = {
         Row: {
           id: string
           email: string
-          subscription: Json
+          subscription: Json | null
           ai_credits: number
           channel_audit: Json | null
           content_pillars: string[] | null
@@ -286,7 +286,7 @@ export type Database = {
         Insert: {
           id: string
           email: string
-          subscription: Json
+          subscription: Json | null
           ai_credits: number
           channel_audit?: Json | null
           content_pillars?: string[] | null
@@ -296,7 +296,7 @@ export type Database = {
         Update: {
           id?: string
           email?: string
-          subscription?: Json
+          subscription?: Json | null
           ai_credits?: number
           channel_audit?: Json | null
           content_pillars?: string[] | null
@@ -314,6 +314,7 @@ export type Database = {
           name: string
           topic: string
           platform: string
+          video_size: string | null
           status: string
           workflow_step: number
           title: string | null
@@ -339,6 +340,7 @@ export type Database = {
           name: string
           topic: string
           platform: string
+          video_size?: string | null
           status: string
           workflow_step: number
           title?: string | null
@@ -364,6 +366,7 @@ export type Database = {
           name?: string
           topic?: string
           platform?: string
+          video_size?: string | null
           status?: string
           workflow_step?: number
           title?: string | null
@@ -381,19 +384,50 @@ export type Database = {
           last_performance_check?: string | null
           timeline?: Json | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "projects_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       notifications: {
         Row: { id: string; user_id: string; project_id: string | null; message: string; is_read: boolean; created_at: string; }
         Insert: { id?: string; user_id: string; project_id?: string | null; message: string; is_read?: boolean; created_at?: string; }
         Update: { id?: string; user_id?: string; project_id?: string | null; message?: string; is_read?: boolean; created_at?: string; }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "notifications_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       user_youtube_tokens: {
         Row: { user_id: string; access_token: string; refresh_token: string; expires_at: string; scope: string; }
         Insert: { user_id: string; access_token: string; refresh_token: string; expires_at: string; scope: string; }
         Update: { user_id?: string; access_token?: string; refresh_token?: string; expires_at?: string; scope?: string; }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_youtube_tokens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       video_jobs: {
         Row: {
@@ -426,7 +460,22 @@ export type Database = {
           result_url?: string | null
           error_message?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "video_jobs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_jobs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       brand_identities: {
         Row: {
@@ -436,7 +485,7 @@ export type Database = {
           name: string
           tone_of_voice: string
           writing_style_guide: string
-          color_palette: Json
+          color_palette: Json | null
           font_selection: string
           thumbnail_formula: string
           visual_style_guide: string
@@ -451,7 +500,7 @@ export type Database = {
           name: string
           tone_of_voice: string
           writing_style_guide: string
-          color_palette: Json
+          color_palette?: Json | null
           font_selection: string
           thumbnail_formula: string
           visual_style_guide: string
@@ -466,7 +515,7 @@ export type Database = {
           name?: string
           tone_of_voice?: string
           writing_style_guide?: string
-          color_palette?: Json
+          color_palette?: Json | null
           font_selection?: string
           thumbnail_formula?: string
           visual_style_guide?: string
@@ -474,18 +523,26 @@ export type Database = {
           channel_mission?: string
           logo_url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "brand_identities_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
       }
-    },
+    }
     Views: {
       [_ in never]: never
-    },
+    }
     Functions: {
       [_ in never]: never
-    },
+    }
     Enums: {
       [_ in never]: never
-    },
+    }
     CompositeTypes: {
       [_ in never]: never
     }

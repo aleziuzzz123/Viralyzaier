@@ -122,7 +122,7 @@ serve(async (req: Request) => {
         }
 
         // Fetch latest stats from YouTube API
-        const videoApiUrl = `https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${videoId}&key=${YOUTUBE_API_KEY}`;
+        const videoApiUrl = `https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${videoId}`;
         const apiResponse = await fetch(videoApiUrl, {
             headers: { 'Authorization': `Bearer ${access_token}` },
         });

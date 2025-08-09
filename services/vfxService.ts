@@ -1,78 +1,42 @@
-import { invokeEdgeFunction } from './supabaseService';
+// services/vfxService.ts
+import { invokeEdgeFunction } from './supabaseService.ts';
 
-// Simulates calling a backend service to remove a video background.
-export const removeBackground = async (clipUrl: string): Promise<string> => {
-    // In a real app, this would return a new URL to the processed video.
-    // For this demo, we'll assume the operation is successful and return the original URL.
+/**
+ * Applies AI background removal to a video or image.
+ * @param mediaUrl The public URL of the media to process.
+ * @returns The public URL of the processed media.
+ */
+export const removeBackground = async (mediaUrl: string): Promise<string> => {
     const { processedUrl } = await invokeEdgeFunction<{ processedUrl: string }>('ai-vfx-proxy', {
         type: 'removeBackground',
-        clipUrl,
+        mediaUrl,
     });
     return processedUrl;
 };
 
-// Simulates applying a retouching filter.
-export const applyRetouch = async (clipUrl: string): Promise<string> => {
+/**
+ * Applies AI retouching to a video or image.
+ * @param mediaUrl The public URL of the media to process.
+ * @returns The public URL of the processed media.
+ */
+export const applyRetouch = async (mediaUrl: string): Promise<string> => {
     const { processedUrl } = await invokeEdgeFunction<{ processedUrl: string }>('ai-vfx-proxy', {
-        type: 'applyRetouch',
-        clipUrl,
+        type: 'retouch',
+        mediaUrl,
     });
     return processedUrl;
 };
 
-// Simulates removing an object from a video.
-export const removeObject = async (clipUrl: string, objectDescription: string): Promise<string> => {
-    const { processedUrl } = await invokeEdgeFunction<{ processedUrl: string }>('ai-vfx-proxy', {
-        type: 'removeObject',
-        clipUrl,
-        objectDescription,
-    });
-    return processedUrl;
-};
 
-// Placeholder for GIPHY search. A real implementation would use a backend proxy for the API key.
-export const searchGiphy = async (query: string): Promise<{ url: string }[]> => {
-    if (!query) return [];
-    // This is a placeholder/simulation. In a real app, you'd fetch from GIPHY's API.
-    // Static results for demonstration.
-    return [
-        { url: 'https://media.giphy.com/media/l3vR1tookIhM8nZ6w/giphy.gif' },
-        { url: 'https://media.giphy.com/media/tHIRLHtNwxpjIFttIz/giphy.gif' },
-        { url: 'https://media.giphy.com/media/3o7TKS6AWgwsSkD8UU/giphy.gif' },
-        { url: 'https://media.giphy.com/media/VbnUQpnihPSIgIXuZv/giphy.gif' },
-        { url: 'https://media.giphy.com/media/3o7abnavI3yv28T0IM/giphy.gif' },
-    ];
-}
-
-// --- Audio Mastering ---
-
-// Simulates applying auto-enhancement to an audio clip.
+/**
+ * Applies AI audio enhancement to an audio clip.
+ * @param clipUrl The public URL of the audio clip.
+ * @returns The public URL of the processed audio.
+ */
 export const applyAudioEnhance = async (clipUrl: string): Promise<string> => {
     const { processedUrl } = await invokeEdgeFunction<{ processedUrl: string }>('ai-audio-proxy', {
         type: 'enhance',
         clipUrl,
-    });
-    return processedUrl;
-};
-
-// Simulates applying a voice preset to an audio clip.
-export const applyVoicePreset = async (clipUrl: string, preset: string): Promise<string> => {
-    const { processedUrl } = await invokeEdgeFunction<{ processedUrl: string }>('ai-audio-proxy', {
-        type: 'voicePreset',
-        clipUrl,
-        preset,
-    });
-    return processedUrl;
-};
-
-// --- Layout & Composition ---
-
-// Simulates AI-powered video reframing.
-export const reframeVideo = async (clipUrl: string, aspectRatio: '16:9' | '9:16' | '1:1'): Promise<string> => {
-    const { processedUrl } = await invokeEdgeFunction<{ processedUrl: string }>('ai-vfx-proxy', {
-        type: 'reframe',
-        clipUrl,
-        aspectRatio,
     });
     return processedUrl;
 };

@@ -1,3 +1,4 @@
+// supabase/functions/youtube-api-proxy/index.ts
 declare const Deno: any;
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.44.4';
@@ -95,32 +96,35 @@ serve(async (req: Request) => {
     }
     
     // 4. Make the proxy request to the YouTube API
-    const bodyText = await req.text();
-    if (!bodyText) {
-        return new Response(JSON.stringify({ error: 'Request body is empty.' }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400,
-        });
-    }
-    let parsedBody;
+    let body;
     try {
-        parsedBody = JSON.parse(bodyText);
+        body = await req.json();
     } catch (e) {
-        return new Response(JSON.stringify({ error: `Invalid JSON in request body: ${e.message}` }), {
+        return new Response(JSON.stringify({ error: `Invalid JSON body: ${e.message}` }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400,
+            status: 400
         });
     }
-    const { endpoint, params, isAnalytics } = parsedBody;
+
+    const { endpoint, params, isAnalytics } = body;
+    
+    if (!endpoint) {
+        throw new Error("Request body must include 'endpoint'.");
+    }
+
+    // Ensure params is an object, and handle the common mistake of sending 'query' instead of 'q'.
+    const apiParams = params || {};
+    if (endpoint === 'search' && body.query && !apiParams.q) {
+        apiParams.q = body.query;
+    }
 
     const apiBaseUrl = isAnalytics 
         ? 'https://youtubeanalytics.googleapis.com/v2' 
         : 'https://www.googleapis.com/youtube/v3';
 
     const apiUrl = new URL(`${apiBaseUrl}/${endpoint}`);
-    apiUrl.searchParams.set('key', YOUTUBE_API_KEY);
-    for (const key in params) {
-        apiUrl.searchParams.set(key, params[key]);
+    for (const key in apiParams) {
+        apiUrl.searchParams.set(key, apiParams[key]);
     }
 
     const apiResponse = await fetch(apiUrl.toString(), {

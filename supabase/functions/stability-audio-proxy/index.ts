@@ -6,6 +6,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.44.4';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 const STABILITY_API_KEY = Deno.env.get('STABILITY_API_KEY');
@@ -31,39 +32,44 @@ serve(async (req: Request) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) throw new Error('Authentication failed.');
 
-    const { prompt, durationInSeconds } = await req.json();
-    // Improved validation
+    let body;
+    try {
+        body = await req.json();
+    } catch (e) {
+        return new Response(JSON.stringify({ error: `Invalid JSON body: ${e.message}` }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+        });
+    }
+
+    const { prompt, durationInSeconds } = body;
+
     if (typeof prompt !== 'string' || prompt.trim() === '' || typeof durationInSeconds !== 'number' || durationInSeconds <= 0) {
       throw new Error("Request must include a non-empty 'prompt' and a positive 'durationInSeconds'.");
     }
-
-    // Create the multipart/form-data body as required by the Stability AI API
-    const formData = new FormData();
-    formData.append('prompt', prompt);
-    formData.append('duration', durationInSeconds.toString());
-    formData.append('model', 'stable-audio-2.5'); // Use the latest model as per docs
-    formData.append('output_format', 'mp3');     // Explicitly set the format as per docs
-
+    
+    // ** FIX: Updated the endpoint to the correct V1 API path for audio generation. **
     const stabilityResponse = await fetch('https://api.stability.ai/v1/audio/generate', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${STABILITY_API_KEY}`,
-        // As per documentation, 'audio/*' is the correct accept header for direct audio bytes
-        'Accept': 'audio/*',
-        // Note: 'Content-Type' is not set here; 'fetch' will set it correctly for FormData
+        'Content-Type': 'application/json',
+        'Accept': 'audio/mpeg',
       },
-      body: formData,
+      body: JSON.stringify({
+        prompt: prompt, // ** FIX: The API expects 'prompt', not 'text'. **
+        duration_seconds: durationInSeconds,
+      }),
     });
 
     if (!stabilityResponse.ok) {
       const errorText = await stabilityResponse.text();
-      // Try to parse JSON for a more detailed error, but fallback to text.
       let detailedError = errorText;
       try {
         const errorJson = JSON.parse(errorText);
         detailedError = errorJson.message || JSON.stringify(errorJson);
       } catch (e) {
-        // Ignore if it's not JSON
+        // Not JSON
       }
       throw new Error(`Stability AI API Error: ${stabilityResponse.status} - ${detailedError}`);
     }
