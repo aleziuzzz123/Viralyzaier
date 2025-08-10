@@ -15,8 +15,8 @@ export type Json =
   | number
   | boolean
   | null
-  | { [key: string]: Json }
-  | Json[];
+  | { [key: string]: any }
+  | any[];
 
 // --- UI & System Types ---
 export interface Toast { id: number; message: string; type: 'success' | 'error' | 'info'; }
@@ -131,13 +131,6 @@ export interface VideoPerformance { views: number; likes: number; comments: numb
 export interface PerformanceReview { summary: string; whatWorked: string[]; whatToImprove: string[]; }
 export interface Opportunity { idea: string; reason: string; suggestedTitle: string; type: 'Quick Win' | 'Growth Bet' | 'Experimental'; }
 export interface ContentGapSuggestion { idea: string; reason: string; potentialTitles: string[]; }
-export interface TrendData {
-  interestOverTime: InterestPoint[];
-  breakoutQueries: RelatedQuery[];
-  topQueries: RelatedQuery[];
-}
-export interface InterestPoint { time: string; value: number; }
-export interface RelatedQuery { query: string; value: string; }
 export interface Notification {
   id: string;
   user_id: string;
@@ -269,6 +262,7 @@ export type Database = {
           visual_style_guide?: string | null
           writing_style_guide?: string | null
         }
+        Relationships: []
       }
       notifications: {
         Row: {
@@ -295,6 +289,7 @@ export type Database = {
           project_id?: string | null
           user_id?: string
         }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -327,6 +322,7 @@ export type Database = {
           stripe_customer_id?: string | null
           subscription?: Json | null
         }
+        Relationships: []
       }
       projects: {
         Row: {
@@ -404,6 +400,7 @@ export type Database = {
           voiceover_voice_id?: string | null
           workflow_step?: number
         }
+        Relationships: []
       }
       user_youtube_tokens: {
         Row: {
@@ -430,6 +427,7 @@ export type Database = {
           scope?: string
           user_id?: string
         }
+        Relationships: []
       }
       video_jobs: {
         Row: {
@@ -465,6 +463,7 @@ export type Database = {
           error_message?: string | null
           output_url?: string | null
         }
+        Relationships: []
       }
     }
     Views: {
@@ -479,56 +478,5 @@ export type Database = {
     CompositeTypes: {
       [_ in never]: never
     }
-    Relationships: [
-      {
-        foreignKeyName: "brand_identities_user_id_fkey"
-        columns: ["user_id"]
-        isOneToOne: false
-        referencedRelation: "profiles"
-        referencedColumns: ["id"]
-      },
-      {
-        foreignKeyName: "notifications_project_id_fkey"
-        columns: ["project_id"]
-        isOneToOne: false
-        referencedRelation: "projects"
-        referencedColumns: ["id"]
-      },
-      {
-        foreignKeyName: "notifications_user_id_fkey"
-        columns: ["user_id"]
-        isOneToOne: false
-        referencedRelation: "profiles"
-        referencedColumns: ["id"]
-      },
-      {
-        foreignKeyName: "projects_user_id_fkey"
-        columns: ["user_id"]
-        isOneToOne: false
-        referencedRelation: "profiles"
-        referencedColumns: ["id"]
-      },
-      {
-        foreignKeyName: "user_youtube_tokens_user_id_fkey"
-        columns: ["user_id"]
-        isOneToOne: true
-        referencedRelation: "profiles"
-        referencedColumns: ["id"]
-      },
-      {
-        foreignKeyName: "video_jobs_project_id_fkey"
-        columns: ["project_id"]
-        isOneToOne: false
-        referencedRelation: "projects"
-        referencedColumns: ["id"]
-      },
-      {
-        foreignKeyName: "video_jobs_user_id_fkey"
-        columns: ["user_id"]
-        isOneToOne: false
-        referencedRelation: "profiles"
-        referencedColumns: ["id"]
-      }
-    ]
   }
 }

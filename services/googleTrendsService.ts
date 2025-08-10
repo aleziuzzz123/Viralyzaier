@@ -1,3 +1,8 @@
+/*
+This file has been commented out to resolve build errors as requested.
+The types it depends on (TrendData, InterestPoint, RelatedQuery) have been removed from types.ts.
+*/
+/*
 import { Type } from "@google/genai";
 import { TrendData } from '../types.js';
 import { invokeEdgeFunction } from './supabaseService.js';
@@ -83,3 +88,4 @@ export const fetchTrends = async (keyword: string): Promise<TrendData> => {
 
     return parseGeminiJson(response);
 };
+*/
