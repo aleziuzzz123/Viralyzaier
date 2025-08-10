@@ -1,5 +1,3 @@
-
-
 import React, { createContext, useState, useEffect, useCallback, useContext, ReactNode, useRef, useMemo } from 'react';
 import { Project, User, PlanId, Blueprint, Toast, Platform, Opportunity, ContentGapSuggestion, PerformanceReview, Notification, ProjectStatus, Database, UserAsset, BrandIdentity, VideoStyle, Json } from '../types.ts';
 import * as supabaseService from '../services/supabaseService.ts';
@@ -62,8 +60,10 @@ interface AppContextType {
     setUpgradeModalOpen: (isOpen: boolean) => void;
     setPrefilledBlueprintPrompt: (prompt: string | null) => void;
     
-    setActiveProjectId: (id: string | null) => void;
     activeProjectId: string | null;
+    setActiveProjectId: (id: string | null) => Promise<void>;
+    activeProjectDetails: Project | null;
+    isProjectDetailsLoading: boolean;
     
     setUser: React.Dispatch<React.SetStateAction<User | null>>;
     
@@ -102,7 +102,9 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     const [fonts, setFonts] = useState<GoogleFont[]>([]);
     const [isInitialLoading, setIsInitialLoading] = useState(true);
     
-    const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+    const [activeProjectId, setActiveProjectIdInternal] = useState<string | null>(null);
+    const [activeProjectDetails, setActiveProjectDetails] = useState<Project | null>(null);
+    const [isProjectDetailsLoading, setIsProjectDetailsLoading] = useState(false);
 
     const [isUpgradeModalOpen, setUpgradeModalOpen] = useState(false);
     const [upgradeReason, setUpgradeReason] = useState<{title: string, description: string}>({title: '', description: ''});
@@ -153,6 +155,40 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       const newToast: Toast = { id: Date.now(), message, type };
       setToasts(t => [...t, newToast]);
     }, []);
+
+    const setActiveProjectId = useCallback(async (id: string | null) => {
+        setActiveProjectIdInternal(id);
+        if (id === null) {
+            setActiveProjectDetails(null);
+            return;
+        }
+
+        const projectInList = projects.find(p => p.id === id);
+        if (projectInList && projectInList.script) {
+            setActiveProjectDetails(projectInList);
+            return;
+        }
+
+        setIsProjectDetailsLoading(true);
+        setActiveProjectDetails(null);
+        try {
+            const details = await supabaseService.getProjectDetails(id);
+            if (details) {
+                setActiveProjectDetails(details);
+                setProjects(currentProjects => 
+                    currentProjects.map(p => p.id === id ? details : p)
+                );
+            } else {
+                addToast(`Could not find project with ID: ${id}`, 'error');
+                setActiveProjectIdInternal(null);
+            }
+        } catch (err) {
+            addToast(`Failed to load project details: ${getErrorMessage(err)}`, 'error');
+            setActiveProjectIdInternal(null);
+        } finally {
+            setIsProjectDetailsLoading(false);
+        }
+    }, [projects, addToast]);
     
     // --- AUTH & DATA LOADING ---
     useEffect(() => {
@@ -181,35 +217,39 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             setIsInitialLoading(true);
             const loadData = async () => {
                 try {
-                    let profile = await supabaseService.getUserProfile(session.user.id);
-                    if (!profile) profile = await supabaseService.createProfileForUser(session.user.id, session.user.email);
-                    if (profile) {
-                        setUser(profile);
-                        const [projects, notifications, fonts, identities] = await Promise.all([
-                            supabaseService.getProjectsForUser(session.user.id),
-                            supabaseService.getNotifications(session.user.id),
-                            fetchGoogleFonts(),
-                            supabaseService.getBrandIdentitiesForUser(session.user.id),
-                        ]);
-                        setProjects(projects);
-                        setNotifications(notifications);
-                        setFonts(fonts.slice(0, 50));
-                        setBrandIdentities(identities);
-                    } else { throw new Error(t('toast.loading_user_error')); }
-                } catch (err) { addToast(`${t('toast.failed_fetch_profile')}: ${getErrorMessage(err)}`, 'error'); } 
+                    const { user, projects, notifications, brandIdentities } = await supabaseService.invokeEdgeFunction<{
+                        user: User;
+                        projects: Project[];
+                        notifications: Notification[];
+                        brandIdentities: BrandIdentity[];
+                    }>('get-initial-data', {});
+
+                    setUser(user);
+                    setProjects(projects);
+                    setNotifications(notifications);
+                    setBrandIdentities(brandIdentities);
+                    
+                    const fonts = await fetchGoogleFonts();
+                    setFonts(fonts.slice(0, 50));
+
+                } catch (err) { 
+                    const errorMessage = getErrorMessage(err);
+                    addToast(`${t('toast.failed_fetch_profile')}: ${errorMessage}`, 'error'); 
+                    setBackendError({ title: "Critical Data Load Failure", message: errorMessage });
+                } 
                 finally { setIsInitialLoading(false); }
             };
             loadData();
         } else {
             setUser(null); setProjects([]); setNotifications([]); setBrandIdentities([]); setFonts([]); setIsInitialLoading(false);
-            setActiveProjectId(null);
+            setActiveProjectIdInternal(null);
         }
     }, [session, addToast, t]);
     
     // --- Real-time subscriptions ---
     useEffect(() => {
         if (!session?.user?.id) return;
-        const sub = supabase.channel(`public:projects:user_id=eq.${session.user.id}`).on<Project>(
+        const sub = supabase.channel(`public:projects:user_id=eq.${session.user.id}`).on(
             'postgres_changes',
             { event: '*', schema: 'public', table: 'projects' },
             (payload) => {
@@ -300,7 +340,10 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     const handleUpdateProject = async (updatedProjectData: Partial<Project> & { id: string }): Promise<Project | null> => {
         try {
             const updatedProject = await supabaseService.updateProject(updatedProjectData.id, updatedProjectData);
-            setProjects(p => p.map(proj => proj.id === updatedProjectData.id ? updatedProject : proj));
+            setProjects(p => p.map(proj => proj.id === updatedProjectData.id ? {...proj, ...updatedProject} : proj));
+            if (activeProjectId === updatedProjectData.id) {
+                setActiveProjectDetails(currentDetails => currentDetails ? {...currentDetails, ...updatedProject} : null);
+            }
             return updatedProject;
         } catch (err) { addToast(`${t('toast.failed_update_project')}: ${getErrorMessage(err)}`, 'error'); return null; }
     };
@@ -370,7 +413,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             handleCreateProjectForBlueprint, handleDeleteProject,
             requestConfirmation, handleConfirmation, handleCancelConfirmation,
             setUpgradeModalOpen, handleCreateProjectFromIdea, setPrefilledBlueprintPrompt,
-            setActiveProjectId, activeProjectId,
+            activeProjectId, setActiveProjectId, activeProjectDetails, isProjectDetailsLoading,
             setUser,
             handleCreateProjectFromInsights,
             addProjects,
