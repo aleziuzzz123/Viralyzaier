@@ -19,6 +19,7 @@ import ScheduleModal from './components/ScheduleModal.js';
 import UpgradeModal from './components/UpgradeModal.js';
 import ConfirmationModal from './components/ConfirmationModal.js';
 import ProjectKickoff from './components/ProjectKickoff.js';
+import Loader from './components/Loader.js';
 
 
 type View = 'dashboard' | 'project' | 'calendar' | 'pricing' | 'channel' | 'assetLibrary' | 'autopilot' | 'settings' | 'kickoff';
@@ -113,10 +114,11 @@ const ToastComponent: React.FC<ToastComponentProps> = ({ toast, onDismiss }) => 
 
 const MainApp = () => {
     const { 
-        session, user, projects,
+        session, user,
         toasts, dismissToast, activeProjectId, setActiveProjectId,
         t, notifications,
         confirmation, handleConfirmation, handleCancelConfirmation,
+        activeProjectDetails, isProjectDetailsLoading
     } = useAppContext();
     const [currentView, setCurrentView] = useState<View>('dashboard');
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -144,7 +146,6 @@ const MainApp = () => {
 
     const handleSelectProject = (projectId: string) => {
         setActiveProjectId(projectId);
-        setCurrentView('project');
     };
     
     const handleNewProject = () => {
@@ -153,12 +154,17 @@ const MainApp = () => {
 
     const renderCurrentView = () => {
         if (!user) return <div className="bg-gray-900 min-h-screen flex items-center justify-center text-white">{t('toast.loading_user')}</div>;
-        const activeProject = projects.find(p => p.id === activeProjectId);
-
+        
         switch (currentView) {
             case 'project':
-                if (activeProject) return <ProjectView project={activeProject} />;
-                handleSetView('dashboard'); return null;
+                if (isProjectDetailsLoading) {
+                    return <div className="flex justify-center items-center h-64"><Loader /></div>;
+                }
+                if (activeProjectDetails) {
+                    return <ProjectView project={activeProjectDetails} />;
+                }
+                handleSetView('dashboard'); 
+                return null;
             case 'kickoff':
                 return <ProjectKickoff onProjectCreated={handleSelectProject} onExit={() => handleSetView('dashboard')} />;
             case 'calendar':

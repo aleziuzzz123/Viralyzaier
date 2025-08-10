@@ -69,22 +69,22 @@ export const projectRowToProject = (row: any): Project => ({
     platform: row.platform as Platform,
     videoSize: (row.video_size as Project['videoSize']) || '16:9',
     status: row.status as ProjectStatus,
-    title: row.title,
-    script: row.script as unknown as Script | null,
-    analysis: row.analysis as unknown as Analysis | null,
-    competitorAnalysis: row.competitor_analysis as unknown as CompetitorAnalysisResult | null,
-    moodboard: row.moodboard,
+    title: row.title || null,
+    script: (row.script as unknown as Script | null) || null,
+    analysis: (row.analysis as unknown as Analysis | null) || null,
+    competitorAnalysis: (row.competitor_analysis as unknown as CompetitorAnalysisResult | null) || null,
+    moodboard: row.moodboard || null,
     assets: (row.assets as unknown as { [sceneIndex: number]: SceneAssets }) || {},
-    soundDesign: row.sound_design as unknown as SoundDesign | null,
-    launchPlan: row.launch_plan as unknown as LaunchPlan | null,
-    performance: row.performance as unknown as VideoPerformance | null,
-    scheduledDate: row.scheduled_date,
-    publishedUrl: row.published_url,
+    soundDesign: (row.sound_design as unknown as SoundDesign | null) || null,
+    launchPlan: (row.launch_plan as unknown as LaunchPlan | null) || null,
+    performance: (row.performance as unknown as VideoPerformance | null) || null,
+    scheduledDate: row.scheduled_date || null,
+    publishedUrl: row.published_url || null,
     lastUpdated: row.last_updated,
     workflowStep: row.workflow_step as WorkflowStep,
-    voiceoverVoiceId: row.voiceover_voice_id,
-    last_performance_check: row.last_performance_check,
-    final_video_url: row.final_video_url,
+    voiceoverVoiceId: row.voiceover_voice_id || null,
+    last_performance_check: row.last_performance_check || null,
+    final_video_url: row.final_video_url || null,
 });
 
 
@@ -225,15 +225,31 @@ export const updateUserProfile = async (userId: string, updates: Partial<User>):
 };
 
 // --- Projects ---
+const DASHBOARD_PROJECT_COLUMNS = 'id, name, topic, platform, status, last_updated, published_url, scheduled_date, workflow_step';
+
 export const getProjectsForUser = async (userId: string): Promise<Project[]> => {
     const { data, error } = await supabase
         .from('projects')
-        .select('*')
+        .select(DASHBOARD_PROJECT_COLUMNS)
         .eq('user_id', userId)
         .order('last_updated', { ascending: false });
     if (error) throw new Error(getErrorMessage(error));
     return (data || []).map(p => projectRowToProject(p));
 };
+
+export const getProjectDetails = async (projectId: string): Promise<Project | null> => {
+    const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', projectId)
+        .single();
+    if (error) {
+        if (error.code === 'PGRST116') return null; // Not found is not an error
+        throw new Error(getErrorMessage(error));
+    }
+    return data ? projectRowToProject(data) : null;
+};
+
 
 export const createProject = async (projectData: Omit<Project, 'id' | 'lastUpdated'>, userId: string): Promise<Project> => {
     const newProjectData: Database['public']['Tables']['projects']['Insert'] = {
