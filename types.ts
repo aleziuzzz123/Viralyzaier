@@ -8,7 +8,13 @@ export type WorkflowStep = 1 | 2 | 3 | 4 | 5;
 export type VideoStyle = 'High-Energy Viral' | 'Cinematic Documentary' | 'Clean & Corporate' | 'Animation' | 'Historical Documentary' | 'Vlog' | 'Whiteboard';
 export type AiVideoModel = 'runwayml' | 'kling' | 'minimax' | 'seedance';
 
-export type Json = any;
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
 // --- UI & System Types ---
 export interface Toast { id: number; message: string; type: 'success' | 'error' | 'info'; }
@@ -547,3 +553,7 @@ export type Database = {
     }
   }
 }
+
+// Fix for Vercel build error by declaring the module it can't find.
+export type VercelRequest = any;
+export type VercelResponse = any;
