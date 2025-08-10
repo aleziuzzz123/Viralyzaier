@@ -1,5 +1,6 @@
 
 
+
 import React, { useRef, useEffect, useState } from 'react';
 import CreativeEditorSDK from '@cesdk/cesdk-js';
 import { Project } from '../types.ts';
@@ -58,7 +59,7 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
                 const voiceoverUrls = project.assets ? Object.values(project.assets).map(a => a.voiceoverUrl).filter(Boolean) as string[] : [];
                 const moodboardUrls = project.moodboard || [];
                 
-                const engineBase = 'https://cdn.img.ly/packages/imgly/cesdk-engine/1.57.0';
+                const engineBase = 'https://cdn.img.ly/packages/imgly/cesdk-engine/1.57.0/assets';
                 
                 const config = {
                     license: licenseKey,
