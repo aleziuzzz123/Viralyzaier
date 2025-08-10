@@ -1,6 +1,5 @@
 
 
-
 import React, { createContext, useState, useEffect, useCallback, useContext, ReactNode, useRef, useMemo } from 'react';
 import { Project, User, PlanId, Blueprint, Toast, Platform, Opportunity, ContentGapSuggestion, PerformanceReview, Notification, ProjectStatus, Database, UserAsset, BrandIdentity, VideoStyle, Json } from '../types.ts';
 import * as supabaseService from '../services/supabaseService.ts';
@@ -63,10 +62,8 @@ interface AppContextType {
     setUpgradeModalOpen: (isOpen: boolean) => void;
     setPrefilledBlueprintPrompt: (prompt: string | null) => void;
     
+    setActiveProjectId: (id: string | null) => void;
     activeProjectId: string | null;
-    setActiveProjectId: (id: string | null) => Promise<void>;
-    activeProjectDetails: Project | null;
-    isProjectDetailsLoading: boolean;
     
     setUser: React.Dispatch<React.SetStateAction<User | null>>;
     
@@ -105,9 +102,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     const [fonts, setFonts] = useState<GoogleFont[]>([]);
     const [isInitialLoading, setIsInitialLoading] = useState(true);
     
-    const [activeProjectId, setActiveProjectIdInternal] = useState<string | null>(null);
-    const [activeProjectDetails, setActiveProjectDetails] = useState<Project | null>(null);
-    const [isProjectDetailsLoading, setIsProjectDetailsLoading] = useState(false);
+    const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
 
     const [isUpgradeModalOpen, setUpgradeModalOpen] = useState(false);
     const [upgradeReason, setUpgradeReason] = useState<{title: string, description: string}>({title: '', description: ''});
@@ -158,40 +153,6 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       const newToast: Toast = { id: Date.now(), message, type };
       setToasts(t => [...t, newToast]);
     }, []);
-
-    const setActiveProjectId = useCallback(async (id: string | null) => {
-        setActiveProjectIdInternal(id);
-        if (id === null) {
-            setActiveProjectDetails(null);
-            return;
-        }
-
-        const projectInList = projects.find(p => p.id === id);
-        if (projectInList && projectInList.script) {
-            setActiveProjectDetails(projectInList);
-            return;
-        }
-
-        setIsProjectDetailsLoading(true);
-        setActiveProjectDetails(null);
-        try {
-            const details = await supabaseService.getProjectDetails(id);
-            if (details) {
-                setActiveProjectDetails(details);
-                setProjects(currentProjects => 
-                    currentProjects.map(p => p.id === id ? details : p)
-                );
-            } else {
-                addToast(`Could not find project with ID: ${id}`, 'error');
-                setActiveProjectIdInternal(null);
-            }
-        } catch (err) {
-            addToast(`Failed to load project details: ${getErrorMessage(err)}`, 'error');
-            setActiveProjectIdInternal(null);
-        } finally {
-            setIsProjectDetailsLoading(false);
-        }
-    }, [projects, addToast]);
     
     // --- AUTH & DATA LOADING ---
     useEffect(() => {
@@ -241,7 +202,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             loadData();
         } else {
             setUser(null); setProjects([]); setNotifications([]); setBrandIdentities([]); setFonts([]); setIsInitialLoading(false);
-            setActiveProjectIdInternal(null);
+            setActiveProjectId(null);
         }
     }, [session, addToast, t]);
     
@@ -339,10 +300,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     const handleUpdateProject = async (updatedProjectData: Partial<Project> & { id: string }): Promise<Project | null> => {
         try {
             const updatedProject = await supabaseService.updateProject(updatedProjectData.id, updatedProjectData);
-            setProjects(p => p.map(proj => proj.id === updatedProjectData.id ? {...proj, ...updatedProject} : proj));
-            if (activeProjectId === updatedProjectData.id) {
-                setActiveProjectDetails(currentDetails => currentDetails ? {...currentDetails, ...updatedProject} : null);
-            }
+            setProjects(p => p.map(proj => proj.id === updatedProjectData.id ? updatedProject : proj));
             return updatedProject;
         } catch (err) { addToast(`${t('toast.failed_update_project')}: ${getErrorMessage(err)}`, 'error'); return null; }
     };
@@ -412,7 +370,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             handleCreateProjectForBlueprint, handleDeleteProject,
             requestConfirmation, handleConfirmation, handleCancelConfirmation,
             setUpgradeModalOpen, handleCreateProjectFromIdea, setPrefilledBlueprintPrompt,
-            activeProjectId, setActiveProjectId, activeProjectDetails, isProjectDetailsLoading,
+            setActiveProjectId, activeProjectId,
             setUser,
             handleCreateProjectFromInsights,
             addProjects,
