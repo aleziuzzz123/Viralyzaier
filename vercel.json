@@ -1,17 +1,11 @@
 {
-  "version": 2,
-  "framework": null,
   "headers": [
     {
-      "source": "/(.*\\.tsx|.*\\.ts)",
+      "source": "/(.*)",
       "headers": [
-        { "key": "Content-Type", "value": "application/javascript; charset=utf-8" }
+        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
+        { "key": "Cross-Origin-Embedder-Policy", "value": "require-corp" }
       ]
     }
-  ],
-  "functions": {
-    "api/gemini-proxy.ts": {
-      "maxDuration": 60
-    }
-  }
+  ]
 }
