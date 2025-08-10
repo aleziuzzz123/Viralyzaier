@@ -1,4 +1,5 @@
 
+
 import { type PostgrestError } from '@supabase/supabase-js';
 
 // --- Core Types ---
@@ -240,7 +241,7 @@ export type Database = {
         }
         Insert: {
           channel_mission?: string | null
-          color_palette?: any
+          color_palette?: Json | null
           created_at?: string
           font_selection?: string | null
           id?: string
@@ -255,7 +256,7 @@ export type Database = {
         }
         Update: {
           channel_mission?: string | null
-          color_palette?: any
+          color_palette?: Json | null
           created_at?: string
           font_selection?: string | null
           id?: string
@@ -308,23 +309,23 @@ export type Database = {
         }
         Insert: {
           ai_credits?: number
-          channel_audit?: any
-          cloned_voices?: any
+          channel_audit?: Json | null
+          cloned_voices?: Json | null
           content_pillars?: string[] | null
           email: string
           id: string
           stripe_customer_id?: string | null
-          subscription?: any
+          subscription?: Json | null
         }
         Update: {
           ai_credits?: number
-          channel_audit?: any
-          cloned_voices?: any
+          channel_audit?: Json | null
+          cloned_voices?: Json | null
           content_pillars?: string[] | null
           email?: string
           id?: string
           stripe_customer_id?: string | null
-          subscription?: any
+          subscription?: Json | null
         }
       }
       projects: {
@@ -354,22 +355,22 @@ export type Database = {
           workflow_step: number
         }
         Insert: {
-          analysis?: any
-          assets?: any
-          competitor_analysis?: any
+          analysis?: Json | null
+          assets?: Json | null
+          competitor_analysis?: Json | null
           final_video_url?: string | null
           id?: string
           last_performance_check?: string | null
           last_updated?: string
-          launch_plan?: any
+          launch_plan?: Json | null
           moodboard?: string[] | null
           name: string
-          performance?: any
+          performance?: Json | null
           platform: string
           published_url?: string | null
           scheduled_date?: string | null
-          script?: any
-          sound_design?: any
+          script?: Json | null
+          sound_design?: Json | null
           status: string
           title?: string | null
           topic: string
@@ -379,22 +380,22 @@ export type Database = {
           workflow_step: number
         }
         Update: {
-          analysis?: any
-          assets?: any
-          competitor_analysis?: any
+          analysis?: Json | null
+          assets?: Json | null
+          competitor_analysis?: Json | null
           final_video_url?: string | null
           id?: string
           last_performance_check?: string | null
           last_updated?: string
-          launch_plan?: any
+          launch_plan?: Json | null
           moodboard?: string[] | null
           name?: string
-          performance?: any
+          performance?: Json | null
           platform?: string
           published_url?: string | null
           scheduled_date?: string | null
-          script?: any
-          sound_design?: any
+          script?: Json | null
+          sound_design?: Json | null
           status?: string
           title?: string | null
           topic?: string
@@ -448,7 +449,7 @@ export type Database = {
           project_id: string
           user_id: string
           status?: string
-          job_payload?: any
+          job_payload?: Json | null
           updated_at?: string
           error_message?: string | null
           output_url?: string | null
@@ -459,7 +460,7 @@ export type Database = {
           project_id?: string
           user_id?: string
           status?: string
-          job_payload?: any
+          job_payload?: Json | null
           updated_at?: string
           error_message?: string | null
           output_url?: string | null
@@ -478,11 +479,56 @@ export type Database = {
     CompositeTypes: {
       [_ in never]: never
     }
+    Relationships: [
+      {
+        foreignKeyName: "brand_identities_user_id_fkey"
+        columns: ["user_id"]
+        isOneToOne: false
+        referencedRelation: "profiles"
+        referencedColumns: ["id"]
+      },
+      {
+        foreignKeyName: "notifications_project_id_fkey"
+        columns: ["project_id"]
+        isOneToOne: false
+        referencedRelation: "projects"
+        referencedColumns: ["id"]
+      },
+      {
+        foreignKeyName: "notifications_user_id_fkey"
+        columns: ["user_id"]
+        isOneToOne: false
+        referencedRelation: "profiles"
+        referencedColumns: ["id"]
+      },
+      {
+        foreignKeyName: "projects_user_id_fkey"
+        columns: ["user_id"]
+        isOneToOne: false
+        referencedRelation: "profiles"
+        referencedColumns: ["id"]
+      },
+      {
+        foreignKeyName: "user_youtube_tokens_user_id_fkey"
+        columns: ["user_id"]
+        isOneToOne: true
+        referencedRelation: "profiles"
+        referencedColumns: ["id"]
+      },
+      {
+        foreignKeyName: "video_jobs_project_id_fkey"
+        columns: ["project_id"]
+        isOneToOne: false
+        referencedRelation: "projects"
+        referencedColumns: ["id"]
+      },
+      {
+        foreignKeyName: "video_jobs_user_id_fkey"
+        columns: ["user_id"]
+        isOneToOne: false
+        referencedRelation: "profiles"
+        referencedColumns: ["id"]
+      }
+    ]
   }
 }
-export type Trend = unknown;
-export type EnhancedTopic = unknown;
-export type VideoDeconstruction = unknown;
-export type ViralScoreBreakdown = unknown;
-export type OptimizationStep = unknown;
-declare module '@vercel/node' {}

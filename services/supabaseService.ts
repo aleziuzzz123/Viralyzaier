@@ -34,9 +34,9 @@ const isValidSubscription = (sub: any): sub is Subscription => {
 };
 
 // Helper to sanitize JSON before sending it to Supabase
-const sanitizeJson = (value: any): any | null => {
+const sanitizeJson = (value: any): Json | null => {
     // Simple deep-copy for safety. Prevents issues with complex objects.
-    return value ? JSON.parse(JSON.stringify(value)) : null;
+    return value ? JSON.parse(JSON.stringify(value)) as Json : null;
 }
 
 
@@ -208,7 +208,7 @@ export const createProfileForUser = async (userId: string, email: string | null 
         subscription: sanitizeJson({ planId: 'free', status: 'active', endDate: null }),
         ai_credits: freePlan.creditLimit,
     };
-    const { data, error } = await supabase.from('profiles').insert(newUserProfile).select('*').single();
+    const { data, error } = await supabase.from('profiles').insert([newUserProfile]).select('*').single();
     if (error) throw new Error(getErrorMessage(error));
     if (!data) throw new Error("Failed to create profile: no data returned.");
     return profileRowToUser(data, false);
@@ -277,7 +277,7 @@ export const createProject = async (projectData: Omit<Project, 'id' | 'lastUpdat
     
     const { data, error } = await supabase
         .from('projects')
-        .insert(newProjectData)
+        .insert([newProjectData])
         .select('*')
         .single();
     if (error) throw new Error(getErrorMessage(error));
@@ -342,13 +342,13 @@ export const getNotifications = async (userId: string): Promise<Notification[]> 
 };
 
 export const markNotificationAsRead = async (notificationId: string): Promise<void> => {
-    const updates = { is_read: true };
+    const updates: Database['public']['Tables']['notifications']['Update'] = { is_read: true };
     const { error } = await supabase.from('notifications').update(updates).eq('id', notificationId);
     if (error) throw new Error(getErrorMessage(error));
 };
 
 export const markAllNotificationsAsRead = async (userId: string): Promise<void> => {
-    const updates = { is_read: true };
+    const updates: Database['public']['Tables']['notifications']['Update'] = { is_read: true };
     const { error } = await supabase.from('notifications').update(updates).eq('user_id', userId);
     if (error) throw new Error(getErrorMessage(error));
 };
@@ -400,7 +400,7 @@ export const createBrandIdentity = async (identityData: Omit<BrandIdentity, 'id'
         channel_mission: identityData.channelMission,
         logo_url: identityData.logoUrl ?? null
     };
-    const { data, error } = await supabase.from('brand_identities').insert(newIdentityData).select('*').single();
+    const { data, error } = await supabase.from('brand_identities').insert([newIdentityData]).select('*').single();
     if (error) throw new Error(getErrorMessage(error));
     if (!data) throw new Error("Failed to create brand identity: no data returned.");
     return brandIdentityRowToBrandIdentity(data);
