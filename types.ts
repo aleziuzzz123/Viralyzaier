@@ -13,8 +13,8 @@ export type Json =
   | number
   | boolean
   | null
-  | { [key: string]: any }
-  | any[]
+  | { [key: string]: Json | undefined }
+  | Json[];
 
 // --- UI & System Types ---
 export interface Toast { id: number; message: string; type: 'success' | 'error' | 'info'; }
@@ -224,7 +224,7 @@ export type Database = {
       brand_identities: {
         Row: {
           channel_mission: string | null
-          color_palette: Json | null
+          color_palette: any | null
           created_at: string
           font_selection: string | null
           id: string
@@ -239,7 +239,7 @@ export type Database = {
         }
         Insert: {
           channel_mission?: string | null
-          color_palette?: Json | null
+          color_palette?: any | null
           created_at?: string
           font_selection?: string | null
           id?: string
@@ -254,7 +254,7 @@ export type Database = {
         }
         Update: {
           channel_mission?: string | null
-          color_palette?: Json | null
+          color_palette?: any | null
           created_at?: string
           font_selection?: string | null
           id?: string
@@ -322,54 +322,54 @@ export type Database = {
       profiles: {
         Row: {
           ai_credits: number
-          channel_audit: Json | null
-          cloned_voices: Json | null
+          channel_audit: any | null
+          cloned_voices: any | null
           content_pillars: string[] | null
           email: string
           id: string
           stripe_customer_id: string | null
-          subscription: Json | null
+          subscription: any | null
         }
         Insert: {
           ai_credits?: number
-          channel_audit?: Json | null
-          cloned_voices?: Json | null
+          channel_audit?: any | null
+          cloned_voices?: any | null
           content_pillars?: string[] | null
           email: string
           id: string
           stripe_customer_id?: string | null
-          subscription?: Json | null
+          subscription?: any | null
         }
         Update: {
           ai_credits?: number
-          channel_audit?: Json | null
-          cloned_voices?: Json | null
+          channel_audit?: any | null
+          cloned_voices?: any | null
           content_pillars?: string[] | null
           email?: string
           id?: string
           stripe_customer_id?: string | null
-          subscription?: Json | null
+          subscription?: any | null
         }
         Relationships: []
       }
       projects: {
         Row: {
-          analysis: Json | null
-          assets: Json | null
-          competitor_analysis: Json | null
+          analysis: any | null
+          assets: any | null
+          competitor_analysis: any | null
           final_video_url: string | null
           id: string
           last_performance_check: string | null
           last_updated: string
-          launch_plan: Json | null
+          launch_plan: any | null
           moodboard: string[] | null
           name: string
-          performance: Json | null
+          performance: any | null
           platform: string
           published_url: string | null
           scheduled_date: string | null
-          script: Json | null
-          sound_design: Json | null
+          script: any | null
+          sound_design: any | null
           status: string
           title: string | null
           topic: string
@@ -379,22 +379,22 @@ export type Database = {
           workflow_step: number
         }
         Insert: {
-          analysis?: Json | null
-          assets?: Json | null
-          competitor_analysis?: Json | null
+          analysis?: any | null
+          assets?: any | null
+          competitor_analysis?: any | null
           final_video_url?: string | null
           id?: string
           last_performance_check?: string | null
           last_updated?: string
-          launch_plan?: Json | null
+          launch_plan?: any | null
           moodboard?: string[] | null
           name: string
-          performance?: Json | null
+          performance?: any | null
           platform: string
           published_url?: string | null
           scheduled_date?: string | null
-          script?: Json | null
-          sound_design?: Json | null
+          script?: any | null
+          sound_design?: any | null
           status: string
           title?: string | null
           topic: string
@@ -404,22 +404,22 @@ export type Database = {
           workflow_step: number
         }
         Update: {
-          analysis?: Json | null
-          assets?: Json | null
-          competitor_analysis?: Json | null
+          analysis?: any | null
+          assets?: any | null
+          competitor_analysis?: any | null
           final_video_url?: string | null
           id?: string
           last_performance_check?: string | null
           last_updated?: string
-          launch_plan?: Json | null
+          launch_plan?: any | null
           moodboard?: string[] | null
           name?: string
-          performance?: Json | null
+          performance?: any | null
           platform?: string
           published_url?: string | null
           scheduled_date?: string | null
-          script?: Json | null
-          sound_design?: Json | null
+          script?: any | null
+          sound_design?: any | null
           status?: string
           title?: string | null
           topic?: string
@@ -480,7 +480,7 @@ export type Database = {
           project_id: string
           user_id: string
           status: string
-          job_payload: Json | null
+          job_payload: any | null
           updated_at: string
           error_message: string | null
           output_url: string | null
@@ -491,7 +491,7 @@ export type Database = {
           project_id: string
           user_id: string
           status?: string
-          job_payload?: Json | null
+          job_payload?: any | null
           updated_at?: string
           error_message?: string | null
           output_url?: string | null
@@ -502,7 +502,7 @@ export type Database = {
           project_id?: string
           user_id?: string
           status?: string
-          job_payload?: Json | null
+          job_payload?: any | null
           updated_at?: string
           error_message?: string | null
           output_url?: string | null
@@ -542,10 +542,7 @@ export type Database = {
 
 // --- Build Fixes for Vercel Deployment ---
 
-// These types are being imported by an outdated backend function (`api/gemini-proxy.ts`).
-// They are not used by the frontend, but are added here as `any` to allow the Vercel build to succeed.
-export type Trend = any;
-export type EnhancedTopic = any;
-export type VideoDeconstruction = any;
-export type ViralScoreBreakdown = any;
-export type OptimizationStep = any;
+// This declaration satisfies the TypeScript compiler for an outdated backend function
+// (`api/gemini-proxy.ts`) that is no longer used by the frontend but is still
+// present in the project, causing Vercel builds to fail.
+declare module '@vercel/node';
