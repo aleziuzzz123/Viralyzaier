@@ -51,12 +51,7 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
                 
                 editorInstance = await CreativeEditorSDK.create(container, {
                     license: licenseKey,
-                    engine: {
-                        baseURL: 'https://cdn.img.ly/packages/imgly/cesdk-engine/1.57.0/assets',
-                        wasm: {
-                            disableMultithreaded: true
-                        }
-                    },
+                    baseURL: 'https://cdn.img.ly/packages/imgly/cesdk-engine/1.57.0/assets',
                     theme: 'dark',
                     ui: {
                         elements: {
