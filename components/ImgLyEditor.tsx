@@ -1,4 +1,6 @@
 
+
+
 import React, { useRef, useEffect, useState } from 'react';
 import CreativeEditorSDK from '@cesdk/cesdk-js';
 import { Project } from '../types.ts';
@@ -18,20 +20,8 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [isExporting, setIsExporting] = useState(false);
     const isExportingRef = useRef(false);
-    const [isIsolated, setIsIsolated] = useState(false);
 
     useEffect(() => {
-        if (typeof window !== 'undefined') {
-            setIsIsolated(window.crossOriginIsolated);
-        }
-    }, []);
-
-    useEffect(() => {
-        if (!isIsolated) {
-            setIsLoading(false);
-            return;
-        }
-
         const licenseKey = (window as any).__env?.VITE_IMGLY_LICENSE_KEY;
         if (!licenseKey || licenseKey.includes('YOUR_IMGLY')) {
             addToast("VITE_IMGLY_LICENSE_KEY is not configured. Please check your index.html file.", 'error');
@@ -46,16 +36,18 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
 
         const initializeEditor = async () => {
             try {
+                const preferSingleThread = typeof window !== 'undefined' ? !window.crossOriginIsolated : true;
+
                 const voiceoverUrls = project.assets ? Object.values(project.assets).map(a => a.voiceoverUrl).filter(Boolean) as string[] : [];
                 const moodboardUrls = project.moodboard || [];
                 
-                editorInstance = await CreativeEditorSDK.create(container, {
+                const config = {
                     license: licenseKey,
                     baseURL: 'https://cdn.img.ly/packages/imgly/cesdk-engine/1.57.0/assets',
-                    theme: 'dark',
+                    theme: 'dark' as const,
                     ui: {
                         elements: {
-                            view: 'default',
+                            view: 'default' as const,
                             navigation: {
                                 action: { export: true, save: false, load: false }
                             },
@@ -70,7 +62,11 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
                             },
                         },
                     },
-                });
+                    // Conditionally disable multithreading if not in a cross-origin isolated environment.
+                    ...(preferSingleThread ? { wasm: { disableMultithread: true } } : {})
+                };
+
+                editorInstance = await CreativeEditorSDK.create(container, config);
 
                 await editorInstance.asset.addAssets([
                     ...moodboardUrls.map((url, i) => ({ id: `moodboard_${i}`, meta: { uri: url, type: 'image' } })),
@@ -111,22 +107,8 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
                 editorInstance.dispose();
             }
         };
-    }, [isIsolated, project, user, handleFinalVideoSaved, addToast]);
+    }, [project, user, handleFinalVideoSaved, addToast]);
 
-    if (!isIsolated && !isLoading) {
-        return (
-            <div className="w-full h-[calc(100vh-12rem)] relative rounded-2xl overflow-hidden shadow-2xl bg-amber-900/20 border border-amber-500/50 flex flex-col items-center justify-center text-center p-8">
-                <WarningIcon className="w-16 h-16 text-amber-400 mb-4" />
-                <h3 className="text-2xl font-bold text-white">Editor Unavailable in Preview</h3>
-                <p className="mt-2 text-amber-200 max-w-md">
-                    The high-performance Creative Studio cannot run inside this sandboxed preview environment due to security restrictions.
-                </p>
-                <p className="mt-4 text-sm text-amber-300">
-                    Please open the application in a new tab or on your deployed site to use the editor.
-                </p>
-            </div>
-        );
-    }
 
     return (
         <div className="w-full h-[calc(100vh-12rem)] relative rounded-2xl overflow-hidden shadow-2xl bg-gray-950 border border-indigo-500/20">
