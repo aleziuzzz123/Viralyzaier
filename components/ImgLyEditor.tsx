@@ -12,22 +12,6 @@ interface ImgLyEditorProps {
     project: Project;
 }
 
-// Helper function to add CSS if not present
-function ensureCesdkCss() {
-  const hrefs = [
-    '/vendor/cesdk/cesdk.css',
-    '/vendor/cesdk/cesdk-themes.css'
-  ];
-  hrefs.forEach(href => {
-    if (!document.querySelector(`link[href="${href}"]`)) {
-      const l = document.createElement('link');
-      l.rel = 'stylesheet';
-      l.href = href;
-      document.head.appendChild(l);
-    }
-  });
-}
-
 const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
     const { user, handleFinalVideoSaved, addToast } = useAppContext();
     const containerRef = useRef<HTMLDivElement>(null);
@@ -54,35 +38,16 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
             }
 
             try {
-                ensureCesdkCss();
-                
                 const voiceoverUrls = project.assets ? Object.values(project.assets).map(a => a.voiceoverUrl).filter(Boolean) as string[] : [];
                 const moodboardUrls = project.moodboard || [];
                 
-                const engineBase = 'https://cdn.img.ly/packages/imgly/cesdk-engine/1.57.0/assets';
-                
                 const config = {
-                    license: licenseKey,
-                    baseURL: engineBase,
-                    theme: 'dark' as const,
-                    ui: {
-                        elements: {
-                            view: 'default' as const,
-                            navigation: {
-                                action: { export: true, save: false, load: false }
-                            },
-                            dock: {
-                                groups: [
-                                    { id: 'ly.img.video.template' },
-                                    { id: 'ly.img.default-group' },
-                                    { id: 'ly.img.video.text' },
-                                    { id: 'ly.img.video.sticker' },
-                                    { id: 'ly.img.video.audio' },
-                                ]
-                            },
-                        },
-                    },
-                    wasm: { disableMultithread: true, disableSIMD: true }
+                  license: (window as any).__env?.VITE_IMGLY_LICENSE_KEY,
+                  baseURL: 'https://cdn.img.ly/packages/imgly/cesdk-engine/1.57.0',
+                  theme: 'dark' as const,
+                  ui: { elements: { view: 'default' as const } },
+                  // Explicitly point to the smallest WASM module to prevent memory allocation errors.
+                  wasmUrl: 'https://cdn.img.ly/packages/imgly/cesdk-engine/1.57.0/cesdk-engine-no-simd-no-mt.wasm'
                 };
 
                 const editor: any = await CreativeEditorSDK.create(container, config);

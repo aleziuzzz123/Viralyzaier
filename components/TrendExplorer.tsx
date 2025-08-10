@@ -1,3 +1,8 @@
+/*
+This file has been commented out to resolve build errors as requested.
+The types it depends on (TrendData, InterestPoint, RelatedQuery) have been removed from types.ts.
+*/
+/*
 import React, { useState, useCallback } from 'react';
 import { TrendData, InterestPoint, RelatedQuery } from '../types.ts';
 import { fetchTrends } from '../services/googleTrendsService.ts';
@@ -30,18 +35,18 @@ const TrendChart: React.FC<TrendChartProps> = ({ data, t }) => {
   return (
     <div className="w-full">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{ animation: 'fade-in 1s ease-out' }}>
-        {/* Y-axis labels */}
+        {/ Y-axis labels /}
         <text x={padding.left - 8} y={getY(maxValue)} textAnchor="end" alignmentBaseline="middle" fill="#9ca3af" fontSize="10">{maxValue}</text>
         <text x={padding.left - 8} y={getY(0)} textAnchor="end" alignmentBaseline="middle" fill="#9ca3af" fontSize="10">0</text>
         <line x1={padding.left} y1={padding.top} x2={padding.left} y2={height - padding.bottom} stroke="#4b5563" strokeWidth="1" />
         
-        {/* X-axis labels */}
+        {/ X-axis labels /}
         {data.filter((_, i) => i % (Math.floor(data.length / 5)) === 0).map((d, i, arr) => (
           <text key={d.time} x={getX(i * Math.floor(data.length / 5))} y={height - padding.bottom + 15} textAnchor="middle" fill="#9ca3af" fontSize="10">{d.time}</text>
         ))}
         <line x1={padding.left} y1={height - padding.bottom} x2={width - padding.right} y2={height - padding.bottom} stroke="#4b5563" strokeWidth="1" />
         
-        {/* Line path */}
+        {/ Line path /}
         <path d={pathData} fill="none" stroke="#4f46e5" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ strokeDasharray: 1000, animation: 'stroke-draw 1.5s ease-out forwards' }} />
          <style>{`
           @keyframes stroke-draw {
@@ -178,3 +183,4 @@ const TrendExplorer: React.FC<TrendExplorerProps> = ({ onTrendSelect }) => {
 };
 
 export default TrendExplorer;
+*/
