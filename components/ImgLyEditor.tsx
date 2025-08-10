@@ -1,13 +1,11 @@
 
 import React, { useRef, useEffect, useState } from 'react';
+import CreativeEditorSDK from '@imgly/cesdk';
 import { Project } from '../types.ts';
 import { useAppContext } from '../contexts/AppContext.tsx';
 import { getErrorMessage } from '../utils.ts';
 import * as supabaseService from '../services/supabaseService.ts';
 import { v4 as uuidv4 } from 'uuid';
-
-// This is still needed to inform TypeScript that a global variable will exist.
-declare const CreativeEditorSDK: any;
 
 interface ImgLyEditorProps {
     project: Project;
@@ -16,7 +14,6 @@ interface ImgLyEditorProps {
 const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
     const { user, handleFinalVideoSaved, addToast } = useAppContext();
     const containerRef = useRef<HTMLDivElement>(null);
-    const editorRef = useRef<any>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isExporting, setIsExporting] = useState(false);
 
@@ -30,21 +27,18 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
 
         const container = containerRef.current;
         if (!container) return;
-
-        let attempts = 0;
-        const maxAttempts = 50; // Try for 10 seconds (50 * 200ms)
-        let intervalId: number;
+        
+        let editorInstance: any = null;
 
         const initEditor = async () => {
+            if (!container) return;
             try {
-                // Pre-fetch voiceovers and moodboard assets
                 const voiceoverUrls = project.assets ? Object.values(project.assets).map(a => a.voiceoverUrl).filter(Boolean) as string[] : [];
                 const moodboardUrls = project.moodboard || [];
                 
                 const ENGINE_ASSET_BASE = 'https://cdn.img.ly/packages/imgly/cesdk-engine/1.57.0/assets';
 
-                // Use window.CreativeEditorSDK to be explicit about using the global variable
-                const editor = await (window as any).CreativeEditorSDK.create(container, {
+                editorInstance = await CreativeEditorSDK.create(container, {
                     baseURL: ENGINE_ASSET_BASE,
                     license: licenseKey,
                     theme: 'dark',
@@ -72,9 +66,7 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
                     },
                 });
 
-                editorRef.current = editor;
-
-                editor.on('export', async (result: any) => {
+                editorInstance.on('export', async (result: any) => {
                     if (isExporting) return;
                     setIsExporting(true);
                     addToast("Exporting video... This may take a moment.", 'info');
@@ -95,30 +87,15 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
             } catch (err) {
                 console.error("Failed to initialize IMG.LY Editor:", err);
                 addToast(`Could not load the editor: ${getErrorMessage(err)}`, 'error');
+                setIsLoading(false);
             }
         };
-        
-        // Poll until the SDK is loaded onto the window object
-        intervalId = window.setInterval(() => {
-            if ((window as any).CreativeEditorSDK) {
-                window.clearInterval(intervalId);
-                initEditor();
-            } else {
-                attempts++;
-                if (attempts > maxAttempts) {
-                    window.clearInterval(intervalId);
-                    addToast("Could not load the editor: CreativeEditorSDK is not defined (timeout)", 'error');
-                    setIsLoading(false);
-                }
-            }
-        }, 200);
 
+        initEditor();
 
         return () => {
-            window.clearInterval(intervalId);
-            if (editorRef.current) {
-                editorRef.current.dispose();
-                editorRef.current = null;
+            if (editorInstance) {
+                editorInstance.dispose();
             }
         };
     }, [project, user, handleFinalVideoSaved, addToast]);
