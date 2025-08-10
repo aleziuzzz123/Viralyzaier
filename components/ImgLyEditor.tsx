@@ -1,6 +1,5 @@
 
 
-
 import React, { useRef, useEffect, useState } from 'react';
 import CreativeEditorSDK from '@cesdk/cesdk-js';
 import { Project } from '../types.ts';
@@ -12,6 +11,22 @@ import { WarningIcon } from './Icons.tsx';
 
 interface ImgLyEditorProps {
     project: Project;
+}
+
+// Helper function to add CSS if not present
+function ensureCesdkCss() {
+  const hrefs = [
+    'https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/styles/cesdk.css',
+    'https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/styles/cesdk-themes.css'
+  ];
+  hrefs.forEach(href => {
+    if (!document.querySelector(`link[href="${href}"]`)) {
+      const l = document.createElement('link');
+      l.rel = 'stylesheet';
+      l.href = href;
+      document.head.appendChild(l);
+    }
+  });
 }
 
 const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
@@ -36,14 +51,18 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
 
         const initializeEditor = async () => {
             try {
+                ensureCesdkCss();
+                
                 const preferSingleThread = typeof window !== 'undefined' ? !window.crossOriginIsolated : true;
 
                 const voiceoverUrls = project.assets ? Object.values(project.assets).map(a => a.voiceoverUrl).filter(Boolean) as string[] : [];
                 const moodboardUrls = project.moodboard || [];
                 
+                const engineBase = 'https://cdn.img.ly/packages/imgly/cesdk-engine/1.57.0';
+                
                 const config = {
                     license: licenseKey,
-                    baseURL: 'https://cdn.img.ly/packages/imgly/cesdk-engine/1.57.0/assets',
+                    baseURL: engineBase,
                     theme: 'dark' as const,
                     ui: {
                         elements: {
