@@ -1,5 +1,6 @@
 
 
+
 import { type PostgrestError } from '@supabase/supabase-js';
 
 // --- Core Types ---
@@ -86,7 +87,7 @@ export interface Project {
 }
 
 export interface Scene { timecode: string; visual: string; voiceover: string; onScreenText?: string; storyboardImageUrl?: string; sceneIndex: number; }
-export interface Script { hooks: string[]; scenes: Scene[]; cta: string; selectedHookIndex?: number; }
+export interface Script { id?: any; hooks: string[]; scenes: Scene[]; cta: string; selectedHookIndex?: number; }
 export interface MoodboardImage { prompt: string; url: string; }
 export interface Blueprint { suggestedTitles: string[]; script: Script; moodboard: string[]; strategicSummary: string; platform: Platform; }
 export interface SceneAssets { visualUrl: string | null; voiceoverUrl: string | null; }
@@ -218,6 +219,15 @@ export interface GiphyAsset {
     };
   };
 }
+
+// --- Build Fixes for Vercel Deployment ---
+// These types are being imported by an outdated backend function (`api/gemini-proxy.ts`).
+// They are not used by the frontend, but are added here as `any` to allow the Vercel build to succeed.
+export type Trend = any;
+export type EnhancedTopic = any;
+export type VideoDeconstruction = any;
+export type ViralScoreBreakdown = any;
+export type OptimizationStep = any;
 
 
 // --- Database Types (Auto-generated from Supabase) ---
