@@ -3,12 +3,14 @@
 
 
 
+
+
 import React, { useState, useRef } from 'react';
 import { useAppContext } from '../contexts/AppContext.tsx';
 import { generateAutopilotBacklog } from '../services/geminiService.ts';
 import * as supabase from '../services/supabaseService.ts';
 import { SparklesIcon, RocketLaunchIcon, PlusIcon, TrashIcon } from './Icons.tsx';
-import { Project, Script, TimelineState } from '../types.ts';
+import { Project, Script } from '../types.ts';
 
 const Autopilot: React.FC = () => {
     const { user, setUser, consumeCredits, requirePermission, addToast, t, addProjects, setActiveProjectId, lockAndExecute } = useAppContext();
@@ -85,7 +87,6 @@ const Autopilot: React.FC = () => {
                     publishedUrl: null,
                     voiceoverVoiceId: null,
                     last_performance_check: null,
-                    timeline: null,
                 };
                 const newProject = await supabase.createProject(initialProjectData, user.id);
 

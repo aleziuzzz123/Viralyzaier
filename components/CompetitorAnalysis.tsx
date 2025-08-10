@@ -132,6 +132,21 @@ const CompetitorAnalysis: React.FC<CompetitorAnalysisProps> = ({ project, onAppl
                             ))}
                         </ul>
                     </div>
+
+                    {result.sources && result.sources.length > 0 && (
+                        <div className="bg-gray-800/50 rounded-2xl p-6 shadow-2xl border border-gray-700">
+                            <h4 className="text-lg font-bold text-white mb-3">Sources</h4>
+                            <ul className="space-y-2">
+                                {result.sources.map((source, i) => (
+                                    <li key={i} className="text-sm text-gray-400">
+                                        <a href={source.uri} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline truncate block">
+                                            {i + 1}. {source.title}
+                                        </a>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
                 </div>
             )}
         </div>
