@@ -6,7 +6,7 @@ import { getErrorMessage } from '../utils.ts';
 import * as supabaseService from '../services/supabaseService.ts';
 import { v4 as uuidv4 } from 'uuid';
 
-// Declare the CreativeEditorSDK global variable that is loaded via the <script> tag in index.html
+// This is still needed to inform TypeScript that a global variable will exist.
 declare const CreativeEditorSDK: any;
 
 interface ImgLyEditorProps {
@@ -23,11 +23,17 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
     useEffect(() => {
         const licenseKey = (window as any).__env?.VITE_IMGLY_LICENSE_KEY;
         if (!licenseKey || licenseKey.includes('YOUR_IMGLY')) {
-            throw new Error("VITE_IMGLY_LICENSE_KEY is not configured. Please check your index.html file.");
+            addToast("VITE_IMGLY_LICENSE_KEY is not configured. Please check your index.html file.", 'error');
+            setIsLoading(false);
+            return;
         }
 
         const container = containerRef.current;
         if (!container) return;
+
+        let attempts = 0;
+        const maxAttempts = 50; // Try for 10 seconds (50 * 200ms)
+        let intervalId: number;
 
         const initEditor = async () => {
             try {
@@ -37,18 +43,15 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
                 
                 const ENGINE_ASSET_BASE = 'https://cdn.img.ly/packages/imgly/cesdk-engine/1.57.0/assets';
 
-                const editor = await CreativeEditorSDK.create(container, {
+                // Use window.CreativeEditorSDK to be explicit about using the global variable
+                const editor = await (window as any).CreativeEditorSDK.create(container, {
                     baseURL: ENGINE_ASSET_BASE,
                     license: licenseKey,
                     theme: 'dark',
                     ui: {
                         elements: {
                             navigation: {
-                                action: {
-                                    export: true,
-                                    save: false,
-                                    load: false,
-                                }
+                                action: { export: true, save: false, load: false }
                             },
                             dock: {
                                 groups: [
@@ -62,23 +65,15 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
                         },
                     },
                     assets: {
-                        // Pre-load all generated assets into the editor's library
                         entries: [
-                            ...moodboardUrls.map((url, i) => ({
-                                id: `moodboard_${i}`,
-                                meta: { uri: url, type: 'video' },
-                            })),
-                            ...voiceoverUrls.map((url, i) => ({
-                                id: `voiceover_${i}`,
-                                meta: { uri: url, type: 'audio' },
-                            })),
+                            ...moodboardUrls.map((url, i) => ({ id: `moodboard_${i}`, meta: { uri: url, type: 'video' } })),
+                            ...voiceoverUrls.map((url, i) => ({ id: `voiceover_${i}`, meta: { uri: url, type: 'audio' } })),
                         ],
                     },
                 });
 
                 editorRef.current = editor;
 
-                // Handle the export event
                 editor.on('export', async (result: any) => {
                     if (isExporting) return;
                     setIsExporting(true);
@@ -102,10 +97,25 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
                 addToast(`Could not load the editor: ${getErrorMessage(err)}`, 'error');
             }
         };
+        
+        // Poll until the SDK is loaded onto the window object
+        intervalId = window.setInterval(() => {
+            if ((window as any).CreativeEditorSDK) {
+                window.clearInterval(intervalId);
+                initEditor();
+            } else {
+                attempts++;
+                if (attempts > maxAttempts) {
+                    window.clearInterval(intervalId);
+                    addToast("Could not load the editor: CreativeEditorSDK is not defined (timeout)", 'error');
+                    setIsLoading(false);
+                }
+            }
+        }, 200);
 
-        initEditor();
 
         return () => {
+            window.clearInterval(intervalId);
             if (editorRef.current) {
                 editorRef.current.dispose();
                 editorRef.current = null;
