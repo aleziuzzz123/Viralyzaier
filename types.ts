@@ -8,13 +8,7 @@ export type WorkflowStep = 1 | 2 | 3 | 4 | 5;
 export type VideoStyle = 'High-Energy Viral' | 'Cinematic Documentary' | 'Clean & Corporate' | 'Animation' | 'Historical Documentary' | 'Vlog' | 'Whiteboard';
 export type AiVideoModel = 'runwayml' | 'kling' | 'minimax' | 'seedance';
 
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[];
+export type Json = any;
 
 // --- UI & System Types ---
 export interface Toast { id: number; message: string; type: 'success' | 'error' | 'info'; }
@@ -224,7 +218,7 @@ export type Database = {
       brand_identities: {
         Row: {
           channel_mission: string | null
-          color_palette: any | null
+          color_palette: Json | null
           created_at: string
           font_selection: string | null
           id: string
@@ -239,7 +233,7 @@ export type Database = {
         }
         Insert: {
           channel_mission?: string | null
-          color_palette?: any | null
+          color_palette?: Json | null
           created_at?: string
           font_selection?: string | null
           id?: string
@@ -254,7 +248,7 @@ export type Database = {
         }
         Update: {
           channel_mission?: string | null
-          color_palette?: any | null
+          color_palette?: Json | null
           created_at?: string
           font_selection?: string | null
           id?: string
@@ -267,15 +261,6 @@ export type Database = {
           visual_style_guide?: string | null
           writing_style_guide?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "brand_identities_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       notifications: {
         Row: {
@@ -302,74 +287,57 @@ export type Database = {
           project_id?: string | null
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "notifications_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "notifications_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       profiles: {
         Row: {
           ai_credits: number
-          channel_audit: any | null
-          cloned_voices: any | null
+          channel_audit: Json | null
+          cloned_voices: Json | null
           content_pillars: string[] | null
           email: string
           id: string
           stripe_customer_id: string | null
-          subscription: any | null
+          subscription: Json | null
         }
         Insert: {
           ai_credits?: number
-          channel_audit?: any | null
-          cloned_voices?: any | null
+          channel_audit?: Json | null
+          cloned_voices?: Json | null
           content_pillars?: string[] | null
           email: string
           id: string
           stripe_customer_id?: string | null
-          subscription?: any | null
+          subscription?: Json | null
         }
         Update: {
           ai_credits?: number
-          channel_audit?: any | null
-          cloned_voices?: any | null
+          channel_audit?: Json | null
+          cloned_voices?: Json | null
           content_pillars?: string[] | null
           email?: string
           id?: string
           stripe_customer_id?: string | null
-          subscription?: any | null
+          subscription?: Json | null
         }
-        Relationships: []
       }
       projects: {
         Row: {
-          analysis: any | null
-          assets: any | null
-          competitor_analysis: any | null
+          analysis: Json | null
+          assets: Json | null
+          competitor_analysis: Json | null
           final_video_url: string | null
           id: string
           last_performance_check: string | null
           last_updated: string
-          launch_plan: any | null
+          launch_plan: Json | null
           moodboard: string[] | null
           name: string
-          performance: any | null
+          performance: Json | null
           platform: string
           published_url: string | null
           scheduled_date: string | null
-          script: any | null
-          sound_design: any | null
+          script: Json | null
+          sound_design: Json | null
           status: string
           title: string | null
           topic: string
@@ -379,22 +347,22 @@ export type Database = {
           workflow_step: number
         }
         Insert: {
-          analysis?: any | null
-          assets?: any | null
-          competitor_analysis?: any | null
+          analysis?: Json | null
+          assets?: Json | null
+          competitor_analysis?: Json | null
           final_video_url?: string | null
           id?: string
           last_performance_check?: string | null
           last_updated?: string
-          launch_plan?: any | null
+          launch_plan?: Json | null
           moodboard?: string[] | null
           name: string
-          performance?: any | null
+          performance?: Json | null
           platform: string
           published_url?: string | null
           scheduled_date?: string | null
-          script?: any | null
-          sound_design?: any | null
+          script?: Json | null
+          sound_design?: Json | null
           status: string
           title?: string | null
           topic: string
@@ -404,22 +372,22 @@ export type Database = {
           workflow_step: number
         }
         Update: {
-          analysis?: any | null
-          assets?: any | null
-          competitor_analysis?: any | null
+          analysis?: Json | null
+          assets?: Json | null
+          competitor_analysis?: Json | null
           final_video_url?: string | null
           id?: string
           last_performance_check?: string | null
           last_updated?: string
-          launch_plan?: any | null
+          launch_plan?: Json | null
           moodboard?: string[] | null
           name?: string
-          performance?: any | null
+          performance?: Json | null
           platform?: string
           published_url?: string | null
           scheduled_date?: string | null
-          script?: any | null
-          sound_design?: any | null
+          script?: Json | null
+          sound_design?: Json | null
           status?: string
           title?: string | null
           topic?: string
@@ -428,15 +396,6 @@ export type Database = {
           voiceover_voice_id?: string | null
           workflow_step?: number
         }
-        Relationships: [
-          {
-            foreignKeyName: "projects_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       user_youtube_tokens: {
         Row: {
@@ -463,15 +422,6 @@ export type Database = {
           scope?: string
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "user_youtube_tokens_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: true
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       video_jobs: {
         Row: {
@@ -480,7 +430,7 @@ export type Database = {
           project_id: string
           user_id: string
           status: string
-          job_payload: any | null
+          job_payload: Json | null
           updated_at: string
           error_message: string | null
           output_url: string | null
@@ -491,7 +441,7 @@ export type Database = {
           project_id: string
           user_id: string
           status?: string
-          job_payload?: any | null
+          job_payload?: Json | null
           updated_at?: string
           error_message?: string | null
           output_url?: string | null
@@ -502,27 +452,11 @@ export type Database = {
           project_id?: string
           user_id?: string
           status?: string
-          job_payload?: any | null
+          job_payload?: Json | null
           updated_at?: string
           error_message?: string | null
           output_url?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "video_jobs_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "video_jobs_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
       }
     }
     Views: {
@@ -539,10 +473,3 @@ export type Database = {
     }
   }
 }
-
-// --- Build Fixes for Vercel Deployment ---
-
-// This declaration satisfies the TypeScript compiler for an outdated backend function
-// (`api/gemini-proxy.ts`) that is no longer used by the frontend but is still
-// present in the project, causing Vercel builds to fail.
-declare module '@vercel/node';
