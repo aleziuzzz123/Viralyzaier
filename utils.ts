@@ -1,3 +1,4 @@
+
 // A robust utility to extract a readable message from any error type.
 export const getErrorMessage = (error: unknown): string => {
     // Default fallback message
@@ -73,6 +74,24 @@ export const base64ToBlob = (base64: string, contentType: string = ''): Blob => 
         throw new Error("Invalid base64 string provided for blob conversion.");
     }
 };
+
+/**
+ * Parses a timecode string (e.g., "0-8s") into start and duration in seconds.
+ * @param timecode The string to parse.
+ * @returns An object with start and duration, or null if parsing fails.
+ */
+export const parseTimecode = (timecode: string): { start: number; duration: number } | null => {
+    const match = timecode.match(/(\d+)-(\d+)s/);
+    if (match) {
+        const start = parseInt(match[1], 10);
+        const end = parseInt(match[2], 10);
+        if (!isNaN(start) && !isNaN(end) && end > start) {
+            return { start, duration: end - start };
+        }
+    }
+    return null;
+};
+
 
 // --- IndexedDB Cache Utilities ---
 

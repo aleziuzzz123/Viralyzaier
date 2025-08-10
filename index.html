@@ -9,9 +9,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <!-- IMG.LY SDK Integration -->
-    <link rel="stylesheet" href="https://img.ly/assets/img.ly-sdk/1.31.0/styles.css" />
-    <script type="module" src="https://img.ly/assets/img.ly-sdk/1.31.0/imgly.js"></script>
+    <!-- IMG.LY SDK Integration (Modern Approach) -->
+    <link rel="stylesheet" href="https://esm.sh/@imgly/cesdk-js@1.17.0/index.css" />
     <script>
       // This script exposes client-safe environment variables from Vercel.
       window.__env = {
@@ -112,7 +111,9 @@
     "jszip": "https://esm.sh/jszip@3.10.1",
     "uuid": "https://esm.sh/uuid@9.0.1",
     "vite": "https://esm.sh/vite@^7.1.1",
-    "path": "https://esm.sh/path@^0.12.7"
+    "path": "https://esm.sh/path@^0.12.7",
+    "@imgly/cesdk-js": "https://esm.sh/@imgly/cesdk-js@1.17.0/index.js",
+    "@imgly/cesdk-js/index.css": "https://esm.sh/@imgly/cesdk-js@1.17.0/index.css"
   }
 }
 </script>

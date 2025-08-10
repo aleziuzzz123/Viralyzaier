@@ -16,7 +16,8 @@
     "jszip": "3.10.1",
     "uuid": "9.0.1",
     "vite": "^7.1.1",
-    "path": "^0.12.7"
+    "path": "^0.12.7",
+    "@imgly/cesdk-js": "1.17.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
