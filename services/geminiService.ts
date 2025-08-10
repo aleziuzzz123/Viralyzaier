@@ -483,7 +483,7 @@ export const analyzeCompetitorVideo = async (url: string): Promise<CompetitorAna
   ]
 }`;
 
-    const response = await supabase.invokeEdgeFunction<{ text: string }>('gemini-proxy', {
+    const response = await supabase.invokeEdgeFunction<{ text: string, groundingMetadata?: any }>('gemini-proxy', {
         type: 'generateContent',
         params: {
             model: 'gemini-2.5-flash', 
@@ -493,7 +493,21 @@ export const analyzeCompetitorVideo = async (url: string): Promise<CompetitorAna
             }
         }
     });
-    return parseGeminiJson(response);
+    
+    const analysisResult = parseGeminiJson<CompetitorAnalysisResult>(response);
+    
+    const sources = response.groundingMetadata?.groundingChunks
+      ?.map((chunk: any) => ({
+        uri: chunk.web?.uri,
+        title: chunk.web?.title,
+      }))
+      .filter((source: any) => source.uri && source.title);
+
+    if (sources && sources.length > 0) {
+      analysisResult.sources = sources;
+    }
+
+    return analysisResult;
 };
 
 export const performChannelAudit = async (videos: {title: string; views: number; likes: number; comments: number}[]): Promise<ChannelAudit> => {

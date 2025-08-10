@@ -37,48 +37,45 @@ const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
 /**
  * Generates a single static image from a text prompt with a retry mechanism.
+ * The backend function now handles uploading and returns a URL.
  */
-export const generateAiImage = async (prompt: string, platform: Platform): Promise<Blob> => {
+export const generateAiImage = async (prompt: string, platform: Platform, projectId: string): Promise<string> => {
     const aspectRatio = platform === 'youtube_long' ? '16:9' : '9:16';
     
     const attemptGeneration = async (p: string) => {
         try {
-            const response = await invokeEdgeFunction<{ generatedImages: { image: { imageBytes: string } }[] }>('gemini-proxy', {
+            const response = await invokeEdgeFunction<{ imageUrl: string }>('gemini-proxy', {
                 type: 'generateImages',
                 params: {
                     model: 'imagen-3.0-generate-002',
                     prompt: p,
-                    config: { numberOfImages: 1, outputMimeType: 'image/jpeg', aspectRatio }
+                    config: { numberOfImages: 1, outputMimeType: 'image/jpeg', aspectRatio },
+                    projectId: projectId
                 }
             });
-            if (!response.generatedImages || response.generatedImages.length === 0 || !response.generatedImages[0].image?.imageBytes) {
-                return null; // Failure
-            }
-            const blob = base64ToBlob(response.generatedImages[0].image.imageBytes, 'image/jpeg');
-            if (blob.size < 1000) return null; // Failure
-            return blob;
+            return response.imageUrl || null;
         } catch (e) {
             console.error(`Image generation attempt failed for prompt "${p}":`, e);
-            return null; // Treat errors as failure for retry logic
+            return null;
         }
     };
 
     // Attempt 1: Full, detailed prompt
     const fullPrompt = `A cinematic, visually stunning image for a video scene: ${prompt}. IMPORTANT: The main subject must be perfectly centered to avoid being cropped.`;
-    let imageBlob = await attemptGeneration(fullPrompt);
+    let imageUrl = await attemptGeneration(fullPrompt);
 
     // Attempt 2: Simplified prompt if first fails (often due to safety filters)
-    if (!imageBlob) {
+    if (!imageUrl) {
         console.warn("Initial image generation failed, retrying with a simpler prompt...");
         const simplePrompt = `A high-quality, safe-for-work photograph of: ${prompt}`;
-        imageBlob = await attemptGeneration(simplePrompt);
+        imageUrl = await attemptGeneration(simplePrompt);
     }
     
-    if (!imageBlob) {
+    if (!imageUrl) {
         throw new Error("AI image generation failed after multiple attempts. This could be due to safety filters rejecting the prompt, or a temporary issue with the AI service.");
     }
 
-    return imageBlob;
+    return imageUrl;
 };
 
 

@@ -32,7 +32,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, { hasError: bool
       const t = translations[lang] || translations.en;
       
       const errorMessage = this.state.error?.message || '';
-      const isConfigError = errorMessage.includes('required') || errorMessage.includes('API key') || errorMessage.includes('SUPABASE') || errorMessage.includes('VITE_') || errorMessage.includes('Cannot read properties of undefined');
+      const isConfigError = errorMessage.includes('required') || errorMessage.includes('API key') || errorMessage.includes('SUPABASE') || errorMessage.includes('VITE_') || errorMessage.includes('Cannot read properties of undefined') || errorMessage.includes('IMGLY');
       
       return (
         <div className="bg-gray-900 text-white min-h-screen flex items-center justify-center p-4">
@@ -48,7 +48,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, { hasError: bool
                 </p>
                  <p className="text-xs text-gray-500 mt-3">
                     {isConfigError 
-                        ? "Please check the configuration script in your `index.html` file. Ensure that all placeholder values (e.g., 'YOUR_GEMINI_API_KEY_HERE') are replaced with your actual keys from Vercel." 
+                        ? "Please check the configuration script in your `index.html` file. Ensure that all placeholder values (e.g., 'YOUR_GOOGLE_CLIENT_ID_HERE', or your IMG.LY license key) are replaced with your actual keys." 
                         : "Please check the browser console for more technical details and contact support if the issue persists."
                     }
                  </p>

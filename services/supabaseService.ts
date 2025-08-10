@@ -19,13 +19,12 @@ import {
     Subscription,
     UserAsset,
     BrandIdentity,
-    TimelineState,
     VideoStyle,
     Json,
 } from '../types.js';
 import { type AuthSession, type FunctionInvokeOptions, type PostgrestError } from '@supabase/supabase-js';
 import { PLANS } from './paymentService.js';
-import { getErrorMessage } from '../utils.js';
+import { getErrorMessage } from '../utils.ts';
 
 // --- Type Guards for Data Validation ---
 const isValidSubscription = (sub: any): sub is Subscription => {
@@ -42,7 +41,7 @@ const sanitizeJson = (value: any): Json | null => {
 
 
 // --- Mappers ---
-export const profileRowToUser = (row: Database['public']['Tables']['profiles']['Row'], youtubeConnected: boolean): User => ({
+export const profileRowToUser = (row: any, youtubeConnected: boolean): User => ({
     id: row.id,
     email: row.email,
     subscription: isValidSubscription(row.subscription) ? row.subscription as Subscription : { planId: 'free', status: 'active', endDate: null },
@@ -56,14 +55,14 @@ export const profileRowToUser = (row: Database['public']['Tables']['profiles']['
 const userToProfileUpdate = (updates: Partial<User>): Database['public']['Tables']['profiles']['Update'] => {
     const dbUpdates: Database['public']['Tables']['profiles']['Update'] = {};
     if (updates.aiCredits !== undefined) dbUpdates.ai_credits = updates.aiCredits;
-    if (updates.channelAudit !== undefined) dbUpdates.channel_audit = updates.channelAudit;
-    if (updates.cloned_voices !== undefined) dbUpdates.cloned_voices = updates.cloned_voices;
+    if (updates.channelAudit !== undefined) dbUpdates.channel_audit = sanitizeJson(updates.channelAudit);
+    if (updates.cloned_voices !== undefined) dbUpdates.cloned_voices = sanitizeJson(updates.cloned_voices);
     if (updates.content_pillars !== undefined) dbUpdates.content_pillars = updates.content_pillars;
-    if (updates.subscription !== undefined) dbUpdates.subscription = updates.subscription;
+    if (updates.subscription !== undefined) dbUpdates.subscription = sanitizeJson(updates.subscription);
     return dbUpdates;
 };
 
-export const projectRowToProject = (row: Database['public']['Tables']['projects']['Row']): Project => ({
+export const projectRowToProject = (row: any): Project => ({
     id: row.id,
     name: row.name,
     topic: row.topic,
@@ -85,8 +84,9 @@ export const projectRowToProject = (row: Database['public']['Tables']['projects'
     workflowStep: row.workflow_step as WorkflowStep,
     voiceoverVoiceId: row.voiceover_voice_id,
     last_performance_check: row.last_performance_check,
-    timeline: row.timeline as unknown as TimelineState | null,
+    final_video_url: row.final_video_url,
 });
+
 
 // --- Edge Function Invoker ---
 export const invokeEdgeFunction = async <T>(
@@ -148,7 +148,7 @@ export const invokeEdgeFunction = async <T>(
 // --- Auth ---
 export const getSession = async () => {
     const { data, error } = await supabase.auth.getSession();
-    if (error) throw error;
+    if (error) throw new Error(getErrorMessage(error));
     return { session: data.session };
 };
 
@@ -159,23 +159,23 @@ export const onAuthStateChange = (callback: (event: string, session: AuthSession
 
 export const signInWithPassword = async (email: string, password: string): Promise<AuthSession | null> => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
+    if (error) throw new Error(getErrorMessage(error));
     return data.session;
 };
 
 export const signUp = async (email: string, password: string): Promise<void> => {
     const { error } = await supabase.auth.signUp({ email, password });
-    if (error) throw error;
+    if (error) throw new Error(getErrorMessage(error));
 };
 
 export const sendPasswordResetEmail = async (email: string): Promise<void> => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
-    if (error) throw error;
+    if (error) throw new Error(getErrorMessage(error));
 };
 
 export const signOut = async (): Promise<void> => {
     const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    if (error) throw new Error(getErrorMessage(error));
 };
 
 // --- Profiles ---
@@ -188,7 +188,7 @@ export const getUserProfile = async (userId: string): Promise<User | null> => {
 
     if (error) {
         if (error.code === 'PGRST116') return null; // Not found
-        throw error;
+        throw new Error(getErrorMessage(error));
     }
     if (!data) return null;
     
@@ -206,11 +206,11 @@ export const createProfileForUser = async (userId: string, email: string | null 
     const newUserProfile: Database['public']['Tables']['profiles']['Insert'] = {
         id: userId,
         email: fallbackEmail,
-        subscription: { planId: 'free', status: 'active', endDate: null },
+        subscription: sanitizeJson({ planId: 'free', status: 'active', endDate: null }),
         ai_credits: freePlan.creditLimit,
     };
     const { data, error } = await supabase.from('profiles').insert(newUserProfile).select('*').single();
-    if (error) throw error;
+    if (error) throw new Error(getErrorMessage(error));
     if (!data) throw new Error("Failed to create profile: no data returned.");
     return profileRowToUser(data, false);
 };
@@ -218,7 +218,7 @@ export const createProfileForUser = async (userId: string, email: string | null 
 export const updateUserProfile = async (userId: string, updates: Partial<User>): Promise<User> => {
     const dbUpdates = userToProfileUpdate(updates);
     const { data, error } = await supabase.from('profiles').update(dbUpdates).eq('id', userId).select('*').single();
-    if (error) throw error;
+    if (error) throw new Error(getErrorMessage(error));
     if (!data) throw new Error("Failed to update profile: no data returned.");
     const { data: tokenData } = await supabase.from('user_youtube_tokens').select('user_id').eq('user_id', userId).maybeSingle();
     return profileRowToUser(data, !!tokenData);
@@ -231,7 +231,7 @@ export const getProjectsForUser = async (userId: string): Promise<Project[]> => 
         .select('*')
         .eq('user_id', userId)
         .order('last_updated', { ascending: false });
-    if (error) throw error;
+    if (error) throw new Error(getErrorMessage(error));
     return (data || []).map(p => projectRowToProject(p));
 };
 
@@ -257,7 +257,7 @@ export const createProject = async (projectData: Omit<Project, 'id' | 'lastUpdat
         published_url: projectData.publishedUrl,
         last_performance_check: projectData.last_performance_check,
         voiceover_voice_id: projectData.voiceoverVoiceId,
-        timeline: sanitizeJson(projectData.timeline),
+        final_video_url: projectData.final_video_url,
     };
     
     const { data, error } = await supabase
@@ -265,7 +265,7 @@ export const createProject = async (projectData: Omit<Project, 'id' | 'lastUpdat
         .insert(newProjectData)
         .select('*')
         .single();
-    if (error) throw error;
+    if (error) throw new Error(getErrorMessage(error));
     if (!data) throw new Error("Failed to create project: no data returned.");
     return projectRowToProject(data);
 };
@@ -291,12 +291,11 @@ export const updateProject = async (projectId: string, updates: Partial<Project>
     if (updates.scheduledDate !== undefined) dbUpdates.scheduled_date = updates.scheduledDate;
     if (updates.publishedUrl !== undefined) dbUpdates.published_url = updates.publishedUrl;
     if (updates.voiceoverVoiceId !== undefined) dbUpdates.voiceover_voice_id = updates.voiceoverVoiceId;
-    if (updates.timeline !== undefined) dbUpdates.timeline = sanitizeJson(updates.timeline);
+    if (updates.final_video_url !== undefined) dbUpdates.final_video_url = updates.final_video_url;
     
     const { data, error } = await supabase.from('projects').update(dbUpdates).eq('id', projectId).select('*').single();
     if (error) {
-        console.error("Supabase update project error:", getErrorMessage(error));
-        throw error;
+        throw new Error(getErrorMessage(error));
     }
     if (!data) throw new Error("Failed to update project: no data returned.");
     return projectRowToProject(data);
@@ -304,11 +303,11 @@ export const updateProject = async (projectId: string, updates: Partial<Project>
 
 export const deleteProject = async (projectId: string): Promise<void> => {
     const { error } = await supabase.from('projects').delete().eq('id', projectId);
-    if (error) throw error;
+    if (error) throw new Error(getErrorMessage(error));
 };
 
 // --- Notifications ---
-export const notificationRowToNotification = (row: Database['public']['Tables']['notifications']['Row']): Notification => ({
+const notificationRowToNotification = (row: any): Notification => ({
     id: row.id,
     user_id: row.user_id,
     project_id: row.project_id,
@@ -323,24 +322,24 @@ export const getNotifications = async (userId: string): Promise<Notification[]> 
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
-    if (error) throw error;
+    if (error) throw new Error(getErrorMessage(error));
     return (data || []).map(n => notificationRowToNotification(n));
 };
 
 export const markNotificationAsRead = async (notificationId: string): Promise<void> => {
-    const updates: Database['public']['Tables']['notifications']['Update'] = { is_read: true };
+    const updates = { is_read: true };
     const { error } = await supabase.from('notifications').update(updates).eq('id', notificationId);
-    if (error) throw error;
+    if (error) throw new Error(getErrorMessage(error));
 };
 
 export const markAllNotificationsAsRead = async (userId: string): Promise<void> => {
-    const updates: Database['public']['Tables']['notifications']['Update'] = { is_read: true };
+    const updates = { is_read: true };
     const { error } = await supabase.from('notifications').update(updates).eq('user_id', userId);
-    if (error) throw error;
+    if (error) throw new Error(getErrorMessage(error));
 };
 
 // --- Brand Identity ---
-const brandIdentityRowToBrandIdentity = (row: Database['public']['Tables']['brand_identities']['Row']): BrandIdentity => ({
+const brandIdentityRowToBrandIdentity = (row: any): BrandIdentity => ({
     id: row.id,
     user_id: row.user_id,
     created_at: row.created_at,
@@ -363,13 +362,11 @@ export const getBrandIdentitiesForUser = async (userId: string): Promise<BrandId
         .eq('user_id', userId);
 
     if (error) {
-        // Specifically check for the "relation does not exist" error.
         if (error.message.includes('relation "public.brand_identities" does not exist')) {
             console.warn('Brand identities table not found, skipping. This may be expected if the feature is not enabled.');
-            return []; // Return empty array to allow the app to function.
+            return [];
         }
-        // For other errors, still throw them.
-        throw error;
+        throw new Error(getErrorMessage(error));
     }
     return (data || []).map(b => brandIdentityRowToBrandIdentity(b));
 };
@@ -380,7 +377,7 @@ export const createBrandIdentity = async (identityData: Omit<BrandIdentity, 'id'
         name: identityData.name,
         tone_of_voice: identityData.toneOfVoice,
         writing_style_guide: identityData.writingStyleGuide,
-        color_palette: identityData.colorPalette,
+        color_palette: sanitizeJson(identityData.colorPalette),
         font_selection: identityData.fontSelection,
         thumbnail_formula: identityData.thumbnailFormula,
         visual_style_guide: identityData.visualStyleGuide,
@@ -389,7 +386,7 @@ export const createBrandIdentity = async (identityData: Omit<BrandIdentity, 'id'
         logo_url: identityData.logoUrl ?? null
     };
     const { data, error } = await supabase.from('brand_identities').insert(newIdentityData).select('*').single();
-    if (error) throw error;
+    if (error) throw new Error(getErrorMessage(error));
     if (!data) throw new Error("Failed to create brand identity: no data returned.");
     return brandIdentityRowToBrandIdentity(data);
 };
@@ -399,7 +396,7 @@ export const updateBrandIdentity = async (identityId: string, updates: Partial<O
     if (updates.name !== undefined) dbUpdates.name = updates.name;
     if (updates.toneOfVoice !== undefined) dbUpdates.tone_of_voice = updates.toneOfVoice;
     if (updates.writingStyleGuide !== undefined) dbUpdates.writing_style_guide = updates.writingStyleGuide;
-    if (updates.colorPalette !== undefined) dbUpdates.color_palette = updates.colorPalette;
+    if (updates.colorPalette !== undefined) dbUpdates.color_palette = sanitizeJson(updates.colorPalette);
     if (updates.fontSelection !== undefined) dbUpdates.font_selection = updates.fontSelection;
     if (updates.thumbnailFormula !== undefined) dbUpdates.thumbnail_formula = updates.thumbnailFormula;
     if (updates.visualStyleGuide !== undefined) dbUpdates.visual_style_guide = updates.visualStyleGuide;
@@ -414,14 +411,14 @@ export const updateBrandIdentity = async (identityId: string, updates: Partial<O
         .select('*')
         .single();
         
-    if (error) throw error;
+    if (error) throw new Error(getErrorMessage(error));
     if (!data) throw new Error("Failed to update brand identity: no data returned.");
     return brandIdentityRowToBrandIdentity(data);
 };
 
 export const deleteBrandIdentity = async (identityId: string): Promise<void> => {
     const { error } = await supabase.from('brand_identities').delete().eq('id', identityId);
-    if (error) throw error;
+    if (error) throw new Error(getErrorMessage(error));
 };
 
 // --- Storage & Asset Helpers ---
@@ -435,8 +432,7 @@ export const uploadFile = async (file: Blob, path: string): Promise<string> => {
         });
 
     if (error) {
-        console.error("Supabase upload error:", getErrorMessage(error));
-        throw new Error(`Failed to upload file to Supabase Storage: ${error.message}`);
+        throw new Error(`Failed to upload file to Supabase Storage: ${getErrorMessage(error)}`);
     }
 
     const { data: { publicUrl } } = supabase.storage.from('assets').getPublicUrl(path);

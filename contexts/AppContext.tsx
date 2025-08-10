@@ -1,14 +1,16 @@
-import React, { createContext, useState, useEffect, useCallback, useContext, ReactNode, useRef } from 'react';
-import { Project, User, PlanId, Blueprint, Toast, Platform, Opportunity, ContentGapSuggestion, PerformanceReview, Notification, ProjectStatus, Database, UserAsset, BrandIdentity, TimelineState, VideoStyle, TimelineClip } from '../types.ts';
+
+
+import React, { createContext, useState, useEffect, useCallback, useContext, ReactNode, useRef, useMemo } from 'react';
+import { Project, User, PlanId, Blueprint, Toast, Platform, Opportunity, ContentGapSuggestion, PerformanceReview, Notification, ProjectStatus, Database, UserAsset, BrandIdentity, VideoStyle, Json } from '../types.ts';
 import * as supabaseService from '../services/supabaseService.ts';
 import { supabase } from '../services/supabaseClient.js'; // Import client directly
 import { type AuthSession } from '@supabase/supabase-js';
 import { createCheckoutSession, PLANS } from '../services/paymentService.ts';
-import { fetchVideoPerformance } from '../services/youtubeService.ts';
 import { translations, Language, TranslationKey } from '../translations.ts';
-import { getErrorMessage, saveTimelineToCache, loadTimelineFromCache } from '../utils.ts';
+import { getErrorMessage } from '../utils.ts';
 import { GoogleFont, fetchGoogleFonts } from '../services/fontService.js';
 import { v4 as uuidv4 } from 'uuid';
+
 
 interface AppContextType {
     session: AuthSession | null;
@@ -29,14 +31,8 @@ interface AppContextType {
     brandIdentities: BrandIdentity[];
     fonts: GoogleFont[];
     
-    // Editor State
-    activeTimeline: TimelineState | null;
-    canUndo: boolean;
-    canRedo: boolean;
-    updateActiveTimeline: (newTimeline: TimelineState, addToHistory: boolean) => void;
-    commitTimelineChange: (finalTimeline: TimelineState) => void;
-    undo: () => void;
-    redo: () => void;
+    // New handler for IMG.LY editor
+    handleFinalVideoSaved: (projectId: string, videoUrl: string) => Promise<void>;
 
     setLanguage: (lang: Language) => void;
     t: (key: TranslationKey, replacements?: { [key: string]: string | number }) => string;
@@ -87,41 +83,6 @@ interface ConfirmationState {
     onConfirm: () => void;
 }
 
-// Helper to initialize timeline state from script
-const initializeTimelineFromScript = (script: Project['script']): TimelineState => {
-    if (!script) return { rev: 1, tracks: [], subtitles: [], voiceoverVolume: 1, musicVolume: 0.5, isDuckingEnabled: true, totalDuration: 0 };
-    let currentTime = 0;
-    const voiceoverClips: TimelineClip[] = [];
-    const aRollClips: TimelineClip[] = [];
-
-    script.scenes.forEach((scene, index) => {
-        const wordCount = scene.voiceover.split(/\s+/).filter(Boolean).length;
-        const estimatedDuration = Math.max(3, wordCount / 2.5); // Min 3s, avg 2.5 words/sec
-
-        voiceoverClips.push({ id: `vo_${index}`, type: 'audio', url: '', sceneIndex: index, startTime: currentTime, endTime: currentTime + estimatedDuration, sourceDuration: estimatedDuration, opacity: 1, volume: 1, keyframes: {} } as TimelineClip);
-        aRollClips.push({ id: `ar_${index}`, type: 'image', url: '', sceneIndex: index, startTime: currentTime, endTime: currentTime + estimatedDuration, sourceDuration: estimatedDuration, opacity: 1, volume: 1, effects: {}, aiEffects: {}, animation: {}, color: { adjustments: { exposure: 0, contrast: 0, saturation: 0, temperature: 0 }}, keyframes: {} } as TimelineClip);
-        currentTime += estimatedDuration;
-    });
-
-    return {
-        rev: 1,
-        tracks: [
-            { id: 'overlay', type: 'overlay', clips: [] },
-            { id: 'text', type: 'text', clips: [] },
-            { id: 'b-roll', type: 'b-roll', clips: [] },
-            { id: 'a-roll', type: 'a-roll', clips: aRollClips },
-            { id: 'voiceover', type: 'voiceover', clips: voiceoverClips },
-            { id: 'music', type: 'music', clips: [] },
-            { id: 'sfx', type: 'sfx', clips: [] },
-        ],
-        subtitles: [],
-        voiceoverVolume: 1,
-        musicVolume: 0.5,
-        isDuckingEnabled: true,
-        totalDuration: currentTime,
-    };
-};
-
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const useAppContext = () => {
@@ -141,12 +102,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     const [fonts, setFonts] = useState<GoogleFont[]>([]);
     const [isInitialLoading, setIsInitialLoading] = useState(true);
     
-    // --- Editor State ---
-    const [activeProjectId, _setActiveProjectId] = useState<string | null>(null);
-    const [activeTimeline, setActiveTimeline] = useState<TimelineState | null>(null);
-    const [history, setHistory] = useState<TimelineState[]>([]);
-    const [historyIndex, setHistoryIndex] = useState(-1);
-    const autosaveTimer = useRef<number | null>(null);
+    const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
 
     const [isUpgradeModalOpen, setUpgradeModalOpen] = useState(false);
     const [upgradeReason, setUpgradeReason] = useState<{title: string, description: string}>({title: '', description: ''});
@@ -233,7 +189,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
                             supabaseService.getProjectsForUser(session.user.id),
                             supabaseService.getNotifications(session.user.id),
                             fetchGoogleFonts(),
-                            supabaseService.getBrandIdentitiesForUser(session.user.id)
+                            supabaseService.getBrandIdentitiesForUser(session.user.id),
                         ]);
                         setProjects(projects);
                         setNotifications(notifications);
@@ -246,11 +202,11 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             loadData();
         } else {
             setUser(null); setProjects([]); setNotifications([]); setBrandIdentities([]); setFonts([]); setIsInitialLoading(false);
-            setActiveTimeline(null); setHistory([]); setHistoryIndex(-1); _setActiveProjectId(null);
+            setActiveProjectId(null);
         }
     }, [session, addToast, t]);
     
-     // --- Real-time subscriptions ---
+    // --- Real-time subscriptions ---
     useEffect(() => {
         if (!session?.user?.id) return;
         const sub = supabase.channel(`public:projects:user_id=eq.${session.user.id}`).on<Project>(
@@ -261,9 +217,6 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
                 setProjects(current => {
                     const existing = current.find(p => p.id === updatedProject.id);
                     if (existing) {
-                        if (existing.status === 'Rendering' && updatedProject.status !== 'Rendering') {
-                            addToast(`Video for "${updatedProject.name}" finished rendering!`, 'success');
-                        }
                         return current.map(p => p.id === updatedProject.id ? updatedProject : p);
                     }
                     return [updatedProject, ...current];
@@ -286,88 +239,16 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             window.history.replaceState({}, document.title, window.location.pathname);
         }
     }, [addToast, user]);
-
-    // --- TIMELINE STATE MANAGEMENT ---
-    const setActiveProjectId = useCallback(async (id: string | null) => {
-        if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-        _setActiveProjectId(id);
-
-        if (!id) {
-            setActiveTimeline(null);
-            setHistory([]);
-            setHistoryIndex(-1);
-            return;
-        }
-
-        const project = projects.find(p => p.id === id);
-        if (!project) return;
-        
-        // 1. Try to load from IndexedDB cache first for speed
-        const cachedTimeline = await loadTimelineFromCache(id);
-        if (cachedTimeline && cachedTimeline.rev >= (project.timeline?.rev || 0)) {
-            setActiveTimeline(cachedTimeline);
-            setHistory([cachedTimeline]);
-            setHistoryIndex(0);
-            return;
-        }
-
-        // 2. Fallback to project data from Supabase
-        const initialTimeline = project.timeline || initializeTimelineFromScript(project.script);
-        setActiveTimeline(initialTimeline);
-        setHistory([initialTimeline]);
-        setHistoryIndex(0);
-        await saveTimelineToCache(id, initialTimeline);
-
-    }, [projects]);
     
-    const saveTimelineToSupabase = useCallback(async (timelineToSave: TimelineState) => {
-        if (!activeProjectId) return;
-        handleUpdateProject({ id: activeProjectId, timeline: timelineToSave });
-    }, [activeProjectId]);
-
-    const updateActiveTimeline = useCallback((newTimeline: TimelineState, addToHistory: boolean) => {
-        if (!activeProjectId) return;
-
-        const updatedTimeline = { ...newTimeline, rev: (activeTimeline?.rev || 0) + 1 };
-        setActiveTimeline(updatedTimeline);
-        saveTimelineToCache(activeProjectId, updatedTimeline);
-
-        if (addToHistory) {
-            const newHistory = history.slice(0, historyIndex + 1);
-            setHistory([...newHistory, updatedTimeline]);
-            setHistoryIndex(newHistory.length);
-        } else {
-            const newHistory = [...history];
-            newHistory[historyIndex] = updatedTimeline;
-            setHistory(newHistory);
-        }
-
-        if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-        autosaveTimer.current = window.setTimeout(() => saveTimelineToSupabase(updatedTimeline), 10000); // 10-second autosave
-    }, [activeProjectId, activeTimeline, history, historyIndex, saveTimelineToSupabase]);
-    
-    const commitTimelineChange = useCallback((finalTimeline: TimelineState) => {
-        updateActiveTimeline(finalTimeline, true);
-        saveTimelineToSupabase(finalTimeline); // Save immediately on commit
-    }, [updateActiveTimeline, saveTimelineToSupabase]);
-
-    const undo = useCallback(() => {
-        if (historyIndex > 0) {
-            const newIndex = historyIndex - 1;
-            setHistoryIndex(newIndex);
-            setActiveTimeline(history[newIndex]);
-            saveTimelineToSupabase(history[newIndex]);
-        }
-    }, [history, historyIndex, saveTimelineToSupabase]);
-    
-    const redo = useCallback(() => {
-        if (historyIndex < history.length - 1) {
-            const newIndex = historyIndex + 1;
-            setHistoryIndex(newIndex);
-            setActiveTimeline(history[newIndex]);
-            saveTimelineToSupabase(history[newIndex]);
-        }
-    }, [history, historyIndex, saveTimelineToSupabase]);
+    const handleFinalVideoSaved = async (projectId: string, videoUrl: string) => {
+        await handleUpdateProject({
+            id: projectId,
+            final_video_url: videoUrl,
+            publishedUrl: videoUrl, // Use this for the analysis step preview
+            workflowStep: 4
+        });
+        addToast("Video exported and saved! Proceeding to analysis.", 'success');
+    };
 
     // --- OTHER CONTEXT FUNCTIONS ---
     const requestConfirmation = (title: string, message: string, onConfirm: () => void) => { setConfirmation({ isOpen: true, title, message, onConfirm }); };
@@ -428,7 +309,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
          if (!user) { addToast("User not found.", "error"); return; }
         try {
             const baseProject: Omit<Project, 'id' | 'lastUpdated'> = {
-                name: projectData.name || 'New Project', topic: projectData.topic || '', platform: projectData.platform || 'youtube_long', videoSize: projectData.videoSize || '16:9', status: projectData.status || 'Idea', workflowStep: projectData.workflowStep || 1, title: projectData.title || null, script: projectData.script || null, analysis: null, competitorAnalysis: null, moodboard: projectData.moodboard || null, assets: {}, soundDesign: null, launchPlan: null, performance: null, scheduledDate: null, publishedUrl: null, voiceoverVoiceId: projectData.voiceoverVoiceId || null, last_performance_check: null, timeline: projectData.timeline || null,
+                name: projectData.name || 'New Project', topic: projectData.topic || '', platform: projectData.platform || 'youtube_long', videoSize: projectData.videoSize || '16:9', status: projectData.status || 'Idea', workflowStep: projectData.workflowStep || 1, title: projectData.title || null, script: projectData.script || null, analysis: null, competitorAnalysis: null, moodboard: projectData.moodboard || null, assets: {}, soundDesign: null, launchPlan: null, performance: null, scheduledDate: null, publishedUrl: null, voiceoverVoiceId: projectData.voiceoverVoiceId || null, last_performance_check: null,
             };
             const newProject = await supabaseService.createProject(baseProject, user.id);
             addProjects([newProject]);
@@ -440,7 +321,18 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     
     const handleCreateProjectForBlueprint = async (topic: string, platform: Platform, title: string, voiceoverVoiceId: string, videoSize: Project['videoSize'], blueprint: Blueprint): Promise<string | void> => {
         if (!user) return;
-        return await createProjectFromData({ topic, platform, videoSize, name: title || "New Blueprint Project", status: 'Scripting', workflowStep: 3, voiceoverVoiceId, script: blueprint.script, moodboard: blueprint.moodboard, title: title, timeline: initializeTimelineFromScript(blueprint.script) });
+        return await createProjectFromData({
+            topic,
+            platform,
+            videoSize,
+            name: title || "New Blueprint Project",
+            status: 'Scripting',
+            workflowStep: 2,
+            voiceoverVoiceId,
+            script: blueprint.script,
+            moodboard: blueprint.moodboard,
+            title: title
+        });
     };
 
     const handleCreateProjectFromIdea = async (suggestion: Opportunity | ContentGapSuggestion, platform: Platform) => {
@@ -471,10 +363,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             prefilledBlueprintPrompt, notifications, isInitialLoading,
             isScheduleModalOpen, projectToSchedule, backendError,
             brandIdentities, fonts,
-            
-            activeTimeline, canUndo: historyIndex > 0, canRedo: historyIndex < history.length - 1,
-            updateActiveTimeline, commitTimelineChange, undo, redo,
-
+            handleFinalVideoSaved,
             setLanguage, t, addToast, dismissToast, dismissTutorial,
             handleLogout, consumeCredits, requirePermission,
             handleSubscriptionChange, handleUpdateProject,

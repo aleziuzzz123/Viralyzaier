@@ -3,7 +3,7 @@ declare const Deno: any;
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.44.4';
 import { GoogleGenAI, Type } from 'https://esm.sh/@google/genai@^1.11.0';
-import { v4 as uuidv4 } from 'https://deno.land/std@0.100.0/uuid/mod.ts';
+import { generate as uuidv4 } from 'https://deno.land/std@0.100.0/uuid/v4.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

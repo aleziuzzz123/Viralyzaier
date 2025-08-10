@@ -1,3 +1,5 @@
+
+
 import { type PostgrestError } from '@supabase/supabase-js';
 
 // --- Core Types ---
@@ -80,7 +82,7 @@ export interface Project {
   workflowStep: WorkflowStep;
   voiceoverVoiceId: string | null;
   last_performance_check: string | null;
-  timeline: TimelineState | null;
+  final_video_url?: string | null;
 }
 
 export interface Scene { timecode: string; visual: string; voiceover: string; onScreenText?: string; storyboardImageUrl?: string; sceneIndex: number; }
@@ -117,6 +119,7 @@ export interface CompetitorAnalysisResult {
   stealableStructure: { step: string; description: string; }[];
   extractedKeywords: string[];
   suggestedTitles: string[];
+  sources?: { uri: string; title: string; }[];
 }
 export interface ChannelStats {
   subscriberCount: number;
@@ -146,288 +149,293 @@ export interface Notification {
 
 // --- Asset & Media Types ---
 export interface UserAsset { id: string; user_id: string; url: string; type: 'video' | 'audio' | 'image'; name: string; created_at: string; }
-export interface NormalizedStockAsset { id: string | number; previewImageUrl: string; downloadUrl: string; type: 'video' | 'image' | 'audio'; description: string; duration?: number; provider: 'pexels' | 'storyblocks' | 'jamendo' | 'pixabay'; }
-export interface JamendoTrack { id: string; name: string; duration: number; artist_name: string; image: string; audio: string; }
-export interface GiphyAsset { id: string; title: string; images: { original: { url: string; }; fixed_width: { url: string; }; }; }
-export interface StoryblocksAsset { id: number; title: string; thumbnail_url: string; preview_url: string; type: string; duration?: number; }
+
+export interface Subtitle {
+  id: string;
+  start: number;
+  end: number;
+  text: string;
+}
+
+export interface TimelineState {
+  subtitles: Subtitle[];
+  [key: string]: any;
+}
+
+export interface SubtitleWord {
+  word: string;
+  style?: {
+    fontWeight?: number;
+    color?: string;
+  };
+}
+
 export interface StockAsset {
   id: number;
-  width: number;
-  height: number;
-  url: string;
-  photographer: string;
-  // For photos
-  src?: {
-    original: string;
-    large2x: string;
-    large: string;
-    medium: string;
-    small: string;
-    portrait: string;
-    landscape: string;
-    tiny: string;
-  };
+  image?: string;
+  src?: { medium: string; large2x: string };
+  video_files?: { quality: string; link: string }[];
+  photographer?: string;
   alt?: string;
-  // For videos
-  image?: string; // This is the preview image for videos
   duration?: number;
-  video_files?: {
-    id: number;
-    quality: string;
-    file_type: string;
-    width: number;
-    height: number;
-    link: string;
-  }[];
+  previewURL?: string;
+  largeImageURL?: string;
+  videos?: { medium: { url: string } };
+  user?: string;
+  picture_id?: string;
+}
+
+export interface NormalizedStockAsset {
+  id: number | string;
+  previewImageUrl: string;
+  downloadUrl: string;
+  type: 'video' | 'image' | 'audio';
+  description: string;
+  duration?: number;
+  provider: 'pexels' | 'pixabay' | 'jamendo';
+}
+
+export interface JamendoTrack {
+  id: string;
+  image: string;
+  audio: string;
+  name: string;
+  artist_name: string;
+  duration: number;
+}
+
+export interface GiphyAsset {
+  id: string;
+  title: string;
+  images: {
+    fixed_height: {
+      url: string;
+      webp: string;
+    };
+    original: {
+      url: string;
+      webp: string;
+    };
+  };
 }
 
 
-// --- Timeline & Editing Types ---
-export interface TimelineState {
-    rev: number; // Revision number for smart updates
-    tracks: TimelineTrack[];
-    subtitles: Subtitle[];
-    voiceoverVolume: number;
-    musicVolume: number;
-    isDuckingEnabled: boolean;
-    totalDuration: number;
-}
-export interface TimelineTrack { id: string; type: 'a-roll' | 'b-roll' | 'overlay' | 'voiceover' | 'music' | 'sfx' | 'text'; clips: TimelineClip[]; }
-export type KeyframeableProperty = 'x' | 'y' | 'scale' | 'rotation' | 'opacity' | 'volume';
-export interface TimelineClip {
-    id: string;
-    type: 'video' | 'image' | 'audio' | 'text';
-    url: string;
-    text?: string;
-    sceneIndex: number;
-    startTime: number;
-    endTime: number;
-    sourceDuration: number;
-    volume: number;
-    opacity: number;
-    positioning?: {
-        width: number; // %
-        height: number; // %
-        x: number; // %
-        y: number; // %
-        zIndex: number;
-        scale: number;
-        rotation: number; // degrees
-    };
-    style?: Partial<Subtitle['style']>;
-    effects?: {
-        kenBurns?: { direction: 'in' | 'out' };
-    };
-    aiEffects?: {
-        backgroundRemoved?: boolean;
-        retouch?: boolean;
-    };
-    animation?: {
-        in?: { type: string; duration: number };
-        out?: { type: string; duration: number };
-    };
-    transition?: {
-        type: 'glitch' | 'whip_pan' | 'film_burn' | 'luma_fade' | 'page_peel';
-        duration: number;
-    };
-    color?: {
-        lut?: 'cancun' | 'vintage' | 'noir' | 'cyberpunk' | 'corporate';
-        adjustments?: {
-            exposure: number; // -100 to 100
-            contrast: number; // -100 to 100
-            saturation: number; // -100 to 100
-            temperature: number; // -100 to 100
-        };
-    };
-    audio?: {
-        enhance?: boolean;
-        voicePreset?: 'none' | 'podcast' | 'cinematic' | 'radio' | 'robot';
-    };
-    keyframes?: {
-        [key in KeyframeableProperty]?: { time: number; value: number }[];
-    }
-}
-export interface SubtitleWord { word: string; start: number; end: number; style?: { fontWeight?: number; color?: string; isItalic?: boolean; } }
-export interface Subtitle {
-    id: string;
-    text: string;
-    start: number;
-    end: number;
-    words?: SubtitleWord[];
-    style: {
-        fontFamily: string;
-        fontSize: number;
-        fontWeight: number;
-        letterSpacing: number;
-        lineHeight: number;
-        fill: { type: 'color' | 'gradient' | 'texture'; color?: string; gradient?: { angle: number; start: string; end: string; }; texture?: string; };
-        outline?: { color: string; width: number; };
-        shadow?: { color: string; offsetX: number; offsetY: number; blur: number; };
-        backgroundColor: string;
-    };
-}
-
-
-// --- Database Types (Auto-generated by Supabase) ---
+// --- Database Types (Auto-generated from Supabase) ---
 export type Database = {
   public: {
     Tables: {
-      profiles: {
+      brand_identities: {
         Row: {
+          channel_mission: string | null
+          color_palette: Json | null
+          created_at: string
+          font_selection: string | null
           id: string
-          email: string
-          subscription: Json | null
-          ai_credits: number
-          channel_audit: Json | null
-          content_pillars: string[] | null
-          cloned_voices: Json | null
-          stripe_customer_id: string | null
+          logo_url: string | null
+          name: string | null
+          target_audience: string | null
+          thumbnail_formula: string | null
+          tone_of_voice: string | null
+          user_id: string
+          visual_style_guide: string | null
+          writing_style_guide: string | null
         }
         Insert: {
-          id: string
-          email: string
-          subscription: Json | null
-          ai_credits: number
-          channel_audit?: Json | null
-          content_pillars?: string[] | null
-          cloned_voices?: Json | null
-          stripe_customer_id?: string | null
+          channel_mission?: string | null
+          color_palette?: Json | null
+          created_at?: string
+          font_selection?: string | null
+          id?: string
+          logo_url?: string | null
+          name?: string | null
+          target_audience?: string | null
+          thumbnail_formula?: string | null
+          tone_of_voice?: string | null
+          user_id: string
+          visual_style_guide?: string | null
+          writing_style_guide?: string | null
         }
         Update: {
+          channel_mission?: string | null
+          color_palette?: Json | null
+          created_at?: string
+          font_selection?: string | null
           id?: string
-          email?: string
-          subscription?: Json | null
+          logo_url?: string | null
+          name?: string | null
+          target_audience?: string | null
+          thumbnail_formula?: string | null
+          tone_of_voice?: string | null
+          user_id?: string
+          visual_style_guide?: string | null
+          writing_style_guide?: string | null
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string
+          project_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message: string
+          project_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          project_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          ai_credits: number
+          channel_audit: Json | null
+          cloned_voices: Json | null
+          content_pillars: string[] | null
+          email: string
+          id: string
+          stripe_customer_id: string | null
+          subscription: Json | null
+        }
+        Insert: {
           ai_credits?: number
           channel_audit?: Json | null
-          content_pillars?: string[] | null
           cloned_voices?: Json | null
+          content_pillars?: string[] | null
+          email: string
+          id: string
           stripe_customer_id?: string | null
+          subscription?: Json | null
+        }
+        Update: {
+          ai_credits?: number
+          channel_audit?: Json | null
+          cloned_voices?: Json | null
+          content_pillars?: string[] | null
+          email?: string
+          id?: string
+          stripe_customer_id?: string | null
+          subscription?: Json | null
         }
         Relationships: []
       }
       projects: {
         Row: {
-          id: string
-          user_id: string
-          created_at: string
-          last_updated: string
-          name: string
-          topic: string
-          platform: string
-          video_size: string | null
-          status: string
-          workflow_step: number
-          title: string | null
-          script: Json | null
           analysis: Json | null
-          competitor_analysis: Json | null
-          moodboard: string[] | null
           assets: Json | null
-          sound_design: Json | null
-          launch_plan: Json | null
-          performance: Json | null
-          scheduled_date: string | null
-          published_url: string | null
-          voiceover_voice_id: string | null
+          competitor_analysis: Json | null
+          final_video_url: string | null
+          id: string
           last_performance_check: string | null
-          timeline: Json | null
+          last_updated: string
+          launch_plan: Json | null
+          moodboard: string[] | null
+          name: string
+          performance: Json | null
+          platform: string
+          published_url: string | null
+          scheduled_date: string | null
+          script: Json | null
+          sound_design: Json | null
+          status: string
+          title: string | null
+          topic: string
+          user_id: string
+          video_size: string | null
+          voiceover_voice_id: string | null
+          workflow_step: number
         }
         Insert: {
-          id?: string
-          user_id: string
-          created_at?: string
-          last_updated?: string
-          name: string
-          topic: string
-          platform: string
-          video_size?: string | null
-          status: string
-          workflow_step: number
-          title?: string | null
-          script?: Json | null
           analysis?: Json | null
-          competitor_analysis?: Json | null
-          moodboard?: string[] | null
           assets?: Json | null
-          sound_design?: Json | null
-          launch_plan?: Json | null
-          performance?: Json | null
-          scheduled_date?: string | null
-          published_url?: string | null
-          voiceover_voice_id?: string | null
+          competitor_analysis?: Json | null
+          final_video_url?: string | null
+          id?: string
           last_performance_check?: string | null
-          timeline?: Json | null
+          last_updated?: string
+          launch_plan?: Json | null
+          moodboard?: string[] | null
+          name: string
+          performance?: Json | null
+          platform: string
+          published_url?: string | null
+          scheduled_date?: string | null
+          script?: Json | null
+          sound_design?: Json | null
+          status: string
+          title?: string | null
+          topic: string
+          user_id: string
+          video_size?: string | null
+          voiceover_voice_id?: string | null
+          workflow_step: number
         }
         Update: {
-          id?: string
-          user_id?: string
-          created_at?: string
-          last_updated?: string
-          name?: string
-          topic?: string
-          platform?: string
-          video_size?: string | null
-          status?: string
-          workflow_step?: number
-          title?: string | null
-          script?: Json | null
           analysis?: Json | null
-          competitor_analysis?: Json | null
-          moodboard?: string[] | null
           assets?: Json | null
-          sound_design?: Json | null
-          launch_plan?: Json | null
-          performance?: Json | null
-          scheduled_date?: string | null
-          published_url?: string | null
-          voiceover_voice_id?: string | null
+          competitor_analysis?: Json | null
+          final_video_url?: string | null
+          id?: string
           last_performance_check?: string | null
-          timeline?: Json | null
+          last_updated?: string
+          launch_plan?: Json | null
+          moodboard?: string[] | null
+          name?: string
+          performance?: Json | null
+          platform?: string
+          published_url?: string | null
+          scheduled_date?: string | null
+          script?: Json | null
+          sound_design?: Json | null
+          status?: string
+          title?: string | null
+          topic?: string
+          user_id?: string
+          video_size?: string | null
+          voiceover_voice_id?: string | null
+          workflow_step?: number
         }
-        Relationships: [
-          {
-            foreignKeyName: "projects_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      notifications: {
-        Row: { id: string; user_id: string; project_id: string | null; message: string; is_read: boolean; created_at: string; }
-        Insert: { id?: string; user_id: string; project_id?: string | null; message: string; is_read?: boolean; created_at?: string; }
-        Update: { id?: string; user_id?: string; project_id?: string | null; message?: string; is_read?: boolean; created_at?: string; }
-        Relationships: [
-          {
-            foreignKeyName: "notifications_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "notifications_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          }
-        ]
+        Relationships: []
       }
       user_youtube_tokens: {
-        Row: { user_id: string; access_token: string; refresh_token: string; expires_at: string; scope: string; }
-        Insert: { user_id: string; access_token: string; refresh_token: string; expires_at: string; scope: string; }
-        Update: { user_id?: string; access_token?: string; refresh_token?: string; expires_at?: string; scope?: string; }
-        Relationships: [
-          {
-            foreignKeyName: "user_youtube_tokens_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: true
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          }
-        ]
+        Row: {
+          access_token: string
+          created_at: string
+          expires_at: string
+          refresh_token: string
+          scope: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          expires_at: string
+          refresh_token: string
+          scope: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          expires_at?: string
+          refresh_token?: string
+          scope?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       video_jobs: {
         Row: {
@@ -435,103 +443,35 @@ export type Database = {
           created_at: string
           project_id: string
           user_id: string
-          status: "queued" | "processing" | "completed" | "failed"
-          job_payload: Json
-          result_url: string | null
+          status: string
+          job_payload: Json | null
+          updated_at: string
           error_message: string | null
+          output_url: string | null
         }
         Insert: {
           id?: string
           created_at?: string
           project_id: string
           user_id: string
-          status?: "queued" | "processing" | "completed" | "failed"
-          job_payload: Json
-          result_url?: string | null
+          status?: string
+          job_payload?: Json | null
+          updated_at?: string
           error_message?: string | null
+          output_url?: string | null
         }
         Update: {
           id?: string
           created_at?: string
           project_id?: string
           user_id?: string
-          status?: "queued" | "processing" | "completed" | "failed"
-          job_payload?: Json
-          result_url?: string | null
+          status?: string
+          job_payload?: Json | null
+          updated_at?: string
           error_message?: string | null
+          output_url?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "video_jobs_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "video_jobs_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      brand_identities: {
-        Row: {
-          id: string
-          user_id: string
-          created_at: string
-          name: string
-          tone_of_voice: string
-          writing_style_guide: string
-          color_palette: Json | null
-          font_selection: string
-          thumbnail_formula: string
-          visual_style_guide: string
-          target_audience: string
-          channel_mission: string
-          logo_url: string | null
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          created_at?: string
-          name: string
-          tone_of_voice: string
-          writing_style_guide: string
-          color_palette?: Json | null
-          font_selection: string
-          thumbnail_formula: string
-          visual_style_guide: string
-          target_audience: string
-          channel_mission: string
-          logo_url?: string | null
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          created_at?: string
-          name?: string
-          tone_of_voice?: string
-          writing_style_guide?: string
-          color_palette?: Json | null
-          font_selection?: string
-          thumbnail_formula?: string
-          visual_style_guide?: string
-          target_audience?: string
-          channel_mission?: string
-          logo_url?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "brand_identities_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          }
-        ]
+        Relationships: []
       }
     }
     Views: {

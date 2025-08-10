@@ -9,14 +9,16 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <!-- Google Fonts will be injected here by the app -->
+    <!-- IMG.LY SDK Integration -->
+    <link rel="stylesheet" href="https://img.ly/assets/img.ly-sdk/1.31.0/styles.css" />
+    <script type="module" src="https://img.ly/assets/img.ly-sdk/1.31.0/imgly.js"></script>
     <script>
       // This script exposes client-safe environment variables from Vercel.
-      // All other API keys (Gemini, RunwayML, Stripe, etc.) are handled securely by backend Supabase Edge Functions.
       window.__env = {
         VITE_SUPABASE_URL: "https://wpgrfukcnpcoyruymxdd.supabase.co",
         VITE_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndwZ3JmdWtjbnBjb3lydXlteGRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3MzQ5MjgsImV4cCI6MjA2OTMxMDkyOH0.-b5KHzKWk2N3VEY_K5CzYZfszRRL6GY-MivOVUAL1Z4",
-        VITE_GOOGLE_CLIENT_ID: "YOUR_GOOGLE_CLIENT_ID_HERE" // Used for YouTube OAuth flow.
+        VITE_GOOGLE_CLIENT_ID: "YOUR_GOOGLE_CLIENT_ID_HERE", // Used for YouTube OAuth flow.
+        VITE_IMGLY_LICENSE_KEY: "ShZwWiKGfPK3hulkwwpU1OaKSy-mCLE0cmee3DLrtFIjF4FZ3LLc8z3yCnW1-wWv" // IMG.LY License Key
       };
     </script>
     <style>
