@@ -9,7 +9,13 @@ export type WorkflowStep = 1 | 2 | 3 | 4 | 5;
 export type VideoStyle = 'High-Energy Viral' | 'Cinematic Documentary' | 'Clean & Corporate' | 'Animation' | 'Historical Documentary' | 'Vlog' | 'Whiteboard';
 export type AiVideoModel = 'runwayml' | 'kling' | 'minimax' | 'seedance';
 
-export type Json = any;
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json }
+  | Json[];
 
 // --- UI & System Types ---
 export interface Toast { id: number; message: string; type: 'success' | 'error' | 'info'; }
@@ -234,7 +240,7 @@ export type Database = {
         }
         Insert: {
           channel_mission?: string | null
-          color_palette?: Json | null
+          color_palette?: any
           created_at?: string
           font_selection?: string | null
           id?: string
@@ -249,7 +255,7 @@ export type Database = {
         }
         Update: {
           channel_mission?: string | null
-          color_palette?: Json | null
+          color_palette?: any
           created_at?: string
           font_selection?: string | null
           id?: string
@@ -302,23 +308,23 @@ export type Database = {
         }
         Insert: {
           ai_credits?: number
-          channel_audit?: Json | null
-          cloned_voices?: Json | null
+          channel_audit?: any
+          cloned_voices?: any
           content_pillars?: string[] | null
           email: string
           id: string
           stripe_customer_id?: string | null
-          subscription?: Json | null
+          subscription?: any
         }
         Update: {
           ai_credits?: number
-          channel_audit?: Json | null
-          cloned_voices?: Json | null
+          channel_audit?: any
+          cloned_voices?: any
           content_pillars?: string[] | null
           email?: string
           id?: string
           stripe_customer_id?: string | null
-          subscription?: Json | null
+          subscription?: any
         }
       }
       projects: {
@@ -348,22 +354,22 @@ export type Database = {
           workflow_step: number
         }
         Insert: {
-          analysis?: Json | null
-          assets?: Json | null
-          competitor_analysis?: Json | null
+          analysis?: any
+          assets?: any
+          competitor_analysis?: any
           final_video_url?: string | null
           id?: string
           last_performance_check?: string | null
           last_updated?: string
-          launch_plan?: Json | null
+          launch_plan?: any
           moodboard?: string[] | null
           name: string
-          performance?: Json | null
+          performance?: any
           platform: string
           published_url?: string | null
           scheduled_date?: string | null
-          script?: Json | null
-          sound_design?: Json | null
+          script?: any
+          sound_design?: any
           status: string
           title?: string | null
           topic: string
@@ -373,22 +379,22 @@ export type Database = {
           workflow_step: number
         }
         Update: {
-          analysis?: Json | null
-          assets?: Json | null
-          competitor_analysis?: Json | null
+          analysis?: any
+          assets?: any
+          competitor_analysis?: any
           final_video_url?: string | null
           id?: string
           last_performance_check?: string | null
           last_updated?: string
-          launch_plan?: Json | null
+          launch_plan?: any
           moodboard?: string[] | null
           name?: string
-          performance?: Json | null
+          performance?: any
           platform?: string
           published_url?: string | null
           scheduled_date?: string | null
-          script?: Json | null
-          sound_design?: Json | null
+          script?: any
+          sound_design?: any
           status?: string
           title?: string | null
           topic?: string
@@ -442,7 +448,7 @@ export type Database = {
           project_id: string
           user_id: string
           status?: string
-          job_payload?: Json | null
+          job_payload?: any
           updated_at?: string
           error_message?: string | null
           output_url?: string | null
@@ -453,7 +459,7 @@ export type Database = {
           project_id?: string
           user_id?: string
           status?: string
-          job_payload?: Json | null
+          job_payload?: any
           updated_at?: string
           error_message?: string | null
           output_url?: string | null
@@ -474,3 +480,9 @@ export type Database = {
     }
   }
 }
+export type Trend = unknown;
+export type EnhancedTopic = unknown;
+export type VideoDeconstruction = unknown;
+export type ViralScoreBreakdown = unknown;
+export type OptimizationStep = unknown;
+declare module '@vercel/node' {}
