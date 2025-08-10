@@ -1,6 +1,3 @@
-
-
-
 import { type PostgrestError } from '@supabase/supabase-js';
 
 // --- Core Types ---
@@ -87,7 +84,7 @@ export interface Project {
 }
 
 export interface Scene { timecode: string; visual: string; voiceover: string; onScreenText?: string; storyboardImageUrl?: string; sceneIndex: number; }
-export interface Script { id?: any; hooks: string[]; scenes: Scene[]; cta: string; selectedHookIndex?: number; }
+export interface Script { id?: any; hooks: string[]; scenes: Scene[]; cta: string; selectedHookIndex?: number; tone?: string; }
 export interface MoodboardImage { prompt: string; url: string; }
 export interface Blueprint { suggestedTitles: string[]; script: Script; moodboard: string[]; strategicSummary: string; platform: Platform; }
 export interface SceneAssets { visualUrl: string | null; voiceoverUrl: string | null; }
@@ -228,6 +225,10 @@ export type EnhancedTopic = any;
 export type VideoDeconstruction = any;
 export type ViralScoreBreakdown = any;
 export type OptimizationStep = any;
+
+// Add dummy module declaration for the outdated Vercel function
+export type VercelRequest = any;
+export type VercelResponse = any;
 
 
 // --- Database Types (Auto-generated from Supabase) ---
