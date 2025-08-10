@@ -1,3 +1,4 @@
+
 import { type PostgrestError } from '@supabase/supabase-js';
 
 // --- Core Types ---
