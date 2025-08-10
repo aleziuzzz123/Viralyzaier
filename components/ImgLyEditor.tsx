@@ -12,26 +12,6 @@ interface ImgLyEditorProps {
     project: Project;
 }
 
-// Helper function to ensure a stylesheet is loaded before proceeding.
-const ensureCss = (href: string): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    // Check if the link already exists in the document head.
-    if (document.querySelector(`link[href="${href}"]`)) {
-      return resolve();
-    }
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = href;
-    link.onload = () => resolve();
-    link.onerror = (err) => {
-      console.error(`Failed to load critical CSS: ${href}`, err);
-      reject(new Error(`Failed to load CSS: ${href}`));
-    };
-    document.head.appendChild(link);
-  });
-};
-
-
 const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
     const { user, handleFinalVideoSaved, addToast } = useAppContext();
     const containerRef = useRef<HTMLDivElement>(null);
@@ -58,12 +38,6 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
             }
 
             try {
-                // Await the loading of both required stylesheets before initializing the editor.
-                await Promise.all([
-                    ensureCss('https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/styles/cesdk.css'),
-                    ensureCss('https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/styles/cesdk-themes.css')
-                ]);
-
                 const voiceoverUrls = project.assets ? Object.values(project.assets).map(a => a.voiceoverUrl).filter(Boolean) as string[] : [];
                 const moodboardUrls = project.moodboard || [];
                 
@@ -71,7 +45,19 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
                   license: (window as any).__env?.VITE_IMGLY_LICENSE_KEY,
                   baseURL: 'https://cdn.img.ly/packages/imgly/cesdk-engine/1.57.0',
                   theme: 'dark' as const,
-                  ui: { elements: { view: 'default' as const, navigation: { action: { export: true, save: false, load: false } } } },
+                  ui: {
+                    elements: {
+                      view: 'default' as const,
+                      navigation: { action: { export: true, save: false, load: false } },
+                      dock: { groups: [
+                        { id: 'ly.img.video.template' },
+                        { id: 'ly.img.default-group' },
+                        { id: 'ly.img.video.text' },
+                        { id: 'ly.img.video.sticker' },
+                        { id: 'ly.img.video.audio' },
+                      ] }
+                    }
+                  },
                   wasm: { disableMultithread: true, disableSIMD: true }
                 };
 
