@@ -1,6 +1,4 @@
 
-
-
 import React, { useRef, useEffect, useState } from 'react';
 import CreativeEditorSDK from '@cesdk/cesdk-js';
 import { Project } from '../types.ts';
@@ -17,8 +15,8 @@ interface ImgLyEditorProps {
 // Helper function to add CSS if not present
 function ensureCesdkCss() {
   const hrefs = [
-    'https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/styles/cesdk.css',
-    'https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/styles/cesdk-themes.css'
+    '/vendor/cesdk/cesdk.css',
+    '/vendor/cesdk/cesdk-themes.css'
   ];
   hrefs.forEach(href => {
     if (!document.querySelector(`link[href="${href}"]`)) {
@@ -33,6 +31,7 @@ function ensureCesdkCss() {
 const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
     const { user, handleFinalVideoSaved, addToast } = useAppContext();
     const containerRef = useRef<HTMLDivElement>(null);
+    const editorRef = useRef<any>(null); // Ref to hold the editor instance
     const [isLoading, setIsLoading] = useState(true);
     const [isExporting, setIsExporting] = useState(false);
     const isExportingRef = useRef(false);
@@ -47,15 +46,16 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
 
         const container = containerRef.current;
         if (!container) return;
-        
-        let editorInstance: any = null;
 
         const initializeEditor = async () => {
+            // Guard against re-initialization
+            if (editorRef.current) {
+                return;
+            }
+
             try {
                 ensureCesdkCss();
                 
-                const preferSingleThread = typeof window !== 'undefined' ? !window.crossOriginIsolated : true;
-
                 const voiceoverUrls = project.assets ? Object.values(project.assets).map(a => a.voiceoverUrl).filter(Boolean) as string[] : [];
                 const moodboardUrls = project.moodboard || [];
                 
@@ -82,18 +82,18 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
                             },
                         },
                     },
-                    // Conditionally disable multithreading if not in a cross-origin isolated environment.
-                    ...(preferSingleThread ? { wasm: { disableMultithread: true } } : {})
+                    wasm: { disableMultithread: true, disableSIMD: true }
                 };
 
-                editorInstance = await CreativeEditorSDK.create(container, config);
+                const editor: any = await CreativeEditorSDK.create(container, config);
+                editorRef.current = editor; // Store instance in ref
 
-                await editorInstance.asset.addAssets([
+                await editor.asset.addAssets([
                     ...moodboardUrls.map((url, i) => ({ id: `moodboard_${i}`, meta: { uri: url, type: 'image' } })),
                     ...voiceoverUrls.map((url, i) => ({ id: `voiceover_${i}`, meta: { uri: url, type: 'audio' } })),
                 ]);
 
-                editorInstance.on('export', async (result: any) => {
+                editor.on('export', async (result: any) => {
                     if (isExportingRef.current) return;
                     isExportingRef.current = true;
                     setIsExporting(true);
@@ -123,8 +123,9 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
         initializeEditor();
 
         return () => {
-            if (editorInstance) {
-                editorInstance.dispose();
+            if (editorRef.current) {
+                editorRef.current.dispose();
+                editorRef.current = null;
             }
         };
     }, [project, user, handleFinalVideoSaved, addToast]);
