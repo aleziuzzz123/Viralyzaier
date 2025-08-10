@@ -1,11 +1,13 @@
 
 import React, { useRef, useEffect, useState } from 'react';
-import CreativeEditorSDK from '@imgly/cesdk';
 import { Project } from '../types.ts';
 import { useAppContext } from '../contexts/AppContext.tsx';
 import { getErrorMessage } from '../utils.ts';
 import * as supabaseService from '../services/supabaseService.ts';
 import { v4 as uuidv4 } from 'uuid';
+
+// Declare the CreativeEditorSDK global variable that is loaded via the <script> tag in index.html
+declare const CreativeEditorSDK: any;
 
 interface ImgLyEditorProps {
     project: Project;
