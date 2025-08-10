@@ -11,9 +11,9 @@
   "dependencies": {
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "@google/genai": "^1.13.0",
     "@supabase/supabase-js": "^2.54.0",
     "uuid": "^11.1.0",
+    "@google/genai": "^1.13.0",
     "vite": "^7.1.1",
     "@cesdk/cesdk-js": "^1.57.0"
   },
