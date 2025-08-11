@@ -15,53 +15,14 @@ export type VideoStyle =
   | 'Whiteboard';
 export type AiVideoModel = 'runwayml' | 'kling' | 'minimax' | 'seedance';
 
+// Safer recursive JSON that TS likes in strict projects
 export type Json =
   | string
   | number
   | boolean
   | null
-  | { [key: string]: Json }
+  | { [key: string]: Json | undefined }
   | Json[];
-
-/** ========= Extra types used by api/gemini-proxy.ts ========= */
-export interface Trend {
-  term: string;
-  score: number;
-  growth: number;
-}
-
-export interface EnhancedTopic {
-  idea: string;
-  rationale: string;
-  suggestedTitle: string;
-}
-
-export interface VideoDeconstruction {
-  steps: { step: string; description: string }[];
-  hooks: string[];
-  /** ADDED: used in api/gemini-proxy.ts */
-  generatedScripts?: Script[];
-  /** keep flexible so small API shape changes don't break builds */
-  [key: string]: unknown;
-}
-
-export interface ViralScoreBreakdown {
-  hook: number;
-  pacing: number;
-  visuals: number;
-  cta: number;
-  overall: number;
-}
-
-export interface OptimizationStep {
-  step: string;
-  target: string;
-  /** ADDED: used in api/gemini-proxy.ts */
-  script?: Script;
-  note?: string;
-  [key: string]: unknown;
-}
-/** =========================================================== */
 
 // --- UI & System Types ---
 export interface Toast { id: number; message: string; type: 'success' | 'error' | 'info'; }
@@ -88,7 +49,6 @@ export interface User {
 }
 
 export interface ClonedVoice { id: string; name: string; status: 'ready' | 'pending' | 'failed'; }
-
 export interface BrandIdentity {
   id: string;
   user_id: string;
@@ -151,16 +111,9 @@ export interface Script {
 }
 
 export interface MoodboardImage { prompt: string; url: string; }
-export interface Blueprint {
-  suggestedTitles: string[];
-  script: Script;
-  moodboard: string[];
-  strategicSummary: string;
-  platform: Platform;
-}
+export interface Blueprint { suggestedTitles: string[]; script: Script; moodboard: string[]; strategicSummary: string; platform: Platform; }
 export interface SceneAssets { visualUrl: string | null; voiceoverUrl: string | null; }
 export interface SoundDesign { musicUrl: string | null; sfxUrls: string[]; }
-
 export interface LaunchPlan {
   seo: { description: string; tags: string[] };
   thumbnails: string[] | null;
@@ -169,16 +122,13 @@ export interface LaunchPlan {
 
 // --- Analysis & Intelligence Types ---
 export type ScriptGoal = 'educate' | 'subscribe' | 'sell' | 'entertain';
-
 export interface ScriptOptimization {
   initialScore: number;
   finalScore: number;
   analysisLog: { step: string; target: string }[];
   finalScript: Script;
 }
-
 export interface TitleAnalysis { score: number; pros: string[]; cons: string[]; }
-
 export interface Analysis {
   scores: { overall: number; hook: number; pacing: number; audio: number; cta: number };
   summary: string;
@@ -186,7 +136,6 @@ export interface Analysis {
   strengths: string[];
   improvements: { suggestion: string; reason: string }[];
 }
-
 export interface CompetitorAnalysisResult {
   videoTitle: string;
   viralityDeconstruction: string;
@@ -196,30 +145,21 @@ export interface CompetitorAnalysisResult {
   sources?: { uri: string; title: string }[];
 }
 
+// (often used by trend utilities)
+export interface InterestPoint { time: string; value: number; }
+export interface RelatedQuery { query: string; value: string; }
+export interface TrendData { interestOverTime: InterestPoint[]; breakoutQueries: RelatedQuery[]; topQueries: RelatedQuery[]; }
+
 export interface ChannelStats {
   subscriberCount: number;
   totalViews: number;
   totalVideos: number;
   topPerformingVideo: { title: string; views: number };
 }
-
 export interface VideoPerformance { views: number; likes: number; comments: number; retention: number; }
-
-export interface PerformanceReview {
-  summary: string;
-  whatWorked: string[];
-  whatToImprove: string[];
-}
-
-export interface Opportunity {
-  idea: string;
-  reason: string;
-  suggestedTitle: string;
-  type: 'Quick Win' | 'Growth Bet' | 'Experimental';
-}
-
+export interface PerformanceReview { summary: string; whatWorked: string[]; whatToImprove: string[]; }
+export interface Opportunity { idea: string; reason: string; suggestedTitle: string; type: 'Quick Win' | 'Growth Bet' | 'Experimental'; }
 export interface ContentGapSuggestion { idea: string; reason: string; potentialTitles: string[]; }
-
 export interface Notification {
   id: string;
   user_id: string;
@@ -233,16 +173,8 @@ export interface Notification {
 export interface UserAsset { id: string; user_id: string; url: string; type: 'video' | 'audio' | 'image'; name: string; created_at: string; }
 
 export interface Subtitle { id: string; start: number; end: number; text: string; }
-
-export interface TimelineState {
-  subtitles: Subtitle[];
-  [key: string]: any;
-}
-
-export interface SubtitleWord {
-  word: string;
-  style?: { fontWeight?: number; color?: string };
-}
+export interface TimelineState { subtitles: Subtitle[]; [key: string]: any; }
+export interface SubtitleWord { word: string; style?: { fontWeight?: number; color?: string } }
 
 export interface StockAsset {
   id: number;
@@ -268,26 +200,26 @@ export interface NormalizedStockAsset {
   duration?: number;
   provider: 'pexels' | 'pixabay' | 'jamendo';
 }
-
-export interface JamendoTrack {
-  id: string;
-  image: string;
-  audio: string;
-  name: string;
-  artist_name: string;
-  duration: number;
-}
-
+export interface JamendoTrack { id: string; image: string; audio: string; name: string; artist_name: string; duration: number; }
 export interface GiphyAsset {
   id: string;
   title: string;
-  images: {
-    fixed_height: { url: string; webp: string };
-    original: { url: string; webp: string };
-  };
+  images: { fixed_height: { url: string; webp: string }; original: { url: string; webp: string } };
 }
 
-// --- Database Types (Auto-generated from Supabase) ---
+// --- Minimal helper types for api/gemini-proxy.ts (to satisfy TS) ---
+export interface OptimizationStep {
+  step: string;
+  target: string;
+  // allow extra fields coming from AI:
+  [key: string]: any; // <-- enables .script access without TS2339
+}
+export interface VideoDeconstruction {
+  generatedScripts?: Script[];
+  [key: string]: any; // <-- enables .generatedScripts access without TS2339
+}
+
+// --- Database Types (Auto-generated style, simplified where safe) ---
 export type Database = {
   public: {
     Tables: {
@@ -322,21 +254,7 @@ export type Database = {
           visual_style_guide?: string | null;
           writing_style_guide?: string | null;
         };
-        Update: {
-          channel_mission?: string | null;
-          color_palette?: Json | null;
-          created_at?: string;
-          font_selection?: string | null;
-          id?: string;
-          logo_url?: string | null;
-          name?: string | null;
-          target_audience?: string | null;
-          thumbnail_formula?: string | null;
-          tone_of_voice?: string | null;
-          user_id?: string;
-          visual_style_guide?: string | null;
-          writing_style_guide?: string | null;
-        };
+        Update: Partial<Database['public']['Tables']['brand_identities']['Row']>;
       };
       notifications: {
         Row: {
@@ -347,22 +265,8 @@ export type Database = {
           project_id: string | null;
           user_id: string;
         };
-        Insert: {
-          created_at?: string;
-          id?: string;
-          is_read?: boolean;
-          message: string;
-          project_id?: string | null;
-          user_id: string;
-        };
-        Update: {
-          created_at?: string;
-          id?: string;
-          is_read?: boolean;
-          message?: string;
-          project_id?: string | null;
-          user_id?: string;
-        };
+        Insert: Partial<Database['public']['Tables']['notifications']['Row']> & { message: string; user_id: string };
+        Update: Partial<Database['public']['Tables']['notifications']['Row']>;
       };
       profiles: {
         Row: {
@@ -375,26 +279,8 @@ export type Database = {
           stripe_customer_id: string | null;
           subscription: Json | null;
         };
-        Insert: {
-          ai_credits?: number;
-          channel_audit?: Json | null;
-          cloned_voices?: Json | null;
-          content_pillars?: string[] | null;
-          email: string;
-          id: string;
-          stripe_customer_id?: string | null;
-          subscription?: Json | null;
-        };
-        Update: {
-          ai_credits?: number;
-          channel_audit?: Json | null;
-          cloned_voices?: Json | null;
-          content_pillars?: string[] | null;
-          email?: string;
-          id?: string;
-          stripe_customer_id?: string | null;
-          subscription?: Json | null;
-        };
+        Insert: Partial<Database['public']['Tables']['profiles']['Row']> & { email: string; id: string };
+        Update: Partial<Database['public']['Tables']['profiles']['Row']>;
       };
       projects: {
         Row: {
@@ -422,56 +308,9 @@ export type Database = {
           voiceover_voice_id: string | null;
           workflow_step: number;
         };
-        Insert: {
-          analysis?: Json | null;
-          assets?: Json | null;
-          competitor_analysis?: Json | null;
-          final_video_url?: string | null;
-          id?: string;
-          last_performance_check?: string | null;
-          last_updated?: string;
-          launch_plan?: Json | null;
-          moodboard?: string[] | null;
-          name: string;
-          performance?: Json | null;
-          platform: string;
-          published_url?: string | null;
-          scheduled_date?: string | null;
-          script?: Json | null;
-          sound_design?: Json | null;
-          status: string;
-          title?: string | null;
-          topic: string;
-          user_id: string;
-          video_size?: string | null;
-          voiceover_voice_id?: string | null;
-          workflow_step: number;
-        };
-        Update: {
-          analysis?: Json | null;
-          assets?: Json | null;
-          competitor_analysis?: Json | null;
-          final_video_url?: string | null;
-          id?: string;
-          last_performance_check?: string | null;
-          last_updated?: string;
-          launch_plan?: Json | null;
-          moodboard?: string[] | null;
-          name?: string;
-          performance?: Json | null;
-          platform?: string;
-          published_url?: string | null;
-          scheduled_date?: string | null;
-          script?: Json | null;
-          sound_design?: Json | null;
-          status?: string;
-          title?: string | null;
-          topic?: string;
-          user_id?: string;
-          video_size?: string | null;
-          voiceover_voice_id?: string | null;
-          workflow_step?: number;
-        };
+        Insert: Partial<Database['public']['Tables']['projects']['Row']> &
+          Pick<Database['public']['Tables']['projects']['Row'], 'name' | 'platform' | 'topic' | 'workflow_step' | 'user_id'>;
+        Update: Partial<Database['public']['Tables']['projects']['Row']>;
       };
       user_youtube_tokens: {
         Row: {
@@ -482,22 +321,9 @@ export type Database = {
           scope: string;
           user_id: string;
         };
-        Insert: {
-          access_token: string;
-          created_at?: string;
-          expires_at: string;
-          refresh_token: string;
-          scope: string;
-          user_id: string;
-        };
-        Update: {
-          access_token?: string;
-          created_at?: string;
-          expires_at?: string;
-          refresh_token?: string;
-          scope?: string;
-          user_id?: string;
-        };
+        Insert: Partial<Database['public']['Tables']['user_youtube_tokens']['Row']> &
+          Pick<Database['public']['Tables']['user_youtube_tokens']['Row'], 'access_token' | 'expires_at' | 'refresh_token' | 'scope' | 'user_id'>;
+        Update: Partial<Database['public']['Tables']['user_youtube_tokens']['Row']>;
       };
       video_jobs: {
         Row: {
@@ -511,28 +337,9 @@ export type Database = {
           error_message: string | null;
           output_url: string | null;
         };
-        Insert: {
-          id?: string;
-          created_at?: string;
-          project_id: string;
-          user_id: string;
-          status?: string;
-          job_payload?: Json | null;
-          updated_at?: string;
-          error_message?: string | null;
-          output_url?: string | null;
-        };
-        Update: {
-          id?: string;
-          created_at?: string;
-          project_id?: string;
-          user_id?: string;
-          status?: string;
-          job_payload?: Json | null;
-          updated_at?: string;
-          error_message?: string | null;
-          output_url?: string | null;
-        };
+        Insert: Partial<Database['public']['Tables']['video_jobs']['Row']> &
+          Pick<Database['public']['Tables']['video_jobs']['Row'], 'project_id' | 'user_id'>;
+        Update: Partial<Database['public']['Tables']['video_jobs']['Row']>;
       };
     };
     Views: { [_ in never]: never };
@@ -541,5 +348,6 @@ export type Database = {
     CompositeTypes: { [_ in never]: never };
   };
 };
+
 
 
