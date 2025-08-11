@@ -20,8 +20,8 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
 
   useEffect(() => {
     const licenseKey = (window as any).__env?.VITE_IMGLY_LICENSE_KEY;
-    if (!licenseKey || String(licenseKey).includes('YOUR_')) {
-      addToast('VITE_IMGLY_LICENSE_KEY is missing. Check index.html or Vercel envs.', 'error');
+    if (!licenseKey || /YOUR_IMGLY/i.test(licenseKey)) {
+      addToast('VITE_IMGLY_LICENSE_KEY is not configured. Please check index.html or your env.', 'error');
       setIsLoading(false);
       return;
     }
@@ -30,48 +30,38 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
     if (!container) return;
 
     const init = async () => {
-      if (editorRef.current) return; // avoid double init
+      if (editorRef.current) return;
 
       try {
-        const voiceoverUrls =
-          project.assets ? (Object.values(project.assets).map(a => a.voiceoverUrl).filter(Boolean) as string[]) : [];
-        const moodboardUrls = project.moodboard || [];
-
-        // The engine base must be the exact CDN directory (no trailing slash is also fine).
-        const engineBase = 'https://cdn.img.ly/packages/imgly/cesdk-engine/1.57.0';
-
-        const editor = await CreativeEditorSDK.create(container, {
+        // Use the CE.SDK JS assets path (NOT the engine path).
+        const config = {
           license: licenseKey,
-          baseURL: engineBase,
-          theme: 'dark',
+          baseURL: 'https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/assets',
+          theme: 'dark' as const,
           ui: {
             elements: {
-              view: 'default',
+              view: 'default' as const,
               navigation: { action: { export: true, save: false, load: false } },
-              dock: {
-                groups: [
-                  { id: 'ly.img.video.template' },
-                  { id: 'ly.img.default-group' },
-                  { id: 'ly.img.video.text' },
-                  { id: 'ly.img.video.sticker' },
-                  { id: 'ly.img.video.audio' }
-                ]
-              }
+              dock: { groups: [{ id: 'ly.img.video.template' }, { id: 'ly.img.default-group' }, { id: 'ly.img.video.text' }, { id: 'ly.img.video.sticker' }, { id: 'ly.img.video.audio' }] }
             }
           },
-          // stay single-threaded; avoids COOP/COEP requirements
+          // safest low-memory mode for broad browser support
           wasm: { disableMultithread: true, disableSIMD: true }
-        });
+        };
 
+        const editor: any = await CreativeEditorSDK.create(container, config);
         editorRef.current = editor;
 
-        // Pre-register our assets
-        await editor.asset.addAssets([
-          ...moodboardUrls.map((url, i) => ({ id: `moodboard_${i}`, meta: { uri: url, type: 'image' } })),
-          ...voiceoverUrls.map((url, i) => ({ id: `voiceover_${i}`, meta: { uri: url, type: 'audio' } }))
-        ]);
+        const voiceoverUrls = project.assets ? (Object.values(project.assets).map(a => a.voiceoverUrl).filter(Boolean) as string[]) : [];
+        const moodboardUrls = project.moodboard || [];
 
-        // Handle export
+        if (moodboardUrls.length || voiceoverUrls.length) {
+          await editor.asset.addAssets([
+            ...moodboardUrls.map((url, i) => ({ id: `moodboard_${i}`, meta: { uri: url, type: 'image' } })),
+            ...voiceoverUrls.map((url, i) => ({ id: `voiceover_${i}`, meta: { uri: url, type: 'audio' } }))
+          ]);
+        }
+
         editor.on('export', async (result: any) => {
           if (isExportingRef.current) return;
           isExportingRef.current = true;
@@ -92,7 +82,7 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
 
         setIsLoading(false);
       } catch (err) {
-        console.error('IMG.LY init failed:', err);
+        console.error('Failed to initialize IMG.LY Editor:', err);
         addToast(`Could not load the editor: ${getErrorMessage(err)}`, 'error');
         setIsLoading(false);
       }
@@ -102,7 +92,7 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
 
     return () => {
       if (editorRef.current) {
-        editorRef.current.dispose();
+        try { editorRef.current.dispose(); } catch {}
         editorRef.current = null;
       }
     };
@@ -129,5 +119,6 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
 };
 
 export default ImgLyEditor;
+
 
 
