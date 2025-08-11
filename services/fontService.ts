@@ -1,5 +1,5 @@
 // services/fontService.ts
-import { invokeEdgeFunction } from './supabaseService.js';
+import { invokeEdgeFunction } from './supabaseService.ts';
 
 export interface GoogleFont {
     family: string;

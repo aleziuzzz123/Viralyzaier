@@ -1,13 +1,12 @@
-import React, { createContext, useState, useEffect, useCallback, useContext, ReactNode, useRef, useMemo } from 'react';
-import { Project, User, PlanId, Blueprint, Toast, Platform, Opportunity, ContentGapSuggestion, PerformanceReview, Notification, ProjectStatus, Database, UserAsset, BrandIdentity, VideoStyle, Json } from '../types.ts';
+import React, { createContext, useState, useEffect, useCallback, useContext, ReactNode, useRef } from 'react';
+import { Project, User, PlanId, Blueprint, Toast, Platform, Opportunity, ContentGapSuggestion, PerformanceReview, Notification, BrandIdentity } from '../types.ts';
 import * as supabaseService from '../services/supabaseService.ts';
-import { supabase } from '../services/supabaseClient.js'; // Import client directly
+import { supabase } from '../services/supabaseClient.ts'; // Import client directly
 import { type Session } from '@supabase/supabase-js';
 import { createCheckoutSession, PLANS } from '../services/paymentService.ts';
 import { translations, Language, TranslationKey } from '../translations.ts';
 import { getErrorMessage } from '../utils.ts';
-import { GoogleFont, fetchGoogleFonts } from '../services/fontService.js';
-import { v4 as uuidv4 } from 'uuid';
+import { GoogleFont, fetchGoogleFonts, loadGoogleFont } from '../services/fontService.ts';
 
 
 interface AppContextType {
@@ -29,7 +28,6 @@ interface AppContextType {
     brandIdentities: BrandIdentity[];
     fonts: GoogleFont[];
     
-    // New handler for IMG.LY editor
     handleFinalVideoSaved: (projectId: string, videoUrl: string) => Promise<void>;
 
     setLanguage: (lang: Language) => void;
@@ -97,327 +95,359 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     const [session, setSession] = useState<Session | null>(null);
     const [user, setUser] = useState<User | null>(null);
     const [projects, setProjects] = useState<Project[]>([]);
-    const [notifications, setNotifications] = useState<Notification[]>([]);
-    const [brandIdentities, setBrandIdentities] = useState<BrandIdentity[]>([]);
-    const [fonts, setFonts] = useState<GoogleFont[]>([]);
-    const [isInitialLoading, setIsInitialLoading] = useState(true);
-    
-    const [activeProjectId, setActiveProjectIdInternal] = useState<string | null>(null);
+    const [activeProjectId, _setActiveProjectId] = useState<string | null>(null);
     const [activeProjectDetails, setActiveProjectDetails] = useState<Project | null>(null);
     const [isProjectDetailsLoading, setIsProjectDetailsLoading] = useState(false);
-
-    const [isUpgradeModalOpen, setUpgradeModalOpen] = useState(false);
-    const [upgradeReason, setUpgradeReason] = useState<{title: string, description: string}>({title: '', description: ''});
-    
+    const [isInitialLoading, setIsInitialLoading] = useState(true);
     const [toasts, setToasts] = useState<Toast[]>([]);
     const [dismissedTutorials, setDismissedTutorials] = useState<string[]>([]);
+    const [isUpgradeModalOpen, setUpgradeModalOpen] = useState(false);
+    const [upgradeReason, setUpgradeReason] = useState({ title: 'Upgrade Required', description: 'This feature is not available on your current plan.' });
     const [confirmation, setConfirmation] = useState<ConfirmationState>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+    const [language, setLanguage] = useState<Language>('en');
     const [prefilledBlueprintPrompt, setPrefilledBlueprintPrompt] = useState<string | null>(null);
-
-    const [isScheduleModalOpen, setScheduleModalOpen] = useState(false);
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
     const [projectToSchedule, setProjectToSchedule] = useState<string | null>(null);
     const [backendError, setBackendError] = useState<{ title: string; message: string } | null>(null);
-    const clearBackendError = () => setBackendError(null);
+    const [brandIdentities, setBrandIdentities] = useState<BrandIdentity[]>([]);
+    const [fonts, setFonts] = useState<GoogleFont[]>([]);
     
-    const isOperationLocked = useRef(false);
+    const operationLock = useRef(false);
 
-    const [language, setLanguageState] = useState<Language>(() => {
-        const savedLang = localStorage.getItem('viralyzaier-lang');
-        const browserLang = navigator.language.split('-')[0];
-        if (savedLang && translations[savedLang as Language]) {
-            return savedLang as Language;
+    const setActiveProjectId = async (id: string | null) => {
+        _setActiveProjectId(id);
+        if (id) {
+            setIsProjectDetailsLoading(true);
+            try {
+                const details = await supabaseService.getProjectDetails(id);
+                setActiveProjectDetails(details);
+            } catch (error) {
+                addToast(`Failed to load project details: ${getErrorMessage(error)}`, 'error');
+            } finally {
+                setIsProjectDetailsLoading(false);
+            }
+        } else {
+            setActiveProjectDetails(null);
         }
-        if (translations[browserLang as Language]) {
-            return browserLang as Language;
-        }
-        return 'en';
-    });
+    };
 
-    const setLanguage = (lang: Language) => {
-        localStorage.setItem('viralyzaier-lang', lang);
-        setLanguageState(lang);
+    const lockAndExecute = async (asyncOperation: () => Promise<any>) => {
+        if (operationLock.current) {
+            addToast("Another operation is already in progress.", "info");
+            return;
+        }
+        operationLock.current = true;
+        try {
+            await asyncOperation();
+        } catch (error) {
+            console.error("Operation failed:", error);
+            // Error should be handled within the operation itself
+        } finally {
+            operationLock.current = false;
+        }
     };
 
     const t = useCallback((key: TranslationKey, replacements?: { [key: string]: string | number }) => {
-        const langSource = translations[language] || translations.en;
-        const fallbackSource = translations.en;
-        let text = langSource[key] || fallbackSource[key] || key;
-
+        const langDict = translations[language] || translations.en;
+        let text = langDict[key] || key;
         if (replacements) {
-          for (const rKey in replacements) {
-            text = text.replace(new RegExp(`\\{${rKey}\\}`, 'g'), String(replacements[rKey]));
-          }
+            Object.keys(replacements).forEach(rKey => {
+                text = text.replace(`{${rKey}}`, String(replacements[rKey]));
+            });
         }
         return text;
     }, [language]);
 
-    const addToast = useCallback((message: string, type: Toast['type'] = 'info') => {
-      const newToast: Toast = { id: Date.now(), message, type };
-      setToasts(t => [...t, newToast]);
-    }, []);
-
-    const setActiveProjectId = useCallback(async (id: string | null) => {
-        setActiveProjectIdInternal(id);
-        if (id === null) {
-            setActiveProjectDetails(null);
-            return;
-        }
-
-        const projectInList = projects.find(p => p.id === id);
-        if (projectInList && projectInList.script) {
-            setActiveProjectDetails(projectInList);
-            return;
-        }
-
-        setIsProjectDetailsLoading(true);
-        setActiveProjectDetails(null);
-        try {
-            const details = await supabaseService.getProjectDetails(id);
-            if (details) {
-                setActiveProjectDetails(details);
-                setProjects(currentProjects => 
-                    currentProjects.map(p => p.id === id ? details : p)
-                );
-            } else {
-                addToast(`Could not find project with ID: ${id}`, 'error');
-                setActiveProjectIdInternal(null);
-            }
-        } catch (err) {
-            addToast(`Failed to load project details: ${getErrorMessage(err)}`, 'error');
-            setActiveProjectIdInternal(null);
-        } finally {
-            setIsProjectDetailsLoading(false);
-        }
-    }, [projects, addToast]);
-    
-    // --- AUTH & DATA LOADING ---
     useEffect(() => {
-        setIsInitialLoading(true);
-        const authListener = supabaseService.onAuthStateChange((_event, session) => {
-            setSession(session);
-            setIsInitialLoading(false);
-        });
-
-        const savedTutorials = localStorage.getItem('viralyzaier-tutorials');
-        setDismissedTutorials(savedTutorials ? JSON.parse(savedTutorials) : []);
-
-        return () => {
-            authListener?.subscription.unsubscribe();
+        const fetchInitialData = async () => {
+            try {
+                const data = await supabaseService.invokeEdgeFunction<{user: User; projects: Project[], notifications: Notification[], brandIdentities: BrandIdentity[]}>('get-initial-data', {});
+                setUser(data.user);
+                setProjects(data.projects);
+                setNotifications(data.notifications);
+                setBrandIdentities(data.brandIdentities);
+            } catch (error) {
+                console.error("Failed to fetch initial data:", error);
+                setBackendError({ title: 'Initial Data Load Failed', message: getErrorMessage(error) });
+            } finally {
+                setIsInitialLoading(false);
+            }
         };
 
-    }, []);
-    
-    // --- Data loading for authenticated user ---
-    useEffect(() => {
-        if (session?.user) {
-            setIsInitialLoading(true);
-            const loadData = async () => {
-                try {
-                    const { user, projects, notifications, brandIdentities } = await supabaseService.invokeEdgeFunction<{
-                        user: User;
-                        projects: Project[];
-                        notifications: Notification[];
-                        brandIdentities: BrandIdentity[];
-                    }>('get-initial-data', {});
-
-                    setUser(user);
-                    setProjects(projects);
-                    setNotifications(notifications);
-                    setBrandIdentities(brandIdentities);
-                    
-                    const fonts = await fetchGoogleFonts();
-                    setFonts(fonts.slice(0, 50));
-
-                } catch (err) { 
-                    const errorMessage = getErrorMessage(err);
-                    addToast(`${t('toast.failed_fetch_profile')}: ${errorMessage}`, 'error'); 
-                    setBackendError({ title: "Critical Data Load Failure", message: errorMessage });
-                } 
-                finally { setIsInitialLoading(false); }
-            };
-            loadData();
-        } else {
-            setUser(null); setProjects([]); setNotifications([]); setBrandIdentities([]); setFonts([]); setIsInitialLoading(false);
-            setActiveProjectIdInternal(null);
+        if (session) {
+            fetchInitialData();
+            fetchGoogleFonts().then(setFonts).catch(e => console.error("Failed to fetch Google Fonts:", e));
         }
-    }, [session, addToast, t]);
-    
-    // --- Real-time subscriptions ---
+    }, [session]);
+
     useEffect(() => {
-        if (!session?.user?.id) return;
-        const sub = supabase.channel(`public:projects:user_id=eq.${session.user.id}`).on(
-            'postgres_changes',
-            { event: '*', schema: 'public', table: 'projects' },
-            (payload) => {
-                const updatedProject = supabaseService.projectRowToProject(payload.new as any);
-                setProjects(current => {
-                    const existing = current.find(p => p.id === updatedProject.id);
-                    if (existing) {
-                        return current.map(p => p.id === updatedProject.id ? updatedProject : p);
-                    }
-                    return [updatedProject, ...current];
-                });
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setSession(session);
+            if (!session) {
+                setUser(null);
+                setProjects([]);
+                setIsInitialLoading(false);
+            } else {
+                setIsInitialLoading(true);
             }
-        ).subscribe();
-        return () => { supabase.removeChannel(sub); };
-    }, [session?.user?.id, addToast]);
-    
-    // --- Immediate feedback after Stripe or OAuth redirect ---
-    useEffect(() => {
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.has('payment_success')) {
-            addToast('Payment successful! Your plan has been upgraded.', 'success');
-            window.history.replaceState({}, document.title, window.location.pathname);
-        }
-        if (urlParams.has('youtube_connected')) {
-            addToast('YouTube channel connected successfully!', 'success');
-            if(user) supabaseService.getUserProfile(user.id).then(setUser);
-            window.history.replaceState({}, document.title, window.location.pathname);
-        }
-    }, [addToast, user]);
-    
-    const handleFinalVideoSaved = async (projectId: string, videoUrl: string) => {
-        await handleUpdateProject({
-            id: projectId,
-            final_video_url: videoUrl,
-            publishedUrl: videoUrl, // Use this for the analysis step preview
-            workflowStep: 4
         });
-        addToast("Video exported and saved! Proceeding to analysis.", 'success');
+        return () => subscription.unsubscribe();
+    }, []);
+
+    const addToast = (message: string, type: Toast['type'] = 'info') => {
+        const id = Date.now();
+        setToasts(prev => [...prev, { id, message, type }]);
     };
 
-    // --- OTHER CONTEXT FUNCTIONS ---
-    const requestConfirmation = (title: string, message: string, onConfirm: () => void) => { setConfirmation({ isOpen: true, title, message, onConfirm }); };
-    const handleConfirmation = () => { if(confirmation.isOpen) { confirmation.onConfirm(); } setConfirmation({ isOpen: false, title: '', message: '', onConfirm: () => {} }); };
-    const handleCancelConfirmation = () => { setConfirmation({ isOpen: false, title: '', message: '', onConfirm: () => {} }); };
-    const handleLogout = () => { requestConfirmation(t('confirmation_modal.logout_title'), t('confirmation_modal.logout_message'), async () => { await supabaseService.signOut(); setActiveProjectId(null); addToast(t('toast.logged_out')); }); };
-    const lockAndExecute = async (asyncOperation: () => Promise<any>) => { if (isOperationLocked.current) { addToast("Another AI operation is already in progress. Please wait.", "info"); return; } isOperationLocked.current = true; try { await asyncOperation(); } catch (error) { console.error("Error during locked operation:", error); } finally { isOperationLocked.current = false; } };
-    const dismissToast = (id: number) => { setToasts(t => t.filter(toast => toast.id !== id)); };
-    const dismissTutorial = (id: string) => { setDismissedTutorials(prev => { const newDismissed = [...prev, id]; localStorage.setItem('viralyzaier-tutorials', JSON.stringify(newDismissed)); return newDismissed; }); };
-    const consumeCredits = useCallback(async (amount: number) => {
-        if (!user) return false;
-        if (user.subscription.planId === 'free' && user.aiCredits < amount) {
-            setUpgradeReason({ title: t('upgrade_modal.credits_title'), description: t('upgrade_modal.credits_description') });
+    const dismissToast = (id: number) => {
+        setToasts(prev => prev.filter(toast => toast.id !== id));
+    };
+    
+     const consumeCredits = useCallback(async (amount: number): Promise<boolean> => {
+        if (!user) {
+            addToast('You must be logged in to perform this action.', 'error');
+            return false;
+        }
+        if (user.aiCredits < amount) {
+            setUpgradeReason({
+                title: t('upgrade_modal.credits_title'),
+                description: t('upgrade_modal.credits_description')
+            });
             setUpgradeModalOpen(true);
             return false;
         }
         try {
-            const { success, newCredits, message } = await supabaseService.invokeEdgeFunction<{ success: boolean; newCredits: number; message?: string; }>('consume-credits', { amount_to_consume: amount });
+            const { success, newCredits, message } = await supabaseService.invokeEdgeFunction<{success: boolean, newCredits: number, message?: string}>('consume-credits', { amount_to_consume: amount });
             if (success) {
-                setUser(u => u ? { ...u, aiCredits: newCredits } : null);
+                setUser(prevUser => prevUser ? { ...prevUser, aiCredits: newCredits } : null);
                 return true;
             } else {
                 if (message === 'insufficient_credits') {
                     setUpgradeReason({ title: t('upgrade_modal.credits_title'), description: t('upgrade_modal.credits_description') });
                     setUpgradeModalOpen(true);
-                } else { addToast(message || t('toast.insufficient_credits_error'), 'error'); }
+                }
                 return false;
             }
-        } catch (error) { setBackendError({ title: t('backend_error.title'), message: getErrorMessage(error) }); return false; }
-    }, [user, addToast, t]);
+        } catch (error) {
+            setBackendError({ title: 'Credit Consumption Error', message: getErrorMessage(error) });
+            return false;
+        }
+    }, [user, t]);
 
-    const requirePermission = (requiredPlan: PlanId) => {
-        if (!user) return false;
-        const userPlan = PLANS.findIndex(p => p.id === user.subscription.planId);
-        const requiredPlanIndex = PLANS.findIndex(p => p.id === requiredPlan);
-        if (userPlan >= requiredPlanIndex) return true;
-        const planName = PLANS.find(p => p.id === requiredPlan)?.name || 'a higher';
-        setUpgradeReason({ title: t('upgrade_modal.default_title'), description: `${t('upgrade_modal.default_description')} This feature requires the ${planName} plan.` });
-        setUpgradeModalOpen(true);
-        return false;
-    };
-    
-    const handleSubscriptionChange = async (planId: PlanId) => {
-        if (!user) return;
-        if (user.subscription.planId === planId && user.subscription.status === 'active') { addToast(t('toast.already_on_plan'), 'info'); return; }
-        try { if (planId !== 'free') { const { checkoutUrl } = await createCheckoutSession(planId); window.location.href = checkoutUrl; } } catch (error) { addToast(t('toast.subscription_failed', {error: getErrorMessage(error)}), 'error'); }
-    };
-    
-    const handleUpdateProject = async (updatedProjectData: Partial<Project> & { id: string }): Promise<Project | null> => {
+    const handleUpdateProject = useCallback(async (updatedProjectData: Partial<Project> & { id: string }): Promise<Project | null> => {
         try {
             const updatedProject = await supabaseService.updateProject(updatedProjectData.id, updatedProjectData);
-            setProjects(p => p.map(proj => proj.id === updatedProjectData.id ? {...proj, ...updatedProject} : proj));
-            if (activeProjectId === updatedProjectData.id) {
-                setActiveProjectDetails(currentDetails => currentDetails ? {...currentDetails, ...updatedProject} : null);
+            setProjects(prev => prev.map(p => p.id === updatedProject.id ? { ...p, ...updatedProject } : p));
+            if (activeProjectId === updatedProject.id) {
+                setActiveProjectDetails(prev => prev ? { ...prev, ...updatedProject } : updatedProject);
             }
             return updatedProject;
-        } catch (err) { addToast(`${t('toast.failed_update_project')}: ${getErrorMessage(err)}`, 'error'); return null; }
+        } catch (error) {
+            addToast(`Failed to update project: ${getErrorMessage(error)}`, 'error');
+            return null;
+        }
+    }, [activeProjectId]);
+
+    const handleCreateBrandIdentity = async (identityData: Omit<BrandIdentity, 'id' | 'created_at' | 'user_id'>) => {
+        if (!user) return;
+        try {
+            const newIdentity = await supabaseService.createBrandIdentity(identityData, user.id);
+            setBrandIdentities(prev => [...prev, newIdentity]);
+            addToast("Brand identity created successfully!", "success");
+        } catch (error) {
+            addToast(`Failed to create brand identity: ${getErrorMessage(error)}`, 'error');
+        }
     };
     
-    const createProjectFromData = async (projectData: Partial<Project>): Promise<string | void> => {
-         if (!user) { addToast("User not found.", "error"); return; }
+    const handleUpdateBrandIdentity = async (identityId: string, updates: Partial<Omit<BrandIdentity, 'id' | 'created_at' | 'user_id'>>) => {
         try {
-            const baseProject: Omit<Project, 'id' | 'lastUpdated'> = {
-                name: projectData.name || 'New Project', topic: projectData.topic || '', platform: projectData.platform || 'youtube_long', videoSize: projectData.videoSize || '16:9', status: projectData.status || 'Idea', workflowStep: projectData.workflowStep || 1, title: projectData.title || null, script: projectData.script || null, analysis: null, competitorAnalysis: null, moodboard: projectData.moodboard || null, assets: {}, soundDesign: null, launchPlan: null, performance: null, scheduledDate: null, publishedUrl: null, voiceoverVoiceId: projectData.voiceoverVoiceId || null, last_performance_check: null,
-            };
-            const newProject = await supabaseService.createProject(baseProject, user.id);
-            addProjects([newProject]);
-            setActiveProjectId(newProject.id);
-            addToast(t('toast.project_created'), 'success');
-            return newProject.id;
-        } catch (err) { addToast(`${t('toast.failed_create_project')}: ${getErrorMessage(err)}`, 'error'); }
-    }
-    
-    const handleCreateProjectForBlueprint = async (topic: string, platform: Platform, title: string, voiceoverVoiceId: string, videoSize: Project['videoSize'], blueprint: Blueprint): Promise<string | void> => {
-        if (!user) return;
-        return await createProjectFromData({
-            topic,
-            platform,
-            videoSize,
-            name: title || "New Blueprint Project",
-            status: 'Scripting',
-            workflowStep: 2,
-            voiceoverVoiceId,
-            script: blueprint.script,
-            moodboard: blueprint.moodboard,
-            title: title
+            const updatedIdentity = await supabaseService.updateBrandIdentity(identityId, updates);
+            setBrandIdentities(prev => prev.map(id => id.id === identityId ? updatedIdentity : id));
+            addToast("Brand identity updated!", "success");
+        } catch (error) {
+            addToast(`Failed to update brand identity: ${getErrorMessage(error)}`, 'error');
+        }
+    };
+
+    const handleDeleteBrandIdentity = (identityId: string) => {
+        requestConfirmation("Delete Brand Identity?", "This will permanently delete this brand identity. This action cannot be undone.", async () => {
+            try {
+                await supabaseService.deleteBrandIdentity(identityId);
+                setBrandIdentities(prev => prev.filter(id => id.id !== identityId));
+                addToast("Brand identity deleted.", "success");
+            } catch (error) {
+                addToast(`Failed to delete brand identity: ${getErrorMessage(error)}`, 'error');
+            }
         });
+    };
+    
+    const handleCreateProjectForBlueprint = async (topic: string, platform: Platform, title: string, voiceoverVoiceId: string, videoSize: Project['videoSize'], blueprint: Blueprint) => {
+        if (!user) return;
+        try {
+            const projectData: Omit<Project, 'id' | 'lastUpdated'> = {
+                name: title, topic, platform, videoSize, status: 'Scripting', workflowStep: 2,
+                title, script: blueprint.script, moodboard: blueprint.moodboard,
+                assets: {}, soundDesign: null, launchPlan: null, performance: null,
+                scheduledDate: null, publishedUrl: null, analysis: null, competitorAnalysis: null,
+                voiceoverVoiceId, last_performance_check: null, final_video_url: null
+            };
+            const newProject = await supabaseService.createProject(projectData, user.id);
+            setProjects(prev => [newProject, ...prev]);
+            addToast(t('toast.project_created_blueprint'), 'success');
+            return newProject.id;
+        } catch (error) {
+            addToast(`${t('toast.failed_create_project')}: ${getErrorMessage(error)}`, 'error');
+        }
     };
 
     const handleCreateProjectFromIdea = async (suggestion: Opportunity | ContentGapSuggestion, platform: Platform) => {
-        const title = 'suggestedTitle' in suggestion ? suggestion.suggestedTitle : suggestion.potentialTitles[0];
-        await createProjectFromData({ topic: suggestion.idea, platform, name: title, title: title, status: 'Idea', workflowStep: 1 });
+        if (!user) return;
+        try {
+            const isOpportunity = 'suggestedTitle' in suggestion;
+            const projectData: Omit<Project, 'id' | 'lastUpdated'> = {
+                name: suggestion.idea,
+                topic: suggestion.idea,
+                platform: platform,
+                videoSize: platform === 'youtube_long' ? '16:9' : '9:16',
+                status: 'Idea',
+                workflowStep: 2, // Starts at script
+                title: isOpportunity 
+                    ? (suggestion as Opportunity).suggestedTitle 
+                    : (suggestion as ContentGapSuggestion).potentialTitles[0],
+                script: null, analysis: null, competitorAnalysis: null, moodboard: null,
+                assets: {}, soundDesign: null, launchPlan: null, performance: null,
+                scheduledDate: null, publishedUrl: null, voiceoverVoiceId: null, last_performance_check: null,
+            };
+            const newProject = await supabaseService.createProject(projectData, user.id);
+            setProjects(prev => [newProject, ...prev]);
+            addToast(t('toast.project_created_idea'), 'success');
+        } catch (error) {
+            addToast(`${t('toast.failed_create_project')}: ${getErrorMessage(error)}`, 'error');
+        }
+    };
+
+    const handleCreateProjectFromInsights = (review: PerformanceReview, originalProject: Project) => {
+        const topic = `Based on insights from "${originalProject.name}": ${review.whatToImprove[0]}`;
+        handleCreateProjectFromIdea({ idea: topic, reason: review.summary, suggestedTitle: `New & Improved: ${originalProject.title}`, potentialTitles: [], type: 'Growth Bet' }, originalProject.platform);
+    };
+
+    const handleDeleteProject = (projectId: string) => {
+        requestConfirmation(t('confirmation_modal.delete_project_title'), t('confirmation_modal.delete_project_message'), async () => {
+            try {
+                await supabaseService.deleteProject(projectId);
+                setProjects(prev => prev.filter(p => p.id !== projectId));
+                if (activeProjectId === projectId) setActiveProjectId(null);
+                addToast(t('toast.project_deleted'), 'success');
+            } catch (error) {
+                addToast(`${t('toast.failed_delete_project')}: ${getErrorMessage(error)}`, 'error');
+            }
+        });
+    };
+
+    const requirePermission = useCallback((requiredPlan: PlanId): boolean => {
+        if (!user) return false;
+        const userPlanIndex = PLANS.findIndex(p => p.id === user.subscription.planId);
+        const requiredPlanIndex = PLANS.findIndex(p => p.id === requiredPlan);
+        if (userPlanIndex >= requiredPlanIndex) {
+            return true;
+        } else {
+            const planName = PLANS[requiredPlanIndex].name;
+            setUpgradeReason({ title: 'Upgrade to ' + planName, description: `This feature requires a ${planName} plan or higher.` });
+            setUpgradeModalOpen(true);
+            return false;
+        }
+    }, [user]);
+
+    const handleSubscriptionChange = async (planId: PlanId) => {
+        if (!user) return;
+        if (user.subscription.planId === planId) { addToast(t('toast.already_on_plan'), 'info'); return; }
+        if (planId === 'free') {
+            // Handle downgrade logic if needed (e.g., via Stripe customer portal)
+            window.open('https://billing.stripe.com/p/login/test_9AQg0qgN1g82e4g144', '_blank');
+        } else {
+            try {
+                const { checkoutUrl } = await createCheckoutSession(planId);
+                window.location.href = checkoutUrl;
+            } catch (error) {
+                addToast(t('toast.subscription_failed', { error: getErrorMessage(error) }), 'error');
+            }
+        }
     };
     
-    const handleCreateProjectFromInsights = (review: PerformanceReview, originalProject: Project) => {
-        const newTopic = `Improving upon "${originalProject.name}" - ${review.whatToImprove[0]}`;
-        const newName = `New Video based on "${originalProject.name}"`;
-        createProjectFromData({ topic: newTopic, platform: originalProject.platform, name: newName, status: 'Idea', workflowStep: 1 });
+    const handleLogout = () => {
+        requestConfirmation(t('confirmation_modal.logout_title'), t('confirmation_modal.logout_message'), async () => {
+            await supabaseService.signOut();
+            setSession(null);
+            setUser(null);
+            setProjects([]);
+            addToast(t('toast.logged_out'));
+        });
     };
 
-    const addProjects = (newProjects: Project[]) => { setProjects(prev => [...newProjects, ...prev]); };
-    const handleDeleteProject = (projectId: string) => { requestConfirmation(t('confirmation_modal.delete_project_title'), t('confirmation_modal.delete_project_message'), async () => { try { await supabaseService.deleteProject(projectId); setProjects(p => p.filter(proj => proj.id !== projectId)); if (activeProjectId === projectId) { setActiveProjectId(null); } addToast(t('toast.project_deleted'), 'success'); } catch (err) { addToast(`${t('toast.failed_delete_project')}: ${getErrorMessage(err)}`, 'error'); } }); };
-    const handleCreateBrandIdentity = async (identityData: Omit<BrandIdentity, 'id' | 'created_at' | 'user_id'>) => { if (!user) return; try { const newIdentity = await supabaseService.createBrandIdentity(identityData, user.id); setBrandIdentities(prev => [newIdentity, ...prev]); addToast('Brand Identity created!', 'success'); } catch (err) { addToast(`Failed to create identity: ${getErrorMessage(err)}`, 'error'); } };
-    const handleUpdateBrandIdentity = async (identityId: string, updates: Partial<Omit<BrandIdentity, 'id' | 'created_at' | 'user_id'>>) => { try { const updatedIdentity = await supabaseService.updateBrandIdentity(identityId, updates); setBrandIdentities(prev => prev.map(id => id.id === identityId ? updatedIdentity : id)); addToast('Brand Identity updated!', 'success'); } catch (err) { addToast(`Failed to update identity: ${getErrorMessage(err)}`, 'error'); } };
-    const handleDeleteBrandIdentity = (identityId: string) => { requestConfirmation('Delete Brand Identity?', 'This action cannot be undone.', async () => { try { await supabaseService.deleteBrandIdentity(identityId); setBrandIdentities(prev => prev.filter(id => id.id !== identityId)); addToast('Brand Identity deleted!', 'success'); } catch (err) { addToast(`Failed to delete identity: ${getErrorMessage(err)}`, 'error'); } }); };
-    const markNotificationAsRead = async (notificationId: string) => { try { await supabaseService.markNotificationAsRead(notificationId); setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)); } catch (err) { console.error("Failed to mark notification as read:", err); } };
-    const markAllNotificationsAsRead = async () => { if (!user) return; try { await supabaseService.markAllNotificationsAsRead(user.id); setNotifications(prev => prev.map(n => ({ ...n, is_read: true }))); } catch (err) { console.error("Failed to mark all notifications as read:", err); } };
-    const openScheduleModal = (projectId: string) => { setProjectToSchedule(projectId); setScheduleModalOpen(true); };
-    const closeScheduleModal = () => { setProjectToSchedule(null); setScheduleModalOpen(false); };
+    const requestConfirmation = (title: string, message: string, onConfirm: () => void) => {
+        setConfirmation({ isOpen: true, title, message, onConfirm });
+    };
+
+    const handleConfirmation = () => {
+        confirmation.onConfirm();
+        setConfirmation({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+    };
+
+    const handleCancelConfirmation = () => {
+        setConfirmation({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+    };
+
+    const markNotificationAsRead = async (notificationId: string) => {
+        try {
+            await supabaseService.markNotificationAsRead(notificationId);
+            setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n));
+        } catch (e) {
+            addToast(`Error: ${getErrorMessage(e)}`, 'error');
+        }
+    };
+
+    const markAllNotificationsAsRead = async () => {
+        if (!user) return;
+        try {
+            await supabaseService.markAllNotificationsAsRead(user.id);
+            setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+        } catch (e) {
+            addToast(`Error: ${getErrorMessage(e)}`, 'error');
+        }
+    };
+
+    const openScheduleModal = (projectId: string) => {
+        setProjectToSchedule(projectId);
+        setIsScheduleModalOpen(true);
+    };
+
+    const handleFinalVideoSaved = async (projectId: string, videoUrl: string) => {
+        // This would involve uploading the blob to Supabase storage and getting a URL,
+        // but for this example, we'll assume the provided URL is already the final one.
+        await handleUpdateProject({ id: projectId, final_video_url: videoUrl });
+        addToast("Final video saved and ready for analysis!", "success");
+    };
+
+    const value = {
+        session, user, projects, toasts, dismissedTutorials, isUpgradeModalOpen, upgradeReason, confirmation, language, prefilledBlueprintPrompt, notifications, isInitialLoading, isScheduleModalOpen, projectToSchedule, backendError, brandIdentities, fonts,
+        t, setLanguage, addToast, dismissToast, dismissTutorial: (id: string) => setDismissedTutorials(prev => [...prev, id]),
+        handleLogout, consumeCredits, requirePermission, handleSubscriptionChange,
+        handleUpdateProject, handleCreateProjectForBlueprint, handleCreateProjectFromIdea, handleCreateProjectFromInsights, handleDeleteProject,
+        addProjects: (newProjects: Project[]) => setProjects(prev => [...newProjects, ...prev]),
+        handleCreateBrandIdentity, handleUpdateBrandIdentity, handleDeleteBrandIdentity,
+        requestConfirmation, handleConfirmation, handleCancelConfirmation,
+        setUpgradeModalOpen, setPrefilledBlueprintPrompt,
+        activeProjectId, setActiveProjectId, activeProjectDetails, isProjectDetailsLoading,
+        setUser,
+        markNotificationAsRead, markAllNotificationsAsRead, openScheduleModal, closeScheduleModal: () => setIsScheduleModalOpen(false), clearBackendError: () => setBackendError(null),
+        lockAndExecute,
+        invokeEdgeFunction: supabaseService.invokeEdgeFunction,
+        handleFinalVideoSaved,
+    };
 
     return (
-        <AppContext.Provider value={{
-            session, user, projects, toasts, dismissedTutorials,
-            isUpgradeModalOpen, upgradeReason, confirmation, language,
-            prefilledBlueprintPrompt, notifications, isInitialLoading,
-            isScheduleModalOpen, projectToSchedule, backendError,
-            brandIdentities, fonts,
-            handleFinalVideoSaved,
-            setLanguage, t, addToast, dismissToast, dismissTutorial,
-            handleLogout, consumeCredits, requirePermission,
-            handleSubscriptionChange, handleUpdateProject,
-            handleCreateProjectForBlueprint, handleDeleteProject,
-            requestConfirmation, handleConfirmation, handleCancelConfirmation,
-            setUpgradeModalOpen, handleCreateProjectFromIdea, setPrefilledBlueprintPrompt,
-            activeProjectId, setActiveProjectId, activeProjectDetails, isProjectDetailsLoading,
-            setUser,
-            handleCreateProjectFromInsights,
-            addProjects,
-            handleCreateBrandIdentity, handleUpdateBrandIdentity, handleDeleteBrandIdentity,
-            markNotificationAsRead, markAllNotificationsAsRead,
-            openScheduleModal, closeScheduleModal, clearBackendError, lockAndExecute,
-            invokeEdgeFunction: supabaseService.invokeEdgeFunction,
-        }}>
+        <AppContext.Provider value={value}>
             {children}
         </AppContext.Provider>
     );

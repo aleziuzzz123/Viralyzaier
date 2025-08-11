@@ -1,5 +1,5 @@
-import { ChannelStats, VideoPerformance } from '../types.js';
-import { invokeEdgeFunction } from './supabaseService.js';
+import { ChannelStats, VideoPerformance } from '../types.ts';
+import { invokeEdgeFunction } from './supabaseService.ts';
 
 // This service is now a client for our secure backend proxy.
 // It no longer contains any AI simulation logic.

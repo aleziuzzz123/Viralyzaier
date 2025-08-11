@@ -1,6 +1,5 @@
-import { Platform, SceneAssets, AiVideoModel } from "../types.js";
-import { invokeEdgeFunction } from './supabaseService.js';
-import { base64ToBlob } from '../utils.ts';
+import { Platform, SceneAssets } from "../types.ts";
+import { invokeEdgeFunction } from './supabaseService.ts';
 
 // This service is now secure. API keys are handled by backend proxy functions.
 // We only need to check if the function endpoints are available to the user.

@@ -1,7 +1,3 @@
-
-
-import { type PostgrestError } from '@supabase/supabase-js';
-
 // --- Core Types ---
 export type PlanId = 'free' | 'pro' | 'viralyzaier';
 export type ProjectStatus = 'Autopilot' | 'Idea' | 'Scripting' | 'Rendering' | 'Scheduled' | 'Published';
@@ -40,6 +36,7 @@ export interface User {
   youtubeConnected: boolean;
   content_pillars: string[];
   cloned_voices: ClonedVoice[];
+  isPersonalized?: boolean;
 }
 
 export interface ClonedVoice { id: string; name: string; status: 'ready' | 'pending' | 'failed'; }
