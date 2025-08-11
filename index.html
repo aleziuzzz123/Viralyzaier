@@ -1,26 +1,22 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Viralyzaier: Supercharged AI for Viral Videos in Seconds.</title>
 
-  <!-- Tailwind (ok for CDN dev; Vite will still bundle your app code) -->
+  <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Perf preconnects -->
+  <!-- Fonts & CESDK styles -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://cdn.img.ly" crossorigin>
-
-  <!-- Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-
-  <!-- Official CE.SDK CSS from CDN (no local copies) -->
   <link rel="stylesheet" href="https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/styles/cesdk.css">
   <link rel="stylesheet" href="https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/styles/cesdk-themes.css">
 
-  <!-- Safe, client-side env for the browser (what your app already uses) -->
+  <!-- Expose client-safe envs -->
   <script>
     window.__env = {
       VITE_SUPABASE_URL: "https://wpgrfukcnpcoyruymxdd.supabase.co",
@@ -34,14 +30,31 @@
     body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
     .toast-container { position: fixed; top: 1rem; right: 1rem; z-index: 9999; display:flex; flex-direction:column; gap:.75rem; align-items:flex-end; }
   </style>
+
+  <!-- NOTE: Vite will bundle dependencies, but keeping these mappings helps dev in some hosts -->
+  <script type="importmap">
+  {
+    "imports": {
+      "react": "https://esm.sh/react@19.1.1",
+      "react-dom": "https://esm.sh/react-dom@19.1.1",
+      "react-dom/client": "https://esm.sh/react-dom@19.1.1/client",
+      "react/": "https://esm.sh/react@19.1.1/",
+      "react-dom/": "https://esm.sh/react-dom@19.1.1/",
+      "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.54.0",
+      "@google/genai": "https://esm.sh/@google/genai@1.13.0",
+      "@cesdk/cesdk-js": "https://esm.sh/@cesdk/cesdk-js@1.57.0"
+    }
+  }
+  </script>
 </head>
 <body class="bg-gray-900">
   <div id="root"></div>
   <div id="modal-root"></div>
   <div id="toast-container" class="toast-container"></div>
 
-  <!-- IMPORTANT: no importmap. Vite bundles from node_modules. -->
+  <!-- Vite entry -->
   <script type="module" src="/index.tsx"></script>
 </body>
 </html>
+
  
