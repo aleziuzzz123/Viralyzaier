@@ -1,49 +1,36 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Viralyzaier: Supercharged AI for Viral Videos in Seconds.</title>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Viralyzaier: Supercharged AI for Viral Videos in Seconds.</title>
 
-    <!-- Tailwind (CDN) -->
-    <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- Preconnects (fonts + IMG.LY CDN) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preconnect" href="https://cdn.img.ly" crossorigin>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
-    <!-- Inter font -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script>
+    window.__env = {
+      VITE_SUPABASE_URL: "https://wpgrfukcnpcoyruymxdd.supabase.co",
+      VITE_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndwZ3JmdWtjbnBjb3lydXlteGRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3MzQ5MjgsImV4cCI6MjA2OTMxMDkyOH0.-b5KHzKWk2N3VEY_K5CzYZfszRRL6GY-MivOVUAL1Z4",
+      VITE_GOOGLE_CLIENT_ID: "56718945996-08g7ask8ounk33oua24n50man0vs9d05.apps.googleusercontent.com",
+      VITE_IMGLY_LICENSE_KEY: "ShZwWiKGfPK3hulkwwpU1OaKSy-mCLE0cmee3DLrtFIjF4FZ3LLc8z3yCnW1-wWv"
+    };
+  </script>
 
-    <!-- CESDK CSS (must match @cesdk/cesdk-js version) -->
-    <link rel="stylesheet" href="https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/styles/cesdk.css">
-    <link rel="stylesheet" href="https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/styles/cesdk-themes.css">
-
-    <!-- Expose client-safe env -->
-    <script>
-      window.__env = {
-        VITE_SUPABASE_URL: "https://wpgrfukcnpcoyruymxdd.supabase.co",
-        VITE_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndwZ3JmdWtjbnBjb3lydXlteGRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3MzQ5MjgsImV4cCI6MjA2OTMxMDkyOH0.-b5KHzKWk2N3VEY_K5CzYZfszRRL6GY-MivOVUAL1Z4",
-        VITE_GOOGLE_CLIENT_ID: "56718945996-08g7ask8ounk33oua24n50man0vs9d05.apps.googleusercontent.com",
-        VITE_IMGLY_LICENSE_KEY: "ShZwWiKGfPK3hulkwwpU1OaKSy-mCLE0cmee3DLrtFIjF4FZ3LLc8z3yCnW1-wWv"
-      };
-    </script>
-
-    <style>
-      body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-      .toast-container { position: fixed; top: 1rem; right: 1rem; z-index: 9999; display:flex; flex-direction:column; gap:.75rem; align-items:flex-end; }
-    </style>
-  </head>
-  <body class="bg-gray-900">
-    <div id="root"></div>
-    <div id="modal-root"></div>
-    <div id="toast-container" class="toast-container"></div>
-
-    <!-- IMPORTANT: no import maps / no extra scripts.
-         Vite will bundle @cesdk/cesdk-js from node_modules -->
-    <script type="module" src="/index.tsx"></script>
-  </body>
+  <style>
+    body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+    .toast-container { position: fixed; top: 1rem; right: 1rem; z-index: 9999; display:flex; flex-direction:column; gap:.75rem; align-items:flex-end; }
+  </style>
+</head>
+<body class="bg-gray-900">
+  <div id="root"></div>
+  <div id="modal-root"></div>
+  <div id="toast-container" class="toast-container"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
 </html>
 
 
