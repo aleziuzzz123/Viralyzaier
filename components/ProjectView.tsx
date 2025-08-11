@@ -1,5 +1,5 @@
 import React from 'react';
-import { Project, Blueprint, Script as ScriptType, WorkflowStep } from '../types.ts';
+import { Project, Script as ScriptType, WorkflowStep } from '../types.ts';
 import { useAppContext } from '../contexts/AppContext.tsx';
 import ScriptGenerator from './ScriptGenerator.tsx';
 import FinalEditStep from './FinalEditStep.tsx';
@@ -13,7 +13,7 @@ interface ProjectViewProps {
 }
 
 export const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
-    const { handleUpdateProject, t, dismissedTutorials, addToast } = useAppContext();
+    const { handleUpdateProject, t, dismissedTutorials } = useAppContext();
 
     const handleScriptSaved = (script: ScriptType) => {
         handleUpdateProject({

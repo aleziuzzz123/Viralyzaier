@@ -5,12 +5,14 @@
 
 
 
-import React, { useState, useRef } from 'react';
+
+
+import React, { useState } from 'react';
 import { useAppContext } from '../contexts/AppContext.tsx';
 import { generateAutopilotBacklog } from '../services/geminiService.ts';
 import * as supabase from '../services/supabaseService.ts';
-import { SparklesIcon, RocketLaunchIcon, PlusIcon, TrashIcon } from './Icons.tsx';
-import { Project, Script } from '../types.ts';
+import { RocketLaunchIcon, PlusIcon, TrashIcon } from './Icons.tsx';
+import { Project } from '../types.ts';
 
 const Autopilot: React.FC = () => {
     const { user, setUser, consumeCredits, requirePermission, addToast, t, addProjects, setActiveProjectId, lockAndExecute } = useAppContext();
@@ -92,7 +94,7 @@ const Autopilot: React.FC = () => {
 
                 // 2. Upload moodboard images to a structured path using the new project ID.
                 const moodboardUrls = await Promise.all(
-                    bp.moodboard.map(async (base64Img, index) => {
+                    bp.moodboard.map(async (base64Img: string, index: number) => {
                         const blob = await supabase.dataUrlToBlob(base64Img);
                         const path = `${user!.id}/${newProject.id}/moodboard_${index}.jpg`;
                         return supabase.uploadFile(blob, path);

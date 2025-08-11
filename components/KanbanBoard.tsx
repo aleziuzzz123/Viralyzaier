@@ -25,7 +25,7 @@ interface ProjectCardProps {
 }
 
 const ProjectCard: React.FC<ProjectCardProps> = ({ project, onViewProject }) => {
-    const { user, handleUpdateProject, addToast, t } = useAppContext();
+    const { handleUpdateProject, addToast, t } = useAppContext();
     const [isEditingUrl, setIsEditingUrl] = useState(false);
     const [url, setUrl] = useState(project.publishedUrl || '');
     const inputRef = useRef<HTMLInputElement>(null);

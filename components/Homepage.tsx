@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SparklesIcon, YouTubeIcon, TikTokIcon, InstagramIcon, PlayCircleIcon, LightBulbIcon, ScriptIcon, PhotoIcon, MusicNoteIcon, RocketLaunchIcon, UserGroupIcon, ChevronDownIcon, UserCircleIcon } from './Icons.tsx';
+import { SparklesIcon, YouTubeIcon, TikTokIcon, InstagramIcon, LightBulbIcon, ScriptIcon, PhotoIcon, RocketLaunchIcon, ChevronDownIcon } from './Icons.tsx';
 import LoginModal from './LoginModal.tsx';
 import { useAppContext } from '../contexts/AppContext.tsx';
 import LanguageSwitcher from './LanguageSwitcher.tsx';

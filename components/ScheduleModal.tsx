@@ -1,7 +1,8 @@
 
+
 import React, { useState } from 'react';
-import { CalendarIcon, XCircleIcon } from './Icons';
-import { useAppContext } from '../contexts/AppContext';
+import { CalendarIcon, XCircleIcon } from './Icons.tsx';
+import { useAppContext } from '../contexts/AppContext.tsx';
 
 const ScheduleModal: React.FC = () => {
     const { 
@@ -10,7 +11,6 @@ const ScheduleModal: React.FC = () => {
         projectToSchedule, 
         handleUpdateProject,
         addToast,
-        t 
     } = useAppContext();
     
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format

@@ -1,14 +1,14 @@
 
+
 import React from 'react';
 import { Project } from '../types.ts';
 import { useAppContext } from '../contexts/AppContext.tsx';
 import ImgLyEditor from './ImgLyEditor.tsx';
-import Loader from './Loader.tsx';
 
 const FinalEditStep: React.FC<{
     project: Project;
     onProceedToNextStage: () => void;
-}> = ({ project, onProceedToNextStage }) => {
+}> = ({ project }) => {
     const { t } = useAppContext();
 
     // The script is essential for the editor to have assets like voiceovers
@@ -21,7 +21,7 @@ const FinalEditStep: React.FC<{
         );
     }
     
-    return <ImgLyEditor project={project} />;
+    return <ImgLyEditor projectId={project.id} />;
 };
 
 export default FinalEditStep;

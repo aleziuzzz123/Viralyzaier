@@ -5,6 +5,7 @@
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../contexts/AppContext.tsx';
 import { PhotoIcon, MicIcon, ClipboardCopyIcon } from './Icons.tsx';
+import { Project } from '../types.ts';
 
 interface FlatAsset {
     url: string;
@@ -18,27 +19,28 @@ const AssetLibrary: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'video' | 'audio'>('video');
 
     const allAssets = useMemo<FlatAsset[]>(() => {
-        return projects.flatMap(project => {
+        return projects.flatMap((project: Project) => {
             if (!project.assets) return [];
-            return Object.entries(project.assets).flatMap(([sceneIndex, sceneAssets]) => {
-                const assets: FlatAsset[] = [];
-                if (sceneAssets.visualUrl) {
-                    assets.push({
-                        url: sceneAssets.visualUrl,
+            const sceneAssets = project.assets as any; // Quick fix for unknown type
+            return Object.entries(sceneAssets).flatMap(([sceneIndex, assets]: [string, any]) => {
+                const flatAssets: FlatAsset[] = [];
+                if (assets.visualUrl) {
+                    flatAssets.push({
+                        url: assets.visualUrl,
                         type: 'video', // Note: This assumes all visuals in the library are videos.
                         projectName: project.name,
                         scene: parseInt(sceneIndex) + 1,
                     });
                 }
-                if (sceneAssets.voiceoverUrl) {
-                    assets.push({
-                        url: sceneAssets.voiceoverUrl,
+                if (assets.voiceoverUrl) {
+                    flatAssets.push({
+                        url: assets.voiceoverUrl,
                         type: 'audio',
                         projectName: project.name,
                         scene: parseInt(sceneIndex) + 1,
                     });
                 }
-                return assets;
+                return flatAssets;
             });
         });
     }, [projects]);

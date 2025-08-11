@@ -45,7 +45,7 @@ const PlanCard: React.FC<PlanCardProps> = ({ plan, onSelect, isCurrent, t }) => 
             </div>
             
             <ul className="mt-8 space-y-4 flex-grow">
-                {plan.features.map((featureKey, i) => (
+                {plan.features.map((featureKey: string, i: number) => (
                     <li key={i} className="flex items-start">
                         <CheckBadgeIcon className="w-6 h-6 mr-3 text-green-400 flex-shrink-0" />
                         <span className="text-gray-300">{t(featureKey as any)}</span>
@@ -86,7 +86,7 @@ const PricingPage: React.FC = () => {
             </header>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto items-stretch">
-                {PLANS.map(plan => (
+                {PLANS.map((plan: Plan) => (
                     <PlanCard 
                         key={plan.id}
                         plan={plan}

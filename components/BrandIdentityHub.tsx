@@ -2,11 +2,13 @@
 
 
 
+
+
 import React, { useState } from 'react';
 import { useAppContext } from '../contexts/AppContext.tsx';
 import { BrandIdentity } from '../types.ts';
 import { PlusIcon, PencilIcon, TrashIcon, XCircleIcon, PaintBrushIcon, UploadIcon } from './Icons.tsx';
-import { uploadFile, dataUrlToBlob } from '../services/supabaseService.ts';
+import { uploadFile } from '../services/supabaseService.ts';
 import { getErrorMessage } from '../utils.ts';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -18,7 +20,7 @@ interface BrandIdentityModalProps {
 
 // Modal component for creating/editing brand identities
 const BrandIdentityModal: React.FC<BrandIdentityModalProps> = ({ isOpen, onClose, identityToEdit }) => {
-    const { user, t, handleCreateBrandIdentity, handleUpdateBrandIdentity, addToast } = useAppContext();
+    const { user, handleCreateBrandIdentity, handleUpdateBrandIdentity, addToast } = useAppContext();
     const [isUploadingLogo, setIsUploadingLogo] = useState(false);
     const [identity, setIdentity] = useState<Omit<BrandIdentity, 'id' | 'created_at' | 'user_id'> & { logoUrl?: string }>(() => {
         return identityToEdit || {
@@ -167,7 +169,7 @@ const BrandIdentityModal: React.FC<BrandIdentityModalProps> = ({ isOpen, onClose
 
 
 const BrandIdentityHub: React.FC = () => {
-    const { brandIdentities, handleDeleteBrandIdentity, t } = useAppContext();
+    const { brandIdentities, handleDeleteBrandIdentity } = useAppContext();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [identityToEdit, setIdentityToEdit] = useState<BrandIdentity | null>(null);
 

@@ -1,4 +1,4 @@
-import { supabase } from '../services/supabaseClient';
+import { supabase } from '../services/supabaseClient.ts';
 
 type AssetKind = 'image' | 'video' | 'audio';
 const BUCKET = 'assets'; // change if your bucket name differs
@@ -16,9 +16,9 @@ export async function listSupabaseAssets(prefix = ''): Promise<Array<{ id: strin
   });
   if (error) throw error;
 
-  const files = (data || []).filter((f) => !f.name.endsWith('/'));
+  const files = (data || []).filter((f: { name: string; }) => !f.name.endsWith('/'));
 
-  const mapped = await Promise.all(files.map(async (f) => {
+  const mapped = await Promise.all(files.map(async (f: { name: string; }) => {
     const path = prefix ? `${prefix}/${f.name}` : f.name;
     const { data: signed, error: sErr } = await supabase.storage.from(BUCKET).createSignedUrl(path, 60 * 60);
     if (sErr) throw sErr;

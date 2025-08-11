@@ -242,7 +242,7 @@ const AnalysisResult: React.FC<AnalysisResultProps> = ({ result, onReset, videoP
                   {t('analysis_result.strengths_title')}
                 </h3>
                 <ul className="space-y-3">
-                  {strengths.map((item, index) => (
+                  {strengths.map((item: string, index: number) => (
                     <li key={index} className="flex items-start">
                       <CheckCircleIcon className="w-5 h-5 mr-3 mt-1 text-green-400 flex-shrink-0" />
                       <span className="text-gray-300">{item}</span>
@@ -257,7 +257,7 @@ const AnalysisResult: React.FC<AnalysisResultProps> = ({ result, onReset, videoP
                   {t('analysis_result.improvements_title')}
                 </h3>
                 <ul className="space-y-1 -m-3">
-                  {improvements.map((item, index) => (
+                  {improvements.map((item: { suggestion: string; reason: string; }, index: number) => (
                     <ImprovementItem key={index} suggestion={item.suggestion} reason={item.reason} t={t} />
                   ))}
                 </ul>

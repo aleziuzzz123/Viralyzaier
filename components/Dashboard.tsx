@@ -1,12 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Project, Blueprint, Platform, BrandIdentity, ClonedVoice, VideoStyle } from '../types.ts';
-import { FilePlusIcon, SparklesIcon, LightBulbIcon, YouTubeIcon, TikTokIcon, InstagramIcon, CheckCircleIcon, PlayIcon, StopCircleIcon, FilmIcon, TypeIcon, PaintBrushIcon } from './Icons.tsx';
+import React, { useEffect } from 'react';
+import { Project } from '../types.ts';
+import { FilePlusIcon } from './Icons.tsx';
 import KanbanBoard from './KanbanBoard.tsx';
 import { PLANS } from '../services/paymentService.ts';
 import { useAppContext } from '../contexts/AppContext.tsx';
-import { getErrorMessage } from '../utils.ts';
 import Loader from './Loader.tsx';
-import { ELEVENLABS_VOICES, generateVoiceover } from '../services/generativeMediaService.ts';
 
 interface DashboardProps {
     onSelectProject: (id: string) => void;
@@ -14,7 +12,7 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ onSelectProject, onNewProject }) => {
-    const { user, projects, dismissedTutorials, addToast, t, isInitialLoading } = useAppContext();
+    const { user, projects, addToast, t, isInitialLoading } = useAppContext();
     
     useEffect(() => {
         const hasSeenOnboarding = localStorage.getItem('hasSeenOnboarding');
@@ -25,14 +23,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelectProject, onNewProject }) 
     }, [user, projects, isInitialLoading, onNewProject]);
 
     const creditsUsed = (user ? PLANS.find(p => p.id === user.subscription.planId)!.creditLimit : 0) - (user?.aiCredits || 0);
-
-    const handleCreateProject = () => {
-         if (user?.subscription.planId === 'free' && projects.length >= 1) {
-            addToast("Free Plan Project Limit Reached. Please upgrade.", 'error');
-            return;
-        }
-        onNewProject();
-    };
 
     if (isInitialLoading) {
         return <div className="flex justify-center items-center h-64"><Loader /></div>;
@@ -65,7 +55,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelectProject, onNewProject }) 
                 </div>
                 <div className="bg-gray-800/50 p-4 rounded-lg text-center">
                     <p className="text-sm font-semibold text-gray-400">{t('dashboard.published_videos')}</p>
-                    <p className="text-4xl font-black text-white mt-1">{projects.filter(p => p.status === 'Published').length}</p>
+                    <p className="text-4xl font-black text-white mt-1">{projects.filter((p: Project) => p.status === 'Published').length}</p>
                 </div>
                 <div className="bg-gray-800/50 p-4 rounded-lg text-center">
                     <p className="text-sm font-semibold text-gray-400">{t('dashboard.credits_used')}</p>

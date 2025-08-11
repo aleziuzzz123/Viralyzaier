@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { CrownIcon, CreditIcon, LogoutIcon, SparklesIcon, CogIcon } from './Icons.tsx';
+import { CrownIcon, CreditIcon, LogoutIcon, CogIcon } from './Icons.tsx';
 import { useAppContext } from '../contexts/AppContext.tsx';
 import * as supabase from '../services/supabaseService.ts';
 import { PLANS } from '../services/paymentService.ts';
+import { Plan } from '../types.ts';
 
 interface UserMenuProps {
     onNavigate: (view: 'pricing' | 'settings') => void;
@@ -22,27 +23,6 @@ const UserMenu: React.FC<UserMenuProps> = ({ onNavigate }) => {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
-
-    const handleDevUpgrade = async () => {
-        if (user) {
-            const proPlan = PLANS.find(p => p.id === 'pro');
-            if (!proPlan) {
-                addToast('Pro plan configuration not found.', 'error');
-                return;
-            }
-            try {
-                const updatedUser = await supabase.updateUserProfile(user.id, {
-                    subscription: { planId: 'pro', status: 'active', endDate: null },
-                    aiCredits: proPlan.creditLimit,
-                });
-                setUser(updatedUser);
-                addToast('Successfully upgraded to Pro Plan (Dev Mode)!', 'success');
-                setIsOpen(false);
-            } catch (error) {
-                addToast(error instanceof Error ? error.message : 'Failed to upgrade plan.', 'error');
-            }
-        }
-    };
     
     if (!user) return null;
 

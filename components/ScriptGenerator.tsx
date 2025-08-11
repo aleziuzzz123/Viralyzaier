@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Project, Script, Platform, Scene } from '../types.ts';
-import { PencilIcon, CheckBadgeIcon, MagicWandIcon, SparklesIcon, PlusIcon, TrashIcon, CheckCircleIcon, PhotoIcon } from './Icons.tsx';
+import { Project, Script } from '../types.ts';
+import { CheckBadgeIcon, MagicWandIcon, SparklesIcon, PlusIcon, TrashIcon, CheckCircleIcon, PhotoIcon } from './Icons.tsx';
 import { useAppContext } from '../contexts/AppContext.tsx';
 import { rewriteScriptScene, generateStoryboardImage } from '../services/geminiService.ts';
 import { getErrorMessage } from '../utils.ts';
@@ -66,7 +66,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ project, onScriptSaved }) =
 
     const removeHook = (index: number) => {
         if (!script || script.hooks.length <= 1) return;
-        const newHooks = script.hooks.filter((_, i) => i !== index);
+        const newHooks = script.hooks.filter((_: string, i: number) => i !== index);
         const newSelectedHookIndex = script.selectedHookIndex === index 
             ? 0 
             : (script.selectedHookIndex && script.selectedHookIndex > index ? script.selectedHookIndex - 1 : script.selectedHookIndex);
@@ -144,7 +144,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ project, onScriptSaved }) =
                 <div>
                     <h4 className="font-bold text-indigo-400 mb-2">{t('script_generator.hooks_title')}</h4>
                      <div className="space-y-3">
-                        {script?.hooks.map((hook, index) => (
+                        {script?.hooks.map((hook: string, index: number) => (
                             <div key={index} className={`flex items-center gap-3 p-1 rounded-lg border transition-all ${script.selectedHookIndex === index ? 'bg-indigo-900/30 border-indigo-500' : 'bg-gray-800/50 border-gray-700'}`}>
                                 <button 
                                     onClick={() => handleSelectHook(index)}
@@ -176,7 +176,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ project, onScriptSaved }) =
                 <div>
                     <h4 className="font-bold text-indigo-400 mb-2">{t('script_generator.script_title')}</h4>
                     <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-4 -mr-4">
-                        {script?.scenes.map((scene, i) => (
+                        {script?.scenes.map((scene: any, i: number) => (
                             <div key={i} className="p-4 bg-gray-800/50 rounded-lg border border-gray-700 space-y-4">
                                 <div className="flex justify-between items-center">
                                     <p className="font-bold text-gray-200">Scene {i+1} ({scene.timecode})</p>

@@ -1,7 +1,9 @@
 
 
+
+
 import React, { useState } from 'react';
-import { Opportunity, Platform } from '../types.ts';
+import { Opportunity } from '../types.ts';
 import { fetchChannelVideos } from '../services/youtubeService.ts';
 import { performChannelAudit } from '../services/geminiService.ts';
 import * as supabase from '../services/supabaseService.ts';
@@ -48,7 +50,7 @@ const ChannelHub: React.FC<ChannelHubProps> = () => {
         try {
             // Now fetches REAL videos from the user's connected channel
             const videos = await fetchChannelVideos();
-            const auditResult = await performChannelAudit(videos.map(v => ({ title: v.title, views: v.views, likes: v.likes, comments: v.comments })));
+            const auditResult = await performChannelAudit(videos.map((v: any) => ({ title: v.title, views: v.views, likes: v.likes, comments: v.comments })));
             const updatedUser = await supabase.updateUserProfile(user.id, { channelAudit: auditResult });
             setUser(updatedUser);
             addToast("Channel audit complete! Your growth plan is ready.", 'success');
@@ -118,7 +120,7 @@ const ChannelHub: React.FC<ChannelHubProps> = () => {
                         <div className="bg-gray-800/50 p-6 rounded-lg">
                             <h3 className="text-lg font-bold text-white mb-2">{t('channel_hub.pillars_title')}</h3>
                             <ul className="list-disc list-inside text-gray-300 space-y-1">
-                                {channelAudit.contentPillars.map((p, i) => <li key={i}>{p}</li>)}
+                                {channelAudit.contentPillars.map((p: string, i: number) => <li key={i}>{p}</li>)}
                             </ul>
                         </div>
                          <div className="bg-gray-800/50 p-6 rounded-lg">
@@ -134,7 +136,7 @@ const ChannelHub: React.FC<ChannelHubProps> = () => {
                     <div>
                         <h2 className="text-3xl font-bold text-white mb-4 text-center">{t('channel_hub.matrix_title')}</h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                           {channelAudit.opportunities.map((opp, i) => (
+                           {channelAudit.opportunities.map((opp: Opportunity, i: number) => (
                                <div key={i} className={`p-6 rounded-2xl border-2 ${
                                    opp.type === 'Quick Win' ? 'border-green-500/50 bg-green-900/10' :
                                    opp.type === 'Growth Bet' ? 'border-yellow-500/50 bg-yellow-900/10' :

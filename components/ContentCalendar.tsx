@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { SparklesIcon, XCircleIcon } from './Icons.tsx';
 import { getSchedulingSuggestion } from '../services/geminiService.ts';
 import { useAppContext } from '../contexts/AppContext.tsx';
+import { Project } from '../types.ts';
 
 interface CalendarProps {
 }
@@ -43,7 +44,7 @@ const ContentCalendar: React.FC<CalendarProps> = () => {
     const daysInMonth = getDaysInMonth(currentYear, currentMonth);
     const firstDay = getFirstDayOfMonth(currentYear, currentMonth);
 
-    const calendarDays = Array.from({ length: firstDay }, (_, i) => ({ key: `empty-${i}`, date: null, projects: [] }))
+    const calendarDays: { key: string; date: Date | null; projects: Project[] }[] = Array.from({ length: firstDay }, (_, i) => ({ key: `empty-${i}`, date: null, projects: [] }))
         .concat(Array.from({ length: daysInMonth }, (_, i) => {
             const dayDate = new Date(currentYear, currentMonth, i + 1);
             const dayProjects = projects.filter(p => {
@@ -128,7 +129,7 @@ const ContentCalendar: React.FC<CalendarProps> = () => {
                         <div key={day.key} className="bg-gray-900/70 h-32 p-2 overflow-y-auto">
                            {day.date && <span className="text-sm font-semibold text-gray-300">{day.date.getDate()}</span>}
                            <div className="space-y-1 mt-1">
-                               {day.projects.map(p => (
+                               {day.projects.map((p: Project) => (
                                    <div 
                                       key={p.id}
                                       onClick={() => setActiveProjectId(p.id)}

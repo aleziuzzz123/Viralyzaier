@@ -2,7 +2,7 @@
 
 import React, { useRef, useEffect } from 'react';
 import { useAppContext } from '../contexts/AppContext.tsx';
-import { Project } from '../types.ts';
+import { Notification } from '../types.ts';
 import { SparklesIcon } from './Icons.tsx';
 
 interface NotificationsPanelProps {
@@ -23,7 +23,7 @@ const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ onClose }) => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [onClose]);
     
-    const handleNotificationClick = (notificationId: string, projectId?: string) => {
+    const handleNotificationClick = (notificationId: string, projectId?: string | null) => {
         markNotificationAsRead(notificationId);
         if (projectId) {
             setActiveProjectId(projectId);
@@ -54,7 +54,7 @@ const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ onClose }) => {
             <div className="max-h-96 overflow-y-auto">
                 {notifications.length > 0 ? (
                     <ul className="divide-y divide-gray-700">
-                        {notifications.map(n => (
+                        {notifications.map((n: Notification) => (
                             <li key={n.id}>
                                 <button 
                                     onClick={() => handleNotificationClick(n.id, n.project_id)}

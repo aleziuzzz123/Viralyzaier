@@ -1,12 +1,11 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { analyzeTitles } from '../services/geminiService.ts';
-import { TitleAnalysis, Platform } from '../types.ts';
-import { SparklesIcon, PlusIcon, TrashIcon, LightBulbIcon, MagicWandIcon } from './Icons.tsx';
+import { TitleAnalysis, Platform, Project } from '../types.ts';
+import { PlusIcon, TrashIcon, LightBulbIcon, MagicWandIcon } from './Icons.tsx';
 import { useAppContext } from '../contexts/AppContext.tsx';
 
 interface TitleOptimizerProps {
     onTitleSelect: (title: string) => void;
-    onBack: () => void;
     platform: Platform;
 }
 
@@ -18,9 +17,9 @@ const scoreColor = (score: number) => {
   return 'text-red-400';
 };
 
-const TitleOptimizer: React.FC<TitleOptimizerProps> = ({ onTitleSelect, onBack, platform }) => {
+const TitleOptimizer: React.FC<TitleOptimizerProps> = ({ onTitleSelect, platform }) => {
   const { consumeCredits, projects, activeProjectId, t } = useAppContext();
-  const project = projects.find(p => p.id === activeProjectId);
+  const project = projects.find((p: Project) => p.id === activeProjectId);
   const initialTopic = project?.topic || '';
 
   const [topic, setTopic] = useState(initialTopic);

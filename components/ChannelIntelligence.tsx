@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Project, ChannelStats, VideoPerformance, PerformanceReview, ContentGapSuggestion } from '../types.ts';
+import { ChannelStats, VideoPerformance, PerformanceReview, ContentGapSuggestion } from '../types.ts';
 import { fetchChannelStats, fetchVideoPerformance, fetchChannelVideos } from '../services/youtubeService.ts';
 import { reviewVideoPerformance, suggestContentGaps } from '../services/geminiService.ts';
-import { ChartBarIcon, SparklesIcon, LightBulbIcon, ThumbsUpIcon, CtaIcon, CheckBadgeIcon } from './Icons.tsx';
+import { SparklesIcon, LightBulbIcon, ThumbsUpIcon, CtaIcon } from './Icons.tsx';
 import { useAppContext } from '../contexts/AppContext.tsx';
 
 interface ChannelIntelligenceProps {
-    project: Project;
+    project: any; // Using any for project as its type is complex and not fully used here
 }
 
 interface StatCardProps {
@@ -44,7 +44,7 @@ const ChannelIntelligence: React.FC<ChannelIntelligenceProps> = ({ project }) =>
                     fetchChannelVideos()
                 ]);
                 setStats(channelStats);
-                setRecentVideos(channelVideos.map(v => ({id: v.id, title: v.title})));
+                setRecentVideos(channelVideos.map((v: any) => ({id: v.id, title: v.title})));
             } catch (e) {
                 setError(t('channel_intelligence.error_load'));
             } finally {
@@ -171,13 +171,13 @@ const ChannelIntelligence: React.FC<ChannelIntelligenceProps> = ({ project }) =>
                            <div className="bg-gray-900/50 p-4 rounded-lg">
                                <h4 className="font-semibold text-green-400 flex items-center mb-2"><ThumbsUpIcon className="w-5 h-5 mr-2"/> {t('channel_intelligence.what_worked')}</h4>
                                <ul className="list-disc list-inside text-gray-300 text-sm space-y-1">
-                                   {review.whatWorked.map((item, i) => <li key={i}>{item}</li>)}
+                                   {review.whatWorked.map((item: string, i: number) => <li key={i}>{item}</li>)}
                                </ul>
                            </div>
                            <div className="bg-gray-900/50 p-4 rounded-lg">
                                <h4 className="font-semibold text-yellow-400 flex items-center mb-2"><LightBulbIcon className="w-5 h-5 mr-2"/> {t('channel_intelligence.what_to_improve')}</h4>
                                <ul className="list-disc list-inside text-gray-300 text-sm space-y-1">
-                                   {review.whatToImprove.map((item, i) => <li key={i}>{item}</li>)}
+                                   {review.whatToImprove.map((item: string, i: number) => <li key={i}>{item}</li>)}
                                </ul>
                            </div>
                             <button onClick={() => handleCreateProjectFromInsights(review, project)} className="w-full mt-4 inline-flex items-center justify-center px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-full transition-colors">
@@ -206,7 +206,7 @@ const ChannelIntelligence: React.FC<ChannelIntelligenceProps> = ({ project }) =>
                                     <h4 className="font-bold text-lg text-cyan-300 flex items-center"><LightBulbIcon className="w-5 h-5 mr-2"/> {s.idea}</h4>
                                     <p className="text-sm text-gray-400 mt-1 mb-3 italic">{t('channel_intelligence.why_it_works')} {s.reason}</p>
                                     <div className="flex flex-wrap gap-2 mb-4">
-                                        {s.potentialTitles.map((title, ti) => (
+                                        {s.potentialTitles.map((title: string, ti: number) => (
                                            <span key={ti} className="text-xs px-2 py-1 bg-gray-700 rounded-full">{title}</span>
                                         ))}
                                     </div>

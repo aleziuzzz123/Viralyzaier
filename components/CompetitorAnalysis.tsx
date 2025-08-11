@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Project, CompetitorAnalysisResult } from '../types.ts';
 import { analyzeCompetitorVideo } from '../services/geminiService.ts';
-import { SparklesIcon, TargetIcon, LightBulbIcon, CtaIcon, CheckIcon } from './Icons.tsx';
+import { SparklesIcon, TargetIcon, LightBulbIcon, CheckIcon } from './Icons.tsx';
 import { useAppContext } from '../contexts/AppContext.tsx';
 
 interface CompetitorAnalysisProps {
@@ -87,7 +87,7 @@ const CompetitorAnalysis: React.FC<CompetitorAnalysisProps> = ({ project, onAppl
                         <div className="bg-gray-800/50 rounded-2xl p-6 shadow-2xl border border-gray-700">
                             <h4 className="text-lg font-bold text-white mb-3">{t('competitor_analysis.structure_title')}</h4>
                             <ul className="space-y-3">
-                                {result.stealableStructure.map((item, i) => (
+                                {result.stealableStructure.map((item: { step: string; description: string; }, i: number) => (
                                     <li key={i} className="flex items-start">
                                         <div className="bg-gray-900 text-pink-400 font-bold rounded-md w-8 h-8 flex items-center justify-center mr-4 flex-shrink-0">{i + 1}</div>
                                         <div>
@@ -101,7 +101,7 @@ const CompetitorAnalysis: React.FC<CompetitorAnalysisProps> = ({ project, onAppl
                         <div className="bg-gray-800/50 rounded-2xl p-6 shadow-2xl border border-gray-700">
                             <h4 className="text-lg font-bold text-white mb-3">{t('competitor_analysis.keywords_title')}</h4>
                              <div className="flex flex-wrap gap-2">
-                                {result.extractedKeywords.map((keyword, i) => (
+                                {result.extractedKeywords.map((keyword: string, i: number) => (
                                     <span key={i} className="px-3 py-1 bg-gray-700 text-gray-300 text-sm font-medium rounded-full">{keyword}</span>
                                 ))}
                             </div>
@@ -111,7 +111,7 @@ const CompetitorAnalysis: React.FC<CompetitorAnalysisProps> = ({ project, onAppl
                     <div className="bg-gray-800/50 rounded-2xl p-6 shadow-2xl border border-gray-700">
                         <h4 className="flex items-center text-lg font-bold text-white mb-3"><LightBulbIcon className="w-5 h-5 mr-2 text-yellow-300"/>{t('competitor_analysis.upgrades_title')}</h4>
                         <ul className="space-y-2">
-                            {result.suggestedTitles.map((title, i) => (
+                            {result.suggestedTitles.map((title: string, i: number) => (
                                 <li key={i} className="group flex items-center justify-between p-3 rounded-md hover:bg-gray-900/50">
                                     <p className="text-gray-200">{title}</p>
                                     <button
@@ -137,7 +137,7 @@ const CompetitorAnalysis: React.FC<CompetitorAnalysisProps> = ({ project, onAppl
                         <div className="bg-gray-800/50 rounded-2xl p-6 shadow-2xl border border-gray-700">
                             <h4 className="text-lg font-bold text-white mb-3">Sources</h4>
                             <ul className="space-y-2">
-                                {result.sources.map((source, i) => (
+                                {result.sources.map((source: { uri: string; title: string; }, i: number) => (
                                     <li key={i} className="text-sm text-gray-400">
                                         <a href={source.uri} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline truncate block">
                                             {i + 1}. {source.title}
