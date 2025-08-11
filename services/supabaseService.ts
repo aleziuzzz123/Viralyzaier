@@ -22,7 +22,7 @@ import {
     VideoStyle,
     Json,
 } from '../types.js';
-import { type AuthSession, type FunctionInvokeOptions, type PostgrestError } from '@supabase/supabase-js';
+import { type Session, type FunctionInvokeOptions, type PostgrestError } from '@supabase/supabase-js';
 import { PLANS } from './paymentService.js';
 import { getErrorMessage } from '../utils.ts';
 
@@ -151,12 +151,12 @@ export const getSession = async () => {
     return { session };
 };
 
-export const onAuthStateChange = (callback: (event: string, session: AuthSession | null) => void) => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(callback as any);
+export const onAuthStateChange = (callback: (event: string, session: Session | null) => void) => {
+    const { data: subscription } = supabase.auth.onAuthStateChange(callback as any);
     return subscription;
 };
 
-export const signInWithPassword = async (email: string, password: string): Promise<AuthSession | null> => {
+export const signInWithPassword = async (email: string, password: string): Promise<Session | null> => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw new Error(getErrorMessage(error));
     return data.session;

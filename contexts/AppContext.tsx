@@ -2,7 +2,7 @@ import React, { createContext, useState, useEffect, useCallback, useContext, Rea
 import { Project, User, PlanId, Blueprint, Toast, Platform, Opportunity, ContentGapSuggestion, PerformanceReview, Notification, ProjectStatus, Database, UserAsset, BrandIdentity, VideoStyle, Json } from '../types.ts';
 import * as supabaseService from '../services/supabaseService.ts';
 import { supabase } from '../services/supabaseClient.js'; // Import client directly
-import { type AuthSession } from '@supabase/supabase-js';
+import { type Session } from '@supabase/supabase-js';
 import { createCheckoutSession, PLANS } from '../services/paymentService.ts';
 import { translations, Language, TranslationKey } from '../translations.ts';
 import { getErrorMessage } from '../utils.ts';
@@ -11,7 +11,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 
 interface AppContextType {
-    session: AuthSession | null;
+    session: Session | null;
     user: User | null;
     projects: Project[];
     toasts: Toast[];
@@ -94,7 +94,7 @@ export const useAppContext = () => {
 };
 
 export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
-    const [session, setSession] = useState<AuthSession | null>(null);
+    const [session, setSession] = useState<Session | null>(null);
     const [user, setUser] = useState<User | null>(null);
     const [projects, setProjects] = useState<Project[]>([]);
     const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -192,24 +192,20 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     
     // --- AUTH & DATA LOADING ---
     useEffect(() => {
-        supabaseService.getSession().then(({ session }) => setSession(session))
-        .catch(err => {
-            console.error("Failed to get initial session:", err);
-            addToast(`Could not connect to the authentication service: ${getErrorMessage(err)}`, "error");
-        }).finally(() => setIsInitialLoading(false));
-
+        setIsInitialLoading(true);
         const authListener = supabaseService.onAuthStateChange((_event, session) => {
             setSession(session);
+            setIsInitialLoading(false);
         });
 
         const savedTutorials = localStorage.getItem('viralyzaier-tutorials');
         setDismissedTutorials(savedTutorials ? JSON.parse(savedTutorials) : []);
 
         return () => {
-            authListener?.unsubscribe();
+            authListener?.subscription.unsubscribe();
         };
 
-    }, [addToast]);
+    }, []);
     
     // --- Data loading for authenticated user ---
     useEffect(() => {
