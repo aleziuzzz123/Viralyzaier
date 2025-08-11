@@ -1,5 +1,3 @@
-
-
 import React, { useState } from 'react';
 import { VideoStyle, Platform, BrandIdentity } from '../types.ts';
 import { useAppContext } from '../contexts/AppContext.tsx';

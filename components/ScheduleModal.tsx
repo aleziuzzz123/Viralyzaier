@@ -1,5 +1,3 @@
-
-
 import React, { useState } from 'react';
 import { CalendarIcon, XCircleIcon } from './Icons.tsx';
 import { useAppContext } from '../contexts/AppContext.tsx';

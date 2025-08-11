@@ -12,7 +12,7 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ onSelectProject, onNewProject }) => {
-    const { user, projects, addToast, t, isInitialLoading } = useAppContext();
+    const { user, projects, t, isInitialLoading } = useAppContext();
     
     useEffect(() => {
         const hasSeenOnboarding = localStorage.getItem('hasSeenOnboarding');

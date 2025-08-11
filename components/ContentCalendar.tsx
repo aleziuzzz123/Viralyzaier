@@ -69,7 +69,7 @@ const ContentCalendar: React.FC<CalendarProps> = () => {
             setCurrentMonth(0);
             setCurrentYear(currentYear + 1);
         } else {
-            setCurrentMonth(currentMonth - 1);
+            setCurrentMonth(currentMonth + 1);
         }
     };
 

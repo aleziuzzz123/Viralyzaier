@@ -1,7 +1,3 @@
-
-
-
-
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../contexts/AppContext.tsx';
 import { PhotoIcon, MicIcon, ClipboardCopyIcon } from './Icons.tsx';

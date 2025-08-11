@@ -1,7 +1,3 @@
-
-
-
-
 import React, { useState } from 'react';
 import { Opportunity } from '../types.ts';
 import { fetchChannelVideos } from '../services/youtubeService.ts';

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Project, Script } from '../types.ts';
+import { Project, Script, Scene } from '../types.ts';
 import { CheckBadgeIcon, MagicWandIcon, SparklesIcon, PlusIcon, TrashIcon, CheckCircleIcon, PhotoIcon } from './Icons.tsx';
 import { useAppContext } from '../contexts/AppContext.tsx';
 import { rewriteScriptScene, generateStoryboardImage } from '../services/geminiService.ts';
@@ -176,7 +176,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ project, onScriptSaved }) =
                 <div>
                     <h4 className="font-bold text-indigo-400 mb-2">{t('script_generator.script_title')}</h4>
                     <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-4 -mr-4">
-                        {script?.scenes.map((scene: any, i: number) => (
+                        {script?.scenes.map((scene: Scene, i: number) => (
                             <div key={i} className="p-4 bg-gray-800/50 rounded-lg border border-gray-700 space-y-4">
                                 <div className="flex justify-between items-center">
                                     <p className="font-bold text-gray-200">Scene {i+1} ({scene.timecode})</p>

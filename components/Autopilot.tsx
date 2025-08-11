@@ -1,12 +1,3 @@
-
-
-
-
-
-
-
-
-
 import React, { useState } from 'react';
 import { useAppContext } from '../contexts/AppContext.tsx';
 import { generateAutopilotBacklog } from '../services/geminiService.ts';

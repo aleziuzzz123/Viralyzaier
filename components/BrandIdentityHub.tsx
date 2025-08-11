@@ -1,9 +1,3 @@
-
-
-
-
-
-
 import React, { useState } from 'react';
 import { useAppContext } from '../contexts/AppContext.tsx';
 import { BrandIdentity } from '../types.ts';
@@ -200,7 +194,7 @@ const BrandIdentityHub: React.FC = () => {
 
              <div className="space-y-4">
                 {brandIdentities.length > 0 ? (
-                    brandIdentities.map(identity => (
+                    brandIdentities.map((identity: BrandIdentity) => (
                         <div key={identity.id} className="bg-gray-900/50 p-4 rounded-lg flex items-center justify-between">
                             <div className="flex items-center gap-4">
                                 {identity.logoUrl && <img src={identity.logoUrl} alt={`${identity.name} logo`} className="w-12 h-12 rounded-md object-contain bg-white/10" />}

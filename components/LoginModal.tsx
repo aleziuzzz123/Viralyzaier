@@ -1,7 +1,3 @@
-
-
-
-
 import React, { useState } from 'react';
 import { signInWithPassword, signUp, sendPasswordResetEmail } from '../services/supabaseService.ts';
 import { SparklesIcon, XCircleIcon } from './Icons.tsx';

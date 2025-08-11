@@ -1,12 +1,8 @@
-
-
-
-
 import React, { useState, useCallback } from 'react';
 import { useAppContext } from '../contexts/AppContext.tsx';
-import { SparklesIcon, UploadIcon, UserCircleIcon, TrashIcon, RefreshIcon } from './Icons.tsx';
+import { SparklesIcon, UploadIcon, UserCircleIcon, RefreshIcon } from './Icons.tsx';
 import { invokeEdgeFunction } from '../services/supabaseService.ts';
-import { ClonedVoice } from '../types.ts';
+import { ClonedVoice, User } from '../types.ts';
 import BrandIdentityHub from './BrandIdentityHub.tsx';
 
 const Settings: React.FC = () => {
@@ -54,7 +50,7 @@ const Settings: React.FC = () => {
             
             const newVoice = await invokeEdgeFunction<ClonedVoice>('elevenlabs-voice-cloning', formData);
             
-            setUser(prevUser => {
+            setUser((prevUser: User | null) => {
                 if (!prevUser) return null;
                 const updatedVoices = [...(prevUser.cloned_voices || []), newVoice];
                 return { ...prevUser, cloned_voices: updatedVoices };
@@ -79,7 +75,7 @@ const Settings: React.FC = () => {
         setIsSyncing(true);
         try {
             const syncedVoices = await invokeEdgeFunction<ClonedVoice[]>('elevenlabs-sync-voices', {});
-            setUser(prevUser => prevUser ? { ...prevUser, cloned_voices: syncedVoices } : null);
+            setUser((prevUser: User | null) => prevUser ? { ...prevUser, cloned_voices: syncedVoices } : null);
             addToast("Voice statuses have been updated!", "success");
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Failed to sync voices.';
@@ -117,7 +113,7 @@ const Settings: React.FC = () => {
                         </div>
                         {user?.cloned_voices && user.cloned_voices.length > 0 ? (
                             <ul className="space-y-3">
-                                {user.cloned_voices.map(voice => (
+                                {user.cloned_voices.map((voice: ClonedVoice) => (
                                     <li key={voice.id} className="bg-gray-900/50 p-3 rounded-lg flex items-center justify-between">
                                         <div className="flex items-center gap-3">
                                             <UserCircleIcon className="w-6 h-6 text-gray-400" />
