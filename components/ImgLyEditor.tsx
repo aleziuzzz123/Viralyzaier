@@ -28,11 +28,12 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
 
     (async () => {
       try {
+        // IMPORTANT: engine root with trailing slash
         const engineBase = 'https://cdn.img.ly/packages/imgly/cesdk-engine/1.57.0/';
 
         const editor: any = await CreativeEditorSDK.create(el, {
           license,
-          baseURL: engineBase,   // IMPORTANT: engine root, trailing slash
+          baseURL: engineBase,
           theme: 'dark',
           ui: {
             elements: {
@@ -40,7 +41,7 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
               navigation: { action: { export: true, save: false, load: false } }
             }
           },
-          // Low-memory mode to avoid WASM allocation errors on some hosts.
+          // Reduce memory pressure / avoid WASM allocation issues
           wasm: { disableMultithread: true, disableSIMD: true }
         });
 
@@ -111,3 +112,4 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
 };
 
 export default ImgLyEditor;
+
