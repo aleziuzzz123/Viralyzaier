@@ -1,9 +1,9 @@
 import React, { useRef, useEffect, useState } from 'react';
 import CreativeEditorSDK from '@cesdk/cesdk-js';
-import { Project } from '../types';
-import { useAppContext } from '../contexts/AppContext';
-import { getErrorMessage } from '../utils';
-import * as supabaseService from '../services/supabaseService';
+import { Project } from '../types.ts';
+import { useAppContext } from '../contexts/AppContext.tsx';
+import { getErrorMessage } from '../utils.ts';
+import * as supabaseService from '../services/supabaseService.ts';
 import { v4 as uuidv4 } from 'uuid';
 
 interface ImgLyEditorProps {
@@ -20,8 +20,11 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
 
   useEffect(() => {
     const licenseKey = (window as any).__env?.VITE_IMGLY_LICENSE_KEY;
-    if (!licenseKey || /YOUR_IMGLY/i.test(licenseKey)) {
-      addToast('VITE_IMGLY_LICENSE_KEY is not configured. Please check index.html or your env.', 'error');
+    if (!licenseKey || typeof licenseKey !== 'string' || !licenseKey.trim()) {
+      addToast(
+        'VITE_IMGLY_LICENSE_KEY is not configured. Please check your index.html or your hosting env vars.',
+        'error'
+      );
       setIsLoading(false);
       return;
     }
@@ -29,56 +32,99 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
     const container = containerRef.current;
     if (!container) return;
 
-    const init = async () => {
+    const initializeEditor = async () => {
+      // prevent double init
       if (editorRef.current) return;
 
       try {
-        // CRITICAL: point to cesdk-js assets (not cesdk-engine)
-        const config = {
+        const engineBase = 'https://cdn.img.ly/packages/imgly/cesdk-engine/1.57.0/';
+        const editor = await CreativeEditorSDK.create(container, {
           license: licenseKey,
-          baseURL: 'https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/assets',
+          baseURL: engineBase,
           theme: 'dark' as const,
           ui: {
             elements: {
-              view: 'default' as const,
-              navigation: { action: { export: true, save: false, load: false } },
-              dock: {
-                groups: [
-                  { id: 'ly.img.video.template' },
-                  { id: 'ly.img.default-group' },
-                  { id: 'ly.img.video.text' },
-                  { id: 'ly.img.video.sticker' },
-                  { id: 'ly.img.video.audio' }
-                ]
-              }
+              view: 'default',
+              navigation: { action: { export: true, save: false, load: false } }
             }
           },
-          // safest low-memory mode
+          // safer defaults for widest browser support
           wasm: { disableMultithread: true, disableSIMD: true }
-        };
+        });
 
-        const editor: any = await CreativeEditorSDK.create(container, config);
         editorRef.current = editor;
 
-        const voiceoverUrls = project.assets
-          ? (Object.values(project.assets).map(a => a.voiceoverUrl).filter(Boolean) as string[])
-          : [];
-        const moodboardUrls = project.moodboard || [];
+        // Safely try to register assets (API names can vary across CESDK versions)
+        try {
+          const voiceoverUrls =
+            project.assets
+              ? (Object.values(project.assets)
+                  .map((a) => a?.voiceoverUrl)
+                  .filter(Boolean) as string[])
+              : [];
+          const moodboardUrls = project.moodboard || [];
 
-        if (moodboardUrls.length || voiceoverUrls.length) {
-          await editor.asset.addAssets([
-            ...moodboardUrls.map((url, i) => ({ id: `moodboard_${i}`, meta: { uri: url, type: 'image' } })),
-            ...voiceoverUrls.map((url, i) => ({ id: `voiceover_${i}`, meta: { uri: url, type: 'audio' } }))
-          ]);
+          const hasBulkAdd =
+            editor?.asset && typeof editor.asset.addAssets === 'function';
+          const hasSingleAdd =
+            editor?.asset && typeof editor.asset.addAsset === 'function';
+
+          if (hasBulkAdd) {
+            await editor.asset.addAssets([
+              ...moodboardUrls.map((url: string, i: number) => ({
+                id: `moodboard_${i}`,
+                meta: { uri: url, type: 'image' }
+              })),
+              ...voiceoverUrls.map((url: string, i: number) => ({
+                id: `voiceover_${i}`,
+                meta: { uri: url, type: 'audio' }
+              }))
+            ]);
+          } else if (hasSingleAdd) {
+            for (let i = 0; i < moodboardUrls.length; i++) {
+              await editor.asset.addAsset({
+                id: `moodboard_${i}`,
+                meta: { uri: moodboardUrls[i], type: 'image' }
+              });
+            }
+            for (let i = 0; i < voiceoverUrls.length; i++) {
+              await editor.asset.addAsset({
+                id: `voiceover_${i}`,
+                meta: { uri: voiceoverUrls[i], type: 'audio' }
+              });
+            }
+          } else {
+            // No asset API available (older/newer CESDK builds) – editor still usable.
+            console.warn(
+              '[ImgLyEditor] Asset API not available on this CESDK build; skipping asset pre-load.'
+            );
+          }
+        } catch (assetErr) {
+          // Don’t block the editor; just log a warning.
+          console.warn('[ImgLyEditor] Skipped asset preload:', assetErr);
         }
 
+        // Handle export -> upload to Supabase
         editor.on('export', async (result: any) => {
           if (isExportingRef.current) return;
           isExportingRef.current = true;
           setIsExporting(true);
           addToast('Exporting video... This may take a moment.', 'info');
+
           try {
-            const blob = await result.toBlob();
+            const blob =
+              typeof result?.toBlob === 'function'
+                ? await result.toBlob()
+                : result instanceof Blob
+                ? result
+                : null;
+
+            if (!blob) {
+              throw new Error(
+                'Editor returned no blob. Please try exporting again.'
+              );
+            }
+
             const path = `${user!.id}/${project.id}/final_video_${uuidv4()}.mp4`;
             const publicUrl = await supabaseService.uploadFile(blob, path);
             await handleFinalVideoSaved(project.id, publicUrl);
@@ -98,11 +144,13 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
       }
     };
 
-    init();
+    initializeEditor();
 
     return () => {
       if (editorRef.current) {
-        try { editorRef.current.dispose(); } catch {}
+        try {
+          editorRef.current.dispose?.();
+        } catch {}
         editorRef.current = null;
       }
     };
@@ -129,7 +177,5 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
 };
 
 export default ImgLyEditor;
-
-
 
 
