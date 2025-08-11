@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
+import CreativeEditorSDK from '@cesdk/cesdk-js';
 import { Project } from '../types';
 import { useAppContext } from '../contexts/AppContext';
 import { getErrorMessage } from '../utils';
@@ -8,9 +9,6 @@ import { v4 as uuidv4 } from 'uuid';
 interface ImgLyEditorProps {
   project: Project;
 }
-
-const CDN_SDK = 'https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/cesdk.esm.js';
-const CDN_ENGINE = 'https://cdn.img.ly/packages/imgly/cesdk-engine/1.57.0/';
 
 const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
   const { user, handleFinalVideoSaved, addToast } = useAppContext();
@@ -22,8 +20,8 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
 
   useEffect(() => {
     const licenseKey = (window as any).__env?.VITE_IMGLY_LICENSE_KEY;
-    if (!licenseKey || String(licenseKey).includes('YOUR_GOOGLE_CLIENT_ID_HERE')) {
-      addToast('VITE_IMGLY_LICENSE_KEY is missing or invalid in index.html.', 'error');
+    if (!licenseKey || String(licenseKey).includes('YOUR_')) {
+      addToast('VITE_IMGLY_LICENSE_KEY is missing. Check index.html or Vercel envs.', 'error');
       setIsLoading(false);
       return;
     }
@@ -31,46 +29,54 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
     const container = containerRef.current;
     if (!container) return;
 
-    const initialize = async () => {
-      if (editorRef.current) return;
+    const init = async () => {
+      if (editorRef.current) return; // avoid double init
 
       try {
-        // Dynamically import the SDK **from the CDN** to avoid bundler path issues.
-        const mod = await import(/* @vite-ignore */ CDN_SDK);
-        const CreativeEditorSDK = mod.default;
-
-        const config = {
-          license: licenseKey,
-          baseURL: CDN_ENGINE, // IMPORTANT: absolute CDN so wasm/workers load correctly
-          theme: 'dark' as const,
-          ui: {
-            elements: {
-              view: 'default' as const,
-              navigation: { action: { export: true, save: false, load: false } },
-            },
-          },
-          // Make wasm work reliably without COOP/COEP
-          wasm: { disableMultithread: true, disableSIMD: true },
-        };
-
-        const editor: any = await CreativeEditorSDK.create(container, config);
-        editorRef.current = editor;
-
         const voiceoverUrls =
           project.assets ? (Object.values(project.assets).map(a => a.voiceoverUrl).filter(Boolean) as string[]) : [];
         const moodboardUrls = project.moodboard || [];
 
+        // The engine base must be the exact CDN directory (no trailing slash is also fine).
+        const engineBase = 'https://cdn.img.ly/packages/imgly/cesdk-engine/1.57.0';
+
+        const editor = await CreativeEditorSDK.create(container, {
+          license: licenseKey,
+          baseURL: engineBase,
+          theme: 'dark',
+          ui: {
+            elements: {
+              view: 'default',
+              navigation: { action: { export: true, save: false, load: false } },
+              dock: {
+                groups: [
+                  { id: 'ly.img.video.template' },
+                  { id: 'ly.img.default-group' },
+                  { id: 'ly.img.video.text' },
+                  { id: 'ly.img.video.sticker' },
+                  { id: 'ly.img.video.audio' }
+                ]
+              }
+            }
+          },
+          // stay single-threaded; avoids COOP/COEP requirements
+          wasm: { disableMultithread: true, disableSIMD: true }
+        });
+
+        editorRef.current = editor;
+
+        // Pre-register our assets
         await editor.asset.addAssets([
           ...moodboardUrls.map((url, i) => ({ id: `moodboard_${i}`, meta: { uri: url, type: 'image' } })),
-          ...voiceoverUrls.map((url, i) => ({ id: `voiceover_${i}`, meta: { uri: url, type: 'audio' } })),
+          ...voiceoverUrls.map((url, i) => ({ id: `voiceover_${i}`, meta: { uri: url, type: 'audio' } }))
         ]);
 
+        // Handle export
         editor.on('export', async (result: any) => {
           if (isExportingRef.current) return;
           isExportingRef.current = true;
           setIsExporting(true);
-          addToast('Exporting video...', 'info');
-
+          addToast('Exporting video... This may take a moment.', 'info');
           try {
             const blob = await result.toBlob();
             const path = `${user!.id}/${project.id}/final_video_${uuidv4()}.mp4`;
@@ -86,13 +92,13 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
 
         setIsLoading(false);
       } catch (err) {
-        console.error('Failed to initialize IMG.LY Editor:', err);
+        console.error('IMG.LY init failed:', err);
         addToast(`Could not load the editor: ${getErrorMessage(err)}`, 'error');
         setIsLoading(false);
       }
     };
 
-    initialize();
+    init();
 
     return () => {
       if (editorRef.current) {
@@ -100,7 +106,7 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
         editorRef.current = null;
       }
     };
-  }, [project, addToast, handleFinalVideoSaved, user]);
+  }, [project, user, handleFinalVideoSaved, addToast]);
 
   return (
     <div className="w-full h-[calc(100vh-12rem)] relative rounded-2xl overflow-hidden shadow-2xl bg-gray-950 border border-indigo-500/20">
@@ -123,4 +129,5 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
 };
 
 export default ImgLyEditor;
+
 
