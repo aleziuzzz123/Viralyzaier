@@ -2,7 +2,7 @@ import React from 'react';
 import { WarningIcon } from './Icons.tsx';
 import { useAppContext } from '../contexts/AppContext.tsx';
 
-const BackendBanner: React.FC = () => {
+const ApiKeyBanner: React.FC = () => {
   const { t } = useAppContext();
   return (
     <div className="bg-yellow-500/10 border-b border-yellow-500/30 text-yellow-200 text-center p-3 text-sm flex items-center justify-center z-20">
@@ -12,4 +12,4 @@ const BackendBanner: React.FC = () => {
   );
 };
 
-export default BackendBanner;
+export default ApiKeyBanner;
