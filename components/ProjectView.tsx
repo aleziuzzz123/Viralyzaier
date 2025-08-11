@@ -1,5 +1,5 @@
 import React from 'react';
-import { Project, Script as ScriptType, WorkflowStep } from '../types.ts';
+import { Project, WorkflowStep } from '../types.ts';
 import { useAppContext } from '../contexts/AppContext.tsx';
 import ScriptGenerator from './ScriptGenerator.tsx';
 import FinalEditStep from './FinalEditStep.tsx';
@@ -15,7 +15,8 @@ interface ProjectViewProps {
 export const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
     const { handleUpdateProject, t, dismissedTutorials } = useAppContext();
 
-    const handleScriptSaved = (script: ScriptType) => {
+    const handleScriptSaved = (script: Project['script']) => {
+        if (!script) return;
         handleUpdateProject({
             id: project.id,
             script: script,
@@ -51,7 +52,7 @@ export const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
             case 2:
                 return <ScriptGenerator project={project} onScriptSaved={handleScriptSaved} />;
             case 3:
-                return <FinalEditStep project={project} onProceedToNextStage={handleProceedToAnalysis} />;
+                return <FinalEditStep project={project} />;
             case 4:
                 return <AnalysisStep project={project} onProceedToLaunchpad={handleProceedToLaunchpad} onReturnToStudio={handleReturnToStudio} />;
             case 5:

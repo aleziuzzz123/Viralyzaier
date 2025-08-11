@@ -1,5 +1,3 @@
-
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useAppContext } from '../contexts/AppContext.tsx';
 import { Language } from '../translations.ts';

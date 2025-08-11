@@ -1,5 +1,3 @@
-
-
 import React, { useRef, useEffect } from 'react';
 import { useAppContext } from '../contexts/AppContext.tsx';
 import { Notification } from '../types.ts';
@@ -31,7 +29,7 @@ const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ onClose }) => {
         onClose();
     };
     
-    const unreadCount = notifications.filter(n => !n.is_read).length;
+    const unreadCount = notifications.filter((n: Notification) => !n.is_read).length;
 
     return (
         <div 

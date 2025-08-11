@@ -1,17 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Subtitle, TimelineState } from '../types.ts';
-import { PaintBrushIcon } from './Icons.tsx';
 
 interface SubtitleTrackProps {
     timeline: TimelineState;
     onUpdate: (updates: Partial<TimelineState>) => void;
     duration: number;
-    currentTime: number;
     onSelectSubtitle: (id: string | null) => void;
     selectedSubtitleId: string | null;
 }
 
-const SubtitleTrack: React.FC<SubtitleTrackProps> = ({ timeline, onUpdate, duration, currentTime, onSelectSubtitle, selectedSubtitleId }) => {
+const SubtitleTrack: React.FC<SubtitleTrackProps> = ({ timeline, onUpdate, duration, onSelectSubtitle, selectedSubtitleId }) => {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editText, setEditText] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
@@ -29,7 +27,7 @@ const SubtitleTrack: React.FC<SubtitleTrackProps> = ({ timeline, onUpdate, durat
 
     const handleSaveEdit = () => {
         if (!editingId) return;
-        const newSubtitles = timeline.subtitles.map(s => s.id === editingId ? { ...s, text: editText } : s);
+        const newSubtitles = timeline.subtitles.map((s: Subtitle) => s.id === editingId ? { ...s, text: editText } : s);
         onUpdate({ subtitles: newSubtitles });
         setEditingId(null);
     };
@@ -43,7 +41,7 @@ const SubtitleTrack: React.FC<SubtitleTrackProps> = ({ timeline, onUpdate, durat
 
     return (
         <div className="w-full h-12 bg-gray-900/50 rounded relative">
-            {timeline.subtitles.map(sub => (
+            {timeline.subtitles.map((sub: Subtitle) => (
                 <div 
                     key={sub.id} 
                     style={{ 

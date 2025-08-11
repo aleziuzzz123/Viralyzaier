@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 import { Project } from '../types.ts';
 import { useAppContext } from '../contexts/AppContext.tsx';
@@ -7,7 +5,6 @@ import ImgLyEditor from './ImgLyEditor.tsx';
 
 const FinalEditStep: React.FC<{
     project: Project;
-    onProceedToNextStage: () => void;
 }> = ({ project }) => {
     const { t } = useAppContext();
 
