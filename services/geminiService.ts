@@ -483,7 +483,7 @@ export const analyzeCompetitorVideo = async (url: string): Promise<CompetitorAna
   ]
 }`;
 
-    const response = await supabase.invokeEdgeFunction<{ text: string, groundingMetadata?: any }>('gemini-proxy', {
+    const response = await supabase.invokeEdgeFunction<{ text: string, candidates?: any[] }>('gemini-proxy', {
         type: 'generateContent',
         params: {
             model: 'gemini-2.5-flash', 
@@ -496,7 +496,7 @@ export const analyzeCompetitorVideo = async (url: string): Promise<CompetitorAna
     
     const analysisResult = parseGeminiJson<CompetitorAnalysisResult>(response);
     
-    const sources = response.groundingMetadata?.groundingChunks
+    const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
       ?.map((chunk: any) => ({
         uri: chunk.web?.uri,
         title: chunk.web?.title,
