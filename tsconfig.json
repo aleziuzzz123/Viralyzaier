@@ -18,5 +18,5 @@
   },
   "include": ["**/*.ts", "**/*.tsx"],
   "references": [{ "path": "./tsconfig.node.json" }],
-  "exclude": ["node_modules", "supabase/functions/**/*"]
+  "exclude": ["node_modules", "supabase/functions", "api", "dist", "vite.config.ts"]
 }
