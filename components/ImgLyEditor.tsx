@@ -1,64 +1,47 @@
 import React, { useRef, useEffect, useState } from 'react';
+import CreativeEditorSDK from '@cesdk/cesdk-js';
 import { Project } from '../types';
 import { useAppContext } from '../contexts/AppContext';
 import { getErrorMessage } from '../utils';
 import * as supabaseService from '../services/supabaseService';
 import { v4 as uuidv4 } from 'uuid';
 
-declare global {
-  interface Window {
-    CreativeEditorSDK: any;
-    __env?: Record<string, any>;
-  }
-}
-
 interface ImgLyEditorProps {
   project: Project;
 }
-
-const CESDK_ENGINE_BASE = 'https://cdn.img.ly/packages/imgly/cesdk-engine/1.57.0/assets/';
 
 const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
   const { user, handleFinalVideoSaved, addToast } = useAppContext();
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<any>(null);
-
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
-  const exportingFlag = useRef(false);
+  const isExportingRef = useRef(false);
 
   useEffect(() => {
-    const licenseKey = window.__env?.VITE_IMGLY_LICENSE_KEY;
-    if (!licenseKey || /YOUR_IMGLY/i.test(licenseKey)) {
-      addToast('VITE_IMGLY_LICENSE_KEY is missing/placeholder.', 'error');
-      setIsLoading(false);
-      return;
-    }
+    const container = containerRef.current;
+    if (!container) return;
 
-    const el = containerRef.current;
-    if (!el) return;
+    const initialize = async () => {
+      if (editorRef.current) return;
 
-    let disposed = false;
+      const licenseKey: string | undefined =
+        (window as any).__env?.VITE_IMGLY_LICENSE_KEY;
 
-    (async () => {
+      if (!licenseKey) {
+        addToast('IMG.LY license key missing.', 'error');
+        setIsLoading(false);
+        return;
+      }
+
       try {
-        const sdk = window.CreativeEditorSDK;
-        if (!sdk) {
-          addToast('IMG.LY SDK not found on window. Check index.html script tag.', 'error');
-          setIsLoading(false);
-          return;
-        }
+        // IMPORTANT: This path must point to the engine assets exactly.
+        const engineAssetsBase =
+          'https://cdn.img.ly/packages/imgly/cesdk-engine/1.57.0/assets';
 
-        // Avoid double init
-        if (editorRef.current) {
-          setIsLoading(false);
-          return;
-        }
-
-        // Create editor
-        const editor = await sdk.create(el, {
+        const editor = await CreativeEditorSDK.create(container, {
           license: licenseKey,
-          baseURL: CESDK_ENGINE_BASE, // MUST end with /assets/
+          baseURL: engineAssetsBase,
           theme: 'dark',
           ui: {
             elements: {
@@ -66,67 +49,73 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
               navigation: { action: { export: true, save: false, load: false } }
             }
           },
-          // Memory-friendly WASM settings (no threads/SIMD)
+          // Low-memory mode helps avoid WASM allocation errors on smaller devices
           wasm: { disableMultithread: true, disableSIMD: true }
         });
 
-        if (disposed) {
-          editor.dispose?.();
-          return;
-        }
-
         editorRef.current = editor;
 
-        // Wait a tick before touching the asset API
-        await new Promise(r => setTimeout(r, 200));
+        // Add any preloaded assets from the project (optional)
+        const voiceoverUrls =
+          project.assets
+            ? (Object.values(project.assets)
+                .map(a => a.voiceoverUrl)
+                .filter(Boolean) as string[])
+            : [];
+        const moodboardUrls = project.moodboard || [];
 
-        const voiceovers = project.assets
-          ? (Object.values(project.assets).map(a => a.voiceoverUrl).filter(Boolean) as string[])
-          : [];
-        const moodboard = project.moodboard || [];
-
-        // Not all builds expose asset API the same way; guard it.
-        const addAssets = editor?.asset?.addAssets?.bind(editor.asset);
-        if (addAssets) {
-          await addAssets([
-            ...moodboard.map((url, i) => ({ id: `mood_${i}`, meta: { uri: url, type: 'image' } })),
-            ...voiceovers.map((url, i) => ({ id: `vo_${i}`, meta: { uri: url, type: 'audio' } }))
+        if (moodboardUrls.length || voiceoverUrls.length) {
+          await editor.asset.addAssets([
+            ...moodboardUrls.map((url, i) => ({
+              id: `moodboard_${i}`,
+              meta: { uri: url, type: 'image' as const }
+            })),
+            ...voiceoverUrls.map((url, i) => ({
+              id: `voiceover_${i}`,
+              meta: { uri: url, type: 'audio' as const }
+            }))
           ]);
         }
 
-        // Export handling
-        editor.on?.('export', async (result: any) => {
-          if (exportingFlag.current) return;
-          exportingFlag.current = true;
+        // Handle export
+        editor.on('export', async (result: any) => {
+          if (isExportingRef.current) return;
+          isExportingRef.current = true;
           setIsExporting(true);
           addToast('Exporting video…', 'info');
 
           try {
-            const blob = await result.toBlob();
-            const path = `${user!.id}/${project.id}/final_${uuidv4()}.mp4`;
+            const blob: Blob = await result.toBlob();
+            const path = `${user!.id}/${project.id}/final_video_${uuidv4()}.mp4`;
             const publicUrl = await supabaseService.uploadFile(blob, path);
             await handleFinalVideoSaved(project.id, publicUrl);
-          } catch (e) {
-            addToast(`Export failed: ${getErrorMessage(e)}`, 'error');
+          } catch (err) {
+            addToast(`Export failed: ${getErrorMessage(err)}`, 'error');
           } finally {
+            isExportingRef.current = false;
             setIsExporting(false);
-            exportingFlag.current = false;
           }
         });
 
         setIsLoading(false);
-      } catch (e) {
-        console.error(e);
-        addToast(`Could not load the editor: ${getErrorMessage(e)}`, 'error');
+      } catch (err) {
+        console.error('CESDK init failed:', err);
+        addToast(
+          `Could not load the editor: ${getErrorMessage(err)}. ` +
+            `If this persists, hard-refresh (Cmd/Ctrl+Shift+R).`,
+          'error'
+        );
         setIsLoading(false);
       }
-    })();
+    };
+
+    initialize();
 
     return () => {
-      disposed = true;
-      try {
-        editorRef.current?.dispose?.();
-      } finally {
+      if (editorRef.current) {
+        try {
+          editorRef.current.dispose();
+        } catch {}
         editorRef.current = null;
       }
     };
