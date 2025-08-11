@@ -6,8 +6,8 @@ import { useAppContext } from '../contexts/AppContext.tsx';
 type Props = { projectId: string };
 
 const ImgLyEditor: React.FC<Props> = ({ projectId }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [error, setError] = useState<string | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  const [err, setErr] = useState<string | null>(null);
   const { handleFinalVideoSaved } = useAppContext();
 
   useEffect(() => {
@@ -16,19 +16,25 @@ const ImgLyEditor: React.FC<Props> = ({ projectId }) => {
 
     (async () => {
       try {
-        const node = containerRef.current;
-        if (!node || disposed) return;
-        
-        instance = await CreativeEditorSDK.create(node, {
+        const el = ref.current;
+        if (!el || disposed) return;
+
+        instance = await CreativeEditorSDK.create(el, {
           license: (window as any).__env?.VITE_IMGLY_LICENSE_KEY,
           theme: 'dark',
-          // CRITICAL: same-origin path for engine & assets via proxy
+
+          // ✅ All engine files come from your own origin via the Edge proxy:
           baseURL: '/api/cesdk-assets/assets',
+          engine: {
+            // ✅ Make the worker path explicit so it doesn’t resolve to /
+            workerPath: '/api/cesdk-assets/assets/engine/engine_worker.js'
+          },
+
           ui: { elements: { view: 'default' } }
         });
 
-        // Example: expose a simple export button (optional)
-        (instance as any).ui?.addActionButton?.({
+        // Minimal example export
+        instance.ui?.addActionButton?.({
           id: 'viralyzer-export',
           label: 'Export MP4',
           icon: 'download',
@@ -40,8 +46,6 @@ const ImgLyEditor: React.FC<Props> = ({ projectId }) => {
                 mimeType: 'video/mp4'
               });
               if (!blob) return;
-
-              // upload to your storage / then save URL
               const url = URL.createObjectURL(blob);
               await handleFinalVideoSaved(projectId, url);
             } catch (e: any) {
@@ -51,9 +55,7 @@ const ImgLyEditor: React.FC<Props> = ({ projectId }) => {
         });
       } catch (e: any) {
         console.error('CESDK init failed', e);
-        if (!disposed) {
-            setError(e?.message || 'Failed to initialize editor');
-        }
+        if (!disposed) setErr(e?.message || 'Failed to initialize editor');
       }
     })();
 
@@ -65,11 +67,7 @@ const ImgLyEditor: React.FC<Props> = ({ projectId }) => {
 
   return (
     <div className="w-full h-[70vh] rounded-xl overflow-hidden bg-black">
-      {error ? (
-        <div className="p-4 text-red-300 text-sm">{error}</div>
-      ) : (
-        <div ref={containerRef} className="w-full h-full" />
-      )}
+      {err ? <div className="p-4 text-red-300 text-sm">{err}</div> : <div ref={ref} className="w-full h-full" />}
     </div>
   );
 };
