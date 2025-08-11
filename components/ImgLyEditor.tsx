@@ -33,7 +33,7 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
       if (editorRef.current) return;
 
       try {
-        // Use the CE.SDK JS assets path (NOT the engine path).
+        // CRITICAL: point to cesdk-js assets (not cesdk-engine)
         const config = {
           license: licenseKey,
           baseURL: 'https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/assets',
@@ -42,17 +42,27 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
             elements: {
               view: 'default' as const,
               navigation: { action: { export: true, save: false, load: false } },
-              dock: { groups: [{ id: 'ly.img.video.template' }, { id: 'ly.img.default-group' }, { id: 'ly.img.video.text' }, { id: 'ly.img.video.sticker' }, { id: 'ly.img.video.audio' }] }
+              dock: {
+                groups: [
+                  { id: 'ly.img.video.template' },
+                  { id: 'ly.img.default-group' },
+                  { id: 'ly.img.video.text' },
+                  { id: 'ly.img.video.sticker' },
+                  { id: 'ly.img.video.audio' }
+                ]
+              }
             }
           },
-          // safest low-memory mode for broad browser support
+          // safest low-memory mode
           wasm: { disableMultithread: true, disableSIMD: true }
         };
 
         const editor: any = await CreativeEditorSDK.create(container, config);
         editorRef.current = editor;
 
-        const voiceoverUrls = project.assets ? (Object.values(project.assets).map(a => a.voiceoverUrl).filter(Boolean) as string[]) : [];
+        const voiceoverUrls = project.assets
+          ? (Object.values(project.assets).map(a => a.voiceoverUrl).filter(Boolean) as string[])
+          : [];
         const moodboardUrls = project.moodboard || [];
 
         if (moodboardUrls.length || voiceoverUrls.length) {
@@ -119,6 +129,7 @@ const ImgLyEditor: React.FC<ImgLyEditorProps> = ({ project }) => {
 };
 
 export default ImgLyEditor;
+
 
 
 
