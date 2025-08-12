@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { ChannelStats, VideoPerformance, PerformanceReview, ContentGapSuggestion } from '../types.ts';
+import { ChannelStats, VideoPerformance, PerformanceReview, ContentGapSuggestion, Project } from '../types.ts';
 import { fetchChannelStats, fetchVideoPerformance, fetchChannelVideos } from '../services/youtubeService.ts';
 import { reviewVideoPerformance, suggestContentGaps } from '../services/geminiService.ts';
 import { SparklesIcon, LightBulbIcon, ThumbsUpIcon, CtaIcon } from './Icons.tsx';
 import { useAppContext } from '../contexts/AppContext.tsx';
 
 interface ChannelIntelligenceProps {
-    project: any; // Using any for project as its type is complex and not fully used here
+    project: Project; 
 }
 
 interface StatCardProps {
@@ -44,7 +44,7 @@ const ChannelIntelligence: React.FC<ChannelIntelligenceProps> = ({ project }) =>
                     fetchChannelVideos()
                 ]);
                 setStats(channelStats);
-                setRecentVideos(channelVideos.map((v: any) => ({id: v.id, title: v.title})));
+                setRecentVideos(channelVideos.map((v: { id: string; title: string; }) => ({id: v.id, title: v.title})));
             } catch (e) {
                 setError(t('channel_intelligence.error_load'));
             } finally {
@@ -152,7 +152,7 @@ const ChannelIntelligence: React.FC<ChannelIntelligenceProps> = ({ project }) =>
                             className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         >
                             <option value="" disabled>-- Select a recent video --</option>
-                            {recentVideos?.map(v => <option key={v.id} value={v.id}>{v.title}</option>)}
+                            {recentVideos?.map((v: {id: string; title: string}) => <option key={v.id} value={v.id}>{v.title}</option>)}
                         </select>
                     </div>
 

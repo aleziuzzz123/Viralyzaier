@@ -23,13 +23,6 @@ export const ProjectView: React.FC<ProjectViewProps> = ({ project }) => {
             workflowStep: 3,
         });
     };
-
-    const handleProceedToAnalysis = () => {
-        handleUpdateProject({
-            id: project.id,
-            workflowStep: 4,
-        });
-    };
     
     const handleProceedToLaunchpad = () => {
         handleUpdateProject({

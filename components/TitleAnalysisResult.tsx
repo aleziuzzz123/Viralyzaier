@@ -23,29 +23,4 @@ const TitleAnalysisResult: React.FC<TitleAnalysisResultProps> = ({ results, onSu
   };
 
   return (
-    <div className="mt-4 space-y-4 animate-fade-in-up">
-        <div className="bg-gray-900/70 p-4 rounded-lg">
-            <h4 className="font-semibold text-gray-300 mb-2">Analysis:</h4>
-            <p className="text-sm text-gray-400">
-                <span className={`font-bold ${scoreColor(results.analysis.score)}`}>Score: {results.analysis.score}/100</span> - {results.analysis.cons[0] || "A solid starting point."}
-            </p>
-        </div>
-        <div>
-            <h4 className="font-semibold text-gray-300 mb-2 flex items-center"><SparklesIcon className="w-5 h-5 mr-2 text-yellow-300"/>Upgraded Suggestions:</h4>
-            <ul className="space-y-2">
-                {results.suggestions.map((suggestion, sIndex) => (
-                    <li 
-                        key={sIndex}
-                        onClick={() => onSuggestionSelect(suggestion)}
-                        className="group flex items-center justify-between p-3 rounded-md transition-colors cursor-pointer bg-gray-900 hover:bg-indigo-900/50 border border-transparent hover:border-indigo-500/50"
-                    >
-                        <p className="text-gray-200">{suggestion}</p>
-                    </li>
-                ))}
-            </ul>
-        </div>
-    </div>
-  );
-};
-
-export default TitleAnalysisResult;
+    <div className="mt-4 space-y-

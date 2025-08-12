@@ -209,7 +209,7 @@ const AnalysisResult: React.FC<AnalysisResultProps> = ({ result, onReset, videoP
             </div>
           </div>
           <div className="bg-gray-800/50 rounded-2xl p-4 sm:p-6 shadow-2xl border border-gray-700 animate-fade-in-up stagger-2">
-            <ScoreGauge score={overallScore} t={t} />
+            <ScoreGauge score={overallScore} t={t as (key: string) => string} />
             <p className="mt-2 text-md italic text-gray-400 leading-relaxed text-center max-w-sm mx-auto">"{summary}"</p>
           </div>
         </div>
@@ -227,10 +227,10 @@ const AnalysisResult: React.FC<AnalysisResultProps> = ({ result, onReset, videoP
           <div className="bg-gray-800/50 rounded-2xl p-4 sm:p-6 shadow-2xl border border-gray-700 animate-fade-in-up stagger-4">
             <h3 className="text-xl font-bold text-white mb-4">{t('analysis_result.breakdown_title')}</h3>
             <div className="space-y-5">
-                <DetailGauge icon={<HookIcon className="w-5 h-5"/>} label={t('analysis_result.hook_quality')} score={scores.hook} t={t} />
-                <DetailGauge icon={<PacingIcon className="w-6 h-6 -ml-0.5"/>} label={t('analysis_result.pacing_editing')} score={scores.pacing} t={t} />
-                <DetailGauge icon={<AudioIcon className="w-5 h-5"/>} label={t('analysis_result.audio_trends')} score={scores.audio} t={t} />
-                <DetailGauge icon={<CtaIcon className="w-5 h-5"/>} label={t('analysis_result.cta')} score={scores.cta} t={t} />
+                <DetailGauge icon={<HookIcon className="w-5 h-5"/>} label={t('analysis_result.hook_quality')} score={scores.hook} t={t as (key: string) => string} />
+                <DetailGauge icon={<PacingIcon className="w-6 h-6 -ml-0.5"/>} label={t('analysis_result.pacing_editing')} score={scores.pacing} t={t as (key: string) => string} />
+                <DetailGauge icon={<AudioIcon className="w-5 h-5"/>} label={t('analysis_result.audio_trends')} score={scores.audio} t={t as (key: string) => string} />
+                <DetailGauge icon={<CtaIcon className="w-5 h-5"/>} label={t('analysis_result.cta')} score={scores.cta} t={t as (key: string) => string} />
             </div>
           </div>
           
@@ -258,7 +258,7 @@ const AnalysisResult: React.FC<AnalysisResultProps> = ({ result, onReset, videoP
                 </h3>
                 <ul className="space-y-1 -m-3">
                   {improvements.map((item: { suggestion: string; reason: string; }, index: number) => (
-                    <ImprovementItem key={index} suggestion={item.suggestion} reason={item.reason} t={t} />
+                    <ImprovementItem key={index} suggestion={item.suggestion} reason={item.reason} t={t as (key: string) => string} />
                   ))}
                 </ul>
               </div>

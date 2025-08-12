@@ -46,7 +46,7 @@ const ChannelHub: React.FC<ChannelHubProps> = () => {
         try {
             // Now fetches REAL videos from the user's connected channel
             const videos = await fetchChannelVideos();
-            const auditResult = await performChannelAudit(videos.map((v: any) => ({ title: v.title, views: v.views, likes: v.likes, comments: v.comments })));
+            const auditResult = await performChannelAudit(videos.map((v: { title: string; views: number; likes: number; comments: number; }) => ({ title: v.title, views: v.views, likes: v.likes, comments: v.comments })));
             const updatedUser = await supabase.updateUserProfile(user.id, { channelAudit: auditResult });
             setUser(updatedUser);
             addToast("Channel audit complete! Your growth plan is ready.", 'success');

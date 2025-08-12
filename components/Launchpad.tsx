@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Project, LaunchPlan, Script } from '../types.ts';
+import { Project, LaunchPlan } from '../types.ts';
 import { generateSeo, analyzeAndGenerateThumbnails, getSchedulingSuggestion, repurposeProject } from '../services/geminiService.ts';
 import { publishVideo } from '../services/youtubeService.ts';
-import { SparklesIcon, ClipboardCopyIcon, DownloadIcon, RocketLaunchIcon, YouTubeIcon, CheckCircleIcon, CalendarIcon } from './Icons.tsx';
+import { SparklesIcon, ClipboardCopyIcon, DownloadIcon, YouTubeIcon, CheckCircleIcon, CalendarIcon } from './Icons.tsx';
 import { useAppContext } from '../contexts/AppContext.tsx';
 import { getErrorMessage } from '../utils.ts';
 
@@ -169,7 +169,7 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
                                     <div className="mt-4">
                                         <h4 className="font-semibold text-gray-300 mb-2">{t('launchpad.tags_title')}</h4>
                                         <div className="flex flex-wrap gap-2">
-                                            {project.launchPlan.seo.tags.map(tag => <span key={tag} className="px-2 py-1 bg-gray-700 text-xs rounded-full">{tag}</span>)}
+                                            {project.launchPlan.seo.tags.map((tag: string) => <span key={tag} className="px-2 py-1 bg-gray-700 text-xs rounded-full">{tag}</span>)}
                                         </div>
                                     </div>
                                 </div>
@@ -211,7 +211,7 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
                          <h3 className="text-2xl font-bold text-white">{t('launchpad.thumbnail_title')}</h3>
                          {project.launchPlan?.thumbnails ? (
                              <div className="grid grid-cols-1 gap-4 animate-fade-in-up">
-                                {project.launchPlan.thumbnails.map((thumb, i) => (
+                                {project.launchPlan.thumbnails.map((thumb: string, i: number) => (
                                     <div key={i} className="relative group aspect-video">
                                         <img src={thumb} alt={`Thumbnail ${i+1}`} className="w-full h-full rounded-lg object-cover" />
                                         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
