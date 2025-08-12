@@ -1,60 +1,87 @@
-// api/cesdk-assets/[[...path]].ts
-export const config = { runtime: 'edge' };
+// components/ImgLyEditor.tsx
+import React, { useEffect, useRef, useState } from 'react';
+import CreativeEditorSDK from '@cesdk/cesdk-js';
+import { useAppContext } from '../contexts/AppContext.tsx';
 
-// Add trailing slash for safe URL joining.
-const BASE = 'https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/';
+type Props = { projectId: string };
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+const ImgLyEditor: React.FC<Props> = ({ projectId }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const { handleFinalVideoSaved } = useAppContext();
+
+  useEffect(() => {
+    let disposed = false;
+    let instance: any;
+
+    (async () => {
+      try {
+        const node = containerRef.current;
+        if (!node || disposed) return;
+        
+        // Use the official CDN with the correct path to serve assets.
+        const baseURL = 'https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/assets/';
+        
+        const config = {
+          license: (window as any).__env?.VITE_IMGLY_LICENSE_KEY,
+          theme: 'dark' as const,
+          baseURL: baseURL,
+          ui: { elements: { view: 'default' as const } },
+        };
+
+        instance = await CreativeEditorSDK.create(node, config);
+
+        // Example: expose a simple export button (optional)
+        (instance as any).ui?.addActionButton?.({
+          id: 'viralyzer-export',
+          label: 'Export MP4',
+          icon: 'download',
+          group: 'primary',
+          async onClick() {
+            try {
+              const blob = await instance.export?.render?.({
+                type: 'video',
+                mimeType: 'video/mp4'
+              });
+              if (!blob) return;
+
+              // upload to your storage / then save URL
+              const url = URL.createObjectURL(blob);
+              await handleFinalVideoSaved(projectId, url);
+            } catch (e: any) {
+              console.error('Export failed', e);
+            }
+          }
+        });
+      } catch (e: any) {
+        console.error('CESDK init failed', e);
+        if (!disposed) {
+            setError(e?.message || 'Failed to initialize editor');
+        }
+      }
+    })();
+
+    return () => {
+      disposed = true;
+      try { instance?.dispose?.(); } catch {}
+    };
+  }, [projectId, handleFinalVideoSaved]);
+
+  return (
+    <div className="w-full h-[70vh] rounded-xl overflow-hidden bg-black">
+      {error ? (
+        <div className="p-4 text-red-300 text-sm flex items-center justify-center h-full bg-gray-900">
+          <div className="text-center">
+            <p className="font-bold mb-2">Could not load the editor.</p>
+            <p className="text-xs text-gray-400">This usually means the editor's core files could not be loaded. Please check the network tab and console for 404 errors and ensure the asset paths are correct.</p>
+            <p className="font-mono bg-red-900/50 p-2 rounded mt-2 text-xs">{error}</p>
+          </div>
+        </div>
+      ) : (
+        <div ref={containerRef} className="w-full h-full" />
+      )}
+    </div>
+  );
 };
 
-function contentType(path: string) {
-  const ext = path.split('.').pop()?.toLowerCase();
-  if (ext === 'wasm') return 'application/wasm';
-  if (ext === 'css') return 'text/css; charset=utf-8';
-  if (ext === 'js' || ext === 'mjs') return 'application/javascript; charset=utf-8';
-  if (ext === 'svg') return 'image/svg+xml';
-  if (ext === 'json') return 'application/json; charset=utf-8';
-  return undefined;
-}
-
-export default async function handler(req: Request) {
-  const url = new URL(req.url);
-  const path = url.pathname.replace(/^\/api\/cesdk-assets\/?/, '');
-  
-  if (!path) {
-    return new Response('Missing asset path.', { status: 400, headers: corsHeaders });
-  }
-  
-  try {
-    const targetUrl = new URL(path, BASE);
-    const upstream = await fetch(targetUrl.toString(), { headers: { 'User-Agent': 'viralyzer-cesdk-proxy' } });
-    
-    if (!upstream.ok) {
-        const errorText = await upstream.text();
-        return new Response(`Upstream fetch failed: ${upstream.status} - ${errorText}`, { status: upstream.status, headers: corsHeaders });
-    }
-
-    const buf = await upstream.arrayBuffer();
-    const headers = new Headers(corsHeaders);
-
-    const ct = contentType(path) || upstream.headers.get('Content-Type');
-    if (ct) headers.set('Content-Type', ct);
-
-    if (upstream.headers.has('Content-Length')) {
-        headers.set('Content-Length', upstream.headers.get('Content-Length')!);
-    }
-    
-    headers.set('Cache-Control', 'public, max-age=31536000, immutable');
-
-    return new Response(buf, { status: 200, headers });
-    
-  } catch (error) {
-    // This will catch the `new URL()` error if it occurs.
-    return new Response(JSON.stringify({ error: `Proxy internal error: ${error.message}` }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
-    });
-  }
-}
+export default ImgLyEditor;
