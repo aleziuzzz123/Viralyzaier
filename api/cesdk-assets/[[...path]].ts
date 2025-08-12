@@ -1,52 +1,60 @@
 // api/cesdk-assets/[[...path]].ts
 export const config = { runtime: 'edge' };
 
-// IMPORTANT: match the version you import from npm/esm
-const CDN_BASE = 'https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0';
+// Add trailing slash for safe URL joining.
+const BASE = 'https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/';
 
-function contentType(p: string) {
-  const ext = p.split('.').pop()?.toLowerCase();
-  switch (ext) {
-    case 'wasm': return 'application/wasm';
-    case 'css':  return 'text/css; charset=utf-8';
-    case 'js':
-    case 'mjs':  return 'application/javascript; charset=utf-8';
-    case 'svg':  return 'image/svg+xml';
-    case 'json': return 'application/json; charset=utf-8';
-    case 'data': return 'application/octet-stream';
-    case 'woff': return 'font/woff';
-    case 'woff2':return 'font/woff2';
-    default:     return undefined;
-  }
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+function contentType(path: string) {
+  const ext = path.split('.').pop()?.toLowerCase();
+  if (ext === 'wasm') return 'application/wasm';
+  if (ext === 'css') return 'text/css; charset=utf-8';
+  if (ext === 'js' || ext === 'mjs') return 'application/javascript; charset=utf-8';
+  if (ext === 'svg') return 'image/svg+xml';
+  if (ext === 'json') return 'application/json; charset=utf-8';
+  return undefined;
 }
 
 export default async function handler(req: Request) {
-  const inUrl = new URL(req.url);
-  // Strip our API prefix to mirror CDN structure
-  const suffix = inUrl.pathname.replace(/^\/api\/cesdk-assets/, '') || '/';
-  const upstreamUrl = `${CDN_BASE}${suffix}`;
-
-  const upstream = await fetch(upstreamUrl, {
-    headers: { 'User-Agent': 'viralyzer-cesdk-proxy' }
-  });
-
-  if (!upstream.ok) {
-    return new Response(
-      `Proxy upstream ${upstream.status} for ${upstreamUrl}`,
-      { status: upstream.status }
-    );
+  const url = new URL(req.url);
+  const path = url.pathname.replace(/^\/api\/cesdk-assets\/?/, '');
+  
+  if (!path) {
+    return new Response('Missing asset path.', { status: 400, headers: corsHeaders });
   }
+  
+  try {
+    const targetUrl = new URL(path, BASE);
+    const upstream = await fetch(targetUrl.toString(), { headers: { 'User-Agent': 'viralyzer-cesdk-proxy' } });
+    
+    if (!upstream.ok) {
+        const errorText = await upstream.text();
+        return new Response(`Upstream fetch failed: ${upstream.status} - ${errorText}`, { status: upstream.status, headers: corsHeaders });
+    }
 
-  const buf = await upstream.arrayBuffer();
+    const buf = await upstream.arrayBuffer();
+    const headers = new Headers(corsHeaders);
 
-  const headers = new Headers(upstream.headers);
-  const ct = contentType(suffix);
-  if (ct) headers.set('Content-Type', ct);
+    const ct = contentType(path) || upstream.headers.get('Content-Type');
+    if (ct) headers.set('Content-Type', ct);
 
-  // prevent ORB/CORP hiccups and cache aggressively
-  headers.set('Cache-Control', 'public, max-age=31536000, immutable');
-  headers.set('Cross-Origin-Resource-Policy', 'same-origin');
-  headers.delete('content-encoding'); // avoid double-encoding
+    if (upstream.headers.has('Content-Length')) {
+        headers.set('Content-Length', upstream.headers.get('Content-Length')!);
+    }
+    
+    headers.set('Cache-Control', 'public, max-age=31536000, immutable');
 
-  return new Response(buf, { status: 200, headers });
+    return new Response(buf, { status: 200, headers });
+    
+  } catch (error) {
+    // This will catch the `new URL()` error if it occurs.
+    return new Response(JSON.stringify({ error: `Proxy internal error: ${error.message}` }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500,
+    });
+  }
 }

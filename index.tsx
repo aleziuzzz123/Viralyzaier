@@ -28,9 +28,6 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, { hasError: bool
 
   render() {
     if (this.state.hasError) {
-      const lang = navigator.language.split('-')[0] as keyof typeof translations;
-      const t = translations[lang] || translations.en;
-      
       const errorMessage = this.state.error?.message || '';
       const isConfigError = errorMessage.includes('required') || errorMessage.includes('API key') || errorMessage.includes('SUPABASE') || errorMessage.includes('VITE_') || errorMessage.includes('Cannot read properties of undefined') || errorMessage.includes('IMGLY');
       

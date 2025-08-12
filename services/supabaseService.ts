@@ -72,7 +72,7 @@ export const projectRowToProject = (row: any): Project => ({
     analysis: (row.analysis as unknown as Analysis | null) || null,
     competitorAnalysis: (row.competitor_analysis as unknown as CompetitorAnalysisResult | null) || null,
     moodboard: row.moodboard || null,
-    assets: (row.assets as unknown as { [sceneIndex: number]: SceneAssets }) || {},
+    assets: (row.assets as unknown as { [key: string]: SceneAssets }) || {},
     soundDesign: (row.sound_design as unknown as SoundDesign | null) || null,
     launchPlan: (row.launch_plan as unknown as LaunchPlan | null) || null,
     performance: (row.performance as unknown as VideoPerformance | null) || null,
@@ -203,7 +203,7 @@ export const createProfileForUser = async (userId: string, email: string | null 
     const newUserProfile: Database['public']['Tables']['profiles']['Insert'] = {
         id: userId,
         email: fallbackEmail,
-        subscription: sanitizeJson({ planId: 'free', status: 'active', endDate: null }),
+        subscription: { planId: 'free', status: 'active', endDate: null },
         ai_credits: freePlan.creditLimit,
     };
     const { data, error } = await supabase.from('profiles').insert(newUserProfile).select('*').single();
@@ -390,7 +390,7 @@ export const createBrandIdentity = async (identityData: Omit<BrandIdentity, 'id'
         name: identityData.name,
         tone_of_voice: identityData.toneOfVoice,
         writing_style_guide: identityData.writingStyleGuide,
-        color_palette: sanitizeJson(identityData.colorPalette),
+        color_palette: identityData.colorPalette,
         font_selection: identityData.fontSelection,
         thumbnail_formula: identityData.thumbnailFormula,
         visual_style_guide: identityData.visualStyleGuide,
@@ -409,7 +409,7 @@ export const updateBrandIdentity = async (identityId: string, updates: Partial<O
     if (updates.name !== undefined) dbUpdates.name = updates.name;
     if (updates.toneOfVoice !== undefined) dbUpdates.tone_of_voice = updates.toneOfVoice;
     if (updates.writingStyleGuide !== undefined) dbUpdates.writing_style_guide = updates.writingStyleGuide;
-    if (updates.colorPalette !== undefined) dbUpdates.color_palette = sanitizeJson(updates.colorPalette);
+    if (updates.colorPalette !== undefined) dbUpdates.color_palette = updates.colorPalette;
     if (updates.fontSelection !== undefined) dbUpdates.font_selection = updates.fontSelection;
     if (updates.thumbnailFormula !== undefined) dbUpdates.thumbnail_formula = updates.thumbnailFormula;
     if (updates.visualStyleGuide !== undefined) dbUpdates.visual_style_guide = updates.visualStyleGuide;

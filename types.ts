@@ -70,7 +70,7 @@ export interface Project {
   analysis: Analysis | null;
   competitorAnalysis: CompetitorAnalysisResult | null;
   moodboard: string[] | null;
-  assets: { [sceneIndex: number]: SceneAssets };
+  assets: { [key: string]: SceneAssets };
   soundDesign: SoundDesign | null;
   launchPlan: LaunchPlan | null;
   performance: VideoPerformance | null;
