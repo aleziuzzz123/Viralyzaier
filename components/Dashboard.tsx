@@ -22,7 +22,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelectProject, onNewProject }) 
         }
     }, [user, projects, isInitialLoading, onNewProject]);
 
-    const creditsUsed = (user ? PLANS.find(p => p.id === user.subscription.planId)!.creditLimit : 0) - (user?.aiCredits || 0);
+    const planId = user?.subscription?.planId || 'free';
+    const currentPlan = PLANS.find(p => p.id === planId) || PLANS.find(p => p.id === 'free')!;
+    const creditsUsed = currentPlan.creditLimit - (user?.aiCredits || 0);
 
     if (isInitialLoading) {
         return <div className="flex justify-center items-center h-64"><Loader /></div>;

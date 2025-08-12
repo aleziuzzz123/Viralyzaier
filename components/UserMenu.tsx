@@ -23,7 +23,8 @@ const UserMenu: React.FC<UserMenuProps> = ({ onNavigate }) => {
     
     if (!user) return null;
 
-    const planName = user.subscription.planId.charAt(0).toUpperCase() + user.subscription.planId.slice(1);
+    const planId = user.subscription?.planId || 'free';
+    const planName = planId.charAt(0).toUpperCase() + planId.slice(1);
     
     return (
         <div className="relative" ref={menuRef}>
@@ -46,7 +47,7 @@ const UserMenu: React.FC<UserMenuProps> = ({ onNavigate }) => {
                             <span className="text-gray-400">{t('user_menu.plan')}:</span>
                             <span className="font-bold text-white flex items-center">
                                 {planName}
-                                {user.subscription.planId !== 'free' && <CrownIcon className="w-4 h-4 ml-1.5 text-yellow-400"/>}
+                                {planId !== 'free' && <CrownIcon className="w-4 h-4 ml-1.5 text-yellow-400"/>}
                             </span>
                         </div>
                         <div className="flex justify-between items-center text-sm">

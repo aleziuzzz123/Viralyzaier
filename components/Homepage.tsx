@@ -6,7 +6,7 @@ import LanguageSwitcher from './LanguageSwitcher.tsx';
 
 const generatedImages = {
     featureBlueprint: `https://storage.googleapis.com/generative-ai-codelabs/Viralyzer%205.0%20App%20Dev/feature_blueprint.jpeg`,
-    featureStudio: `https://storage.googleapis.com/generative-ai-codelabs/Viralyzer%205.0%20App%20Dev/feature_studio.jpeg`,
+    featureStudio: `https://storage.googleapis.com/generative-ai-codelabs/Viralyzer%205.0%20App%20Dev/testimonial_03.jpeg`,
     featureGenerative: `https://storage.googleapis.com/generative-ai-codelabs/Viralyzer%205.0%20App%20Dev/feature_generative.jpeg`,
     featureAutopilot: `https://storage.googleapis.com/generative-ai-codelabs/Viralyzer%205.0%20App%20Dev/feature_autopilot.jpeg`,
     promoVideo: `https://storage.googleapis.com/generative-ai-codelabs/Viralyzer%205.0%20App%20Dev/final_promo_01.mp4`,

@@ -19,17 +19,17 @@ const ImgLyEditor: React.FC<Props> = ({ projectId }) => {
         const node = containerRef.current;
         if (!node || disposed) return;
         
-        instance = await CreativeEditorSDK.create(node, {
+        // Use the official CDN with the correct path to serve assets.
+        const baseURL = 'https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/assets/';
+        
+        const config = {
           license: (window as any).__env?.VITE_IMGLY_LICENSE_KEY,
-          theme: 'dark',
-          // Set baseURL to the root of the proxy.
-          // The SDK will correctly look for UI assets in `/assets` and engine assets in `/engine` relative to this path.
-          baseURL: '/api/cesdk-assets',
-          core: {
-            baseURL: 'engine/' 
-          },
-          ui: { elements: { view: 'default' } }
-        });
+          theme: 'dark' as const,
+          baseURL: baseURL,
+          ui: { elements: { view: 'default' as const } },
+        };
+
+        instance = await CreativeEditorSDK.create(node, config);
 
         // Example: expose a simple export button (optional)
         (instance as any).ui?.addActionButton?.({
@@ -70,7 +70,13 @@ const ImgLyEditor: React.FC<Props> = ({ projectId }) => {
   return (
     <div className="w-full h-[70vh] rounded-xl overflow-hidden bg-black">
       {error ? (
-        <div className="p-4 text-red-300 text-sm">{error}</div>
+        <div className="p-4 text-red-300 text-sm flex items-center justify-center h-full bg-gray-900">
+          <div className="text-center">
+            <p className="font-bold mb-2">Could not load the editor.</p>
+            <p className="text-xs text-gray-400">This usually means the editor's core files could not be loaded. Please check the network tab and console for 404 errors and ensure the asset paths are correct.</p>
+            <p className="font-mono bg-red-900/50 p-2 rounded mt-2 text-xs">{error}</p>
+          </div>
+        </div>
       ) : (
         <div ref={containerRef} className="w-full h-full" />
       )}

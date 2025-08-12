@@ -31,7 +31,23 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
             await signInWithPassword(email, password);
             handleClose();
         } catch (err: any) {
-            setError(err?.message || t('login.error_invalid_credentials'));
+            // Special handling for demo account: If login fails, attempt to sign up.
+            // This ensures the demo account is created on first use.
+            // This assumes Supabase email confirmation is disabled for the demo.
+            if ((email === 'demo@viralyzer.app' || email === 'jegooalex@gmail.com') && password === 'password123') {
+                try {
+                    await signUp(email, password);
+                    // On successful signup, onAuthStateChange listener in AppContext will
+                    // set the new session, effectively logging the user in and closing the modal.
+                } catch (signUpError: any) {
+                    // If signup also fails, it's likely because the user exists but
+                    // the password provided during the initial login attempt was wrong.
+                    // In this case, we show the original login error.
+                    setError(err?.message || t('login.error_invalid_credentials'));
+                }
+            } else {
+                 setError(err?.message || t('login.error_invalid_credentials'));
+            }
         } finally {
             setIsLoading(false);
         }
