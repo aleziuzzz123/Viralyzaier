@@ -51,6 +51,14 @@ serve(async (req: Request) => {
         status: 401,
       });
     }
+
+    // For the demo user, simulate credit consumption without actually deducting.
+    if (user.email === 'demo@viralyzer.app') {
+      return new Response(JSON.stringify({ success: true, newCredits: 999 }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    }
     
     // 2. Process the request body robustly using req.json().
     let body;

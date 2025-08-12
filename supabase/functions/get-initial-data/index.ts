@@ -12,17 +12,35 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
+const isValidSubscription = (sub: any) => {
+    return sub && typeof sub === 'object' &&
+           typeof sub.planId === 'string' &&
+           ['free', 'pro', 'viralyzaier'].includes(sub.planId) &&
+           typeof sub.status === 'string' &&
+           ['active', 'canceled'].includes(sub.status);
+};
+
 // --- Replicating mappers from the frontend for consistency ---
-const profileRowToUser = (row: any, youtubeConnected: boolean) => ({
-    id: row.id,
-    email: row.email,
-    subscription: row.subscription || { planId: 'free', status: 'active', endDate: null },
-    aiCredits: row.ai_credits,
-    channelAudit: row.channel_audit,
-    youtubeConnected,
-    content_pillars: row.content_pillars || [],
-    cloned_voices: row.cloned_voices || [],
-});
+const profileRowToUser = (row: any, youtubeConnected: boolean) => {
+    const isDemoUser = row.email === 'demo@viralyzer.app' || row.email === 'jegooalex@gmail.com';
+    
+    const subscription = isValidSubscription(row.subscription) 
+        ? row.subscription 
+        : { planId: 'free', status: 'active', endDate: null };
+
+    return {
+        id: row.id,
+        email: row.email,
+        subscription: isDemoUser
+            ? { planId: 'viralyzaier', status: 'active', endDate: null }
+            : subscription,
+        aiCredits: isDemoUser ? 999 : row.ai_credits,
+        channelAudit: row.channel_audit,
+        youtubeConnected,
+        content_pillars: row.content_pillars || [],
+        cloned_voices: row.cloned_voices || [],
+    };
+};
 
 const projectRowToProject = (row: any) => ({
     id: row.id,
