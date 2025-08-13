@@ -1,26 +1,14 @@
+// components/ImgLyEditor.tsx
 import React, { useEffect, useRef, useState } from 'react';
 import CreativeEditorSDK from '@cesdk/cesdk-js';
 import { useAppContext } from '../contexts/AppContext.tsx';
 
 type Props = { projectId: string };
 
-const CSS_URLS = [
-  // NOTE: Correct path is /styles/, not /stylesheets/
-  '/api/cesdk-assets/styles/cesdk.css',
-  '/api/cesdk-assets/styles/cesdk-themes.css'
-];
-
-function injectCssOnce() {
-  CSS_URLS.forEach(href => {
-    const exists = [...document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')]
-      .some(l => l.href.includes('/api/cesdk-assets/styles/cesdk'));
-    if (exists) return;
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = href;
-    document.head.appendChild(link);
-  });
-}
+const VERSION = '1.57.0';
+// NOTE: point to the proxy ROOT (no “assets” suffix). The SDK will request
+// e.g. /stylesheets/cesdk.css and /core/cesdk-*.wasm relative to this.
+const PROXY_BASE = '/api/cesdk-assets/';
 
 const ImgLyEditor: React.FC<Props> = ({ projectId }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -33,37 +21,45 @@ const ImgLyEditor: React.FC<Props> = ({ projectId }) => {
 
     (async () => {
       try {
-        const el = containerRef.current;
-        if (!el || disposed) return;
+        const node = containerRef.current;
+        if (!node || disposed) return;
 
-        // Ensure CE.SDK UI CSS is present (from our proxy)
-        injectCssOnce();
+        const config = {
+          // Prefer Vite envs in production; fall back to window.__env for now
+          license:
+            import.meta.env.VITE_IMGLY_LICENSE_KEY ??
+            (window as any).__env?.VITE_IMGLY_LICENSE_KEY,
+          theme: 'dark' as const,
 
-        // IMPORTANT: baseURL points to our proxy root.
-        const baseURL = '/api/cesdk-assets';
+          // Important: direct all asset lookups to our proxy
+          baseURL: PROXY_BASE,
 
-        instance = await CreativeEditorSDK.create(el, {
-          license: (window as any).__env?.VITE_IMGLY_LICENSE_KEY,
-          theme: 'dark',
-          baseURL,
-          // If your site isn't cross-origin isolated, keep threads/SIMD off:
-          wasm: { disableMultithread: true, disableSIMD: true },
-          ui: { elements: { view: 'default' } }
-        });
+          // Also pass the same base for the engine to be safe
+          creativeEngine: {
+            baseURL: PROXY_BASE
+          },
 
-        // Optional quick export
-        instance.ui?.addActionButton?.({
+          ui: { elements: { view: 'default' as const } }
+        };
+
+        instance = await CreativeEditorSDK.create(node, config);
+
+        // Optional: export button
+        (instance as any).ui?.addActionButton?.({
           id: 'viralyzer-export',
           label: 'Export MP4',
           icon: 'download',
           group: 'primary',
           async onClick() {
             try {
-              const blob = await instance.export?.render?.({ type: 'video', mimeType: 'video/mp4' });
+              const blob = await instance.export?.render?.({
+                type: 'video',
+                mimeType: 'video/mp4'
+              });
               if (!blob) return;
               const url = URL.createObjectURL(blob);
               await handleFinalVideoSaved(projectId, url);
-            } catch (e) {
+            } catch (e: any) {
               console.error('Export failed', e);
             }
           }
@@ -76,7 +72,9 @@ const ImgLyEditor: React.FC<Props> = ({ projectId }) => {
 
     return () => {
       disposed = true;
-      try { instance?.dispose?.(); } catch {}
+      try {
+        instance?.dispose?.();
+      } catch {}
     };
   }, [projectId, handleFinalVideoSaved]);
 
@@ -84,13 +82,11 @@ const ImgLyEditor: React.FC<Props> = ({ projectId }) => {
     <div className="w-full h-[70vh] rounded-xl overflow-hidden bg-black">
       {error ? (
         <div className="p-4 text-red-300 text-sm flex items-center justify-center h-full bg-gray-900">
-          <div className="text-center max-w-xl">
+          <div className="text-center">
             <p className="font-bold mb-2">Could not load the editor.</p>
             <p className="text-xs text-gray-400">
-              Check Network for 200s on:
-              <br />/api/cesdk-assets/styles/cesdk.css
-              <br />/api/cesdk-assets/styles/cesdk-themes.css
-              <br />/api/cesdk-assets/core/cesdk-v1.57.0-*.wasm
+              This usually means the editor&apos;s core files could not be loaded.
+              Check the Network tab and confirm requests hit <code>/api/cesdk-assets/*</code> and return 200.
             </p>
             <p className="font-mono bg-red-900/50 p-2 rounded mt-2 text-xs">{error}</p>
           </div>
@@ -103,3 +99,4 @@ const ImgLyEditor: React.FC<Props> = ({ projectId }) => {
 };
 
 export default ImgLyEditor;
+
