@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+ import React, { useEffect, useRef, useState } from 'react';
 import CreativeEditorSDK from '@cesdk/cesdk-js';
-import { useAppContext } from '../contexts/AppContext'; // adjust path if needed
+import { useAppContext } from '../contexts/AppContext.tsx';
 
 type Props = { projectId: string };
 
@@ -11,46 +11,41 @@ const ImgLyEditor: React.FC<Props> = ({ projectId }) => {
 
   useEffect(() => {
     let disposed = false;
-    let instance: any;
+    let cesdk: any;
 
     (async () => {
       try {
-        const el = containerRef.current;
-        if (!el || disposed) return;
+        const mount = containerRef.current;
+        if (!mount || disposed) return;
 
-        // license from Vercel env (Vite)
-        const license =
-          import.meta.env.VITE_IMGLY_LICENSE_KEY ||
-          (window as any).__env?.VITE_IMGLY_LICENSE_KEY;
+        // IMPORTANT:
+        // 1) baseURL points to YOUR DOMAIN (the proxy), not cdn.img.ly
+        // 2) trailing slash is required
+        const config = {
+          license: import.meta.env.VITE_IMGLY_LICENSE_KEY as string,
+          baseURL: '/api/cesdk-assets/',
+          theme: 'dark' as const,
+          ui: { elements: { view: 'default' as const } },
+        };
 
-        // IMPORTANT: same-origin proxy root that contains /assets/
-        const baseURL = '/api/cesdk-assets/assets';
+        cesdk = await CreativeEditorSDK.create(mount, config);
 
-        instance = await CreativeEditorSDK.create(el, {
-          license,
-          theme: 'dark',
-          baseURL,                  // points to .../assets
-          core: { baseURL: 'engine/' }, // engine lives under assets/engine/
-          wasm: { disableMultithread: true, disableSIMD: true }, // safe if COOP/COEP not set
-          ui: { elements: { view: 'default' } }
-        });
-
-        // optional: export action
-        instance.ui?.addActionButton?.({
+        // Optional export action
+        cesdk.ui?.addActionButton?.({
           id: 'viralyzer-export',
           label: 'Export MP4',
           icon: 'download',
           group: 'primary',
           async onClick() {
             try {
-              const blob = await instance.export?.render?.({
+              const blob = await cesdk.export?.render?.({
                 type: 'video',
                 mimeType: 'video/mp4'
               });
               if (!blob) return;
               const url = URL.createObjectURL(blob);
               await handleFinalVideoSaved(projectId, url);
-            } catch (e) {
+            } catch (e: any) {
               console.error('Export failed', e);
             }
           }
@@ -61,20 +56,23 @@ const ImgLyEditor: React.FC<Props> = ({ projectId }) => {
       }
     })();
 
-    return () => { disposed = true; try { instance?.dispose?.(); } catch {} };
+    return () => {
+      disposed = true;
+      try { cesdk?.dispose?.(); } catch {}
+    };
   }, [projectId, handleFinalVideoSaved]);
 
   return (
     <div className="w-full h-[70vh] rounded-xl overflow-hidden bg-black">
       {error ? (
         <div className="p-4 text-red-300 text-sm flex items-center justify-center h-full bg-gray-900">
-          <div className="text-center">
+          <div className="text-center max-w-lg">
             <p className="font-bold mb-2">Could not load the editor.</p>
             <p className="text-xs text-gray-400">
-              Check DevTools → Network. These must be 200:
-              /api/cesdk-assets/assets/engine/engine_worker.js and *.wasm
+              This usually means the core files weren’t reachable. Verify the proxy at
+              <code className="px-1">/api/cesdk-assets/stylesheets/cesdk.css</code> and your Vercel env var <code>VITE_IMGLY_LICENSE_KEY</code>.
             </p>
-            <p className="font-mono bg-red-900/50 p-2 rounded mt-2 text-xs">{error}</p>
+            <p className="font-mono bg-red-900/50 p-2 rounded mt-2 text-xs break-all">{error}</p>
           </div>
         </div>
       ) : (
@@ -85,4 +83,5 @@ const ImgLyEditor: React.FC<Props> = ({ projectId }) => {
 };
 
 export default ImgLyEditor;
+
 
