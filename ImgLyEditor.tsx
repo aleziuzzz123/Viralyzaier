@@ -1,6 +1,7 @@
+// components/ImgLyEditor.tsx
 import React, { useEffect, useRef, useState } from 'react';
 import CreativeEditorSDK from '@cesdk/cesdk-js';
-import { useAppContext } from '../contexts/AppContext';
+import { useAppContext } from '../contexts/AppContext.tsx';
 
 type Props = { projectId: string };
 
@@ -18,27 +19,18 @@ const ImgLyEditor: React.FC<Props> = ({ projectId }) => {
         const node = containerRef.current;
         if (!node || disposed) return;
 
-        // ✅ Correct CDN bases for v1.57.0
-        const UI_ASSETS_BASE =
-          'https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/assets';
-        const ENGINE_BASE =
-          'https://cdn.img.ly/packages/imgly/cesdk-engine/1.57.0';
-
-        const config: any = {
-          license: import.meta.env.VITE_IMGLY_LICENSE_KEY,
-          theme: 'dark',
-          // UI assets (css, icons, i18n, templates, etc.)
-          baseURL: UI_ASSETS_BASE,
-          // Some builds of CE.SDK accept an explicit engine base;
-          // if your version ignores this, it's harmless.
-          engine: { baseURL: ENGINE_BASE },
-          ui: { elements: { view: 'default' } }
+        const config = {
+          license: import.meta.env.VITE_IMGLY_LICENSE_KEY?.trim(),
+          theme: 'dark' as const,
+          // IMPORTANT: use the proxy; the trailing slash matters
+          baseURL: '/api/cesdk-assets/',
+          ui: { elements: { view: 'default' as const } },
         };
 
         instance = await CreativeEditorSDK.create(node, config);
 
-        // Simple export button
-        instance?.ui?.addActionButton?.({
+        // Optional: export button
+        (instance as any).ui?.addActionButton?.({
           id: 'viralyzer-export',
           label: 'Export MP4',
           icon: 'download',
@@ -76,13 +68,9 @@ const ImgLyEditor: React.FC<Props> = ({ projectId }) => {
           <div className="text-center">
             <p className="font-bold mb-2">Could not load the editor.</p>
             <p className="text-xs text-gray-400">
-              This usually means the editor's core files could not be loaded.
-              Check the Network tab for 404s. Ensure baseURL and your license
-              key are correct.
+              This usually means the editor’s core files could not be fetched. Ensure the proxy and license are set.
             </p>
-            <p className="font-mono bg-red-900/50 p-2 rounded mt-2 text-xs">
-              {error}
-            </p>
+            <p className="font-mono bg-red-900/50 p-2 rounded mt-2 text-xs break-all">{error}</p>
           </div>
         </div>
       ) : (
