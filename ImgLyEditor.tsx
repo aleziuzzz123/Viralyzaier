@@ -1,14 +1,8 @@
-// components/ImgLyEditor.tsx
 import React, { useEffect, useRef, useState } from 'react';
 import CreativeEditorSDK from '@cesdk/cesdk-js';
-import { useAppContext } from '../contexts/AppContext.tsx';
+import { useAppContext } from '../contexts/AppContext';
 
 type Props = { projectId: string };
-
-const VERSION = '1.57.0';
-// NOTE: point to the proxy ROOT (no “assets” suffix). The SDK will request
-// e.g. /stylesheets/cesdk.css and /core/cesdk-*.wasm relative to this.
-const PROXY_BASE = '/api/cesdk-assets/';
 
 const ImgLyEditor: React.FC<Props> = ({ projectId }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -21,47 +15,32 @@ const ImgLyEditor: React.FC<Props> = ({ projectId }) => {
 
     (async () => {
       try {
-        const node = containerRef.current;
-        if (!node || disposed) return;
+        const el = containerRef.current;
+        if (!el || disposed) return;
+
+        // IMPORTANT: use the proxy and include /assets/ at the end.
+        const baseURL = '/api/cesdk-assets/assets/';
 
         const config = {
-          // Prefer Vite envs in production; fall back to window.__env for now
-          license:
-            import.meta.env.VITE_IMGLY_LICENSE_KEY ??
-            (window as any).__env?.VITE_IMGLY_LICENSE_KEY,
+          license: import.meta.env.VITE_IMGLY_LICENSE_KEY,
           theme: 'dark' as const,
-
-          // Important: direct all asset lookups to our proxy
-          baseURL: PROXY_BASE,
-
-          // Also pass the same base for the engine to be safe
-          creativeEngine: {
-            baseURL: PROXY_BASE
-          },
-
+          baseURL, // SDK will resolve stylesheets + engine core from here
           ui: { elements: { view: 'default' as const } }
         };
 
-        instance = await CreativeEditorSDK.create(node, config);
+        instance = await CreativeEditorSDK.create(el, config);
 
-        // Optional: export button
-        (instance as any).ui?.addActionButton?.({
+        // Example "Export" action
+        instance.ui?.addActionButton?.({
           id: 'viralyzer-export',
           label: 'Export MP4',
           icon: 'download',
           group: 'primary',
           async onClick() {
-            try {
-              const blob = await instance.export?.render?.({
-                type: 'video',
-                mimeType: 'video/mp4'
-              });
-              if (!blob) return;
-              const url = URL.createObjectURL(blob);
-              await handleFinalVideoSaved(projectId, url);
-            } catch (e: any) {
-              console.error('Export failed', e);
-            }
+            const blob = await instance.export?.render?.({ type: 'video', mimeType: 'video/mp4' });
+            if (!blob) return;
+            const url = URL.createObjectURL(blob);
+            await handleFinalVideoSaved(projectId, url);
           }
         });
       } catch (e: any) {
@@ -72,9 +51,7 @@ const ImgLyEditor: React.FC<Props> = ({ projectId }) => {
 
     return () => {
       disposed = true;
-      try {
-        instance?.dispose?.();
-      } catch {}
+      try { instance?.dispose?.(); } catch {}
     };
   }, [projectId, handleFinalVideoSaved]);
 
@@ -85,8 +62,7 @@ const ImgLyEditor: React.FC<Props> = ({ projectId }) => {
           <div className="text-center">
             <p className="font-bold mb-2">Could not load the editor.</p>
             <p className="text-xs text-gray-400">
-              This usually means the editor&apos;s core files could not be loaded.
-              Check the Network tab and confirm requests hit <code>/api/cesdk-assets/*</code> and return 200.
+              Check Network tab for 404s; ensure the baseURL points to /api/cesdk-assets/assets/ and VITE_IMGLY_LICENSE_KEY is set.
             </p>
             <p className="font-mono bg-red-900/50 p-2 rounded mt-2 text-xs">{error}</p>
           </div>
@@ -99,4 +75,6 @@ const ImgLyEditor: React.FC<Props> = ({ projectId }) => {
 };
 
 export default ImgLyEditor;
+
+
 
