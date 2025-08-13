@@ -15,32 +15,46 @@ const ImgLyEditor: React.FC<Props> = ({ projectId }) => {
 
     (async () => {
       try {
-        const el = containerRef.current;
-        if (!el || disposed) return;
+        const node = containerRef.current;
+        if (!node || disposed) return;
 
-        // IMPORTANT: use the proxy and include /assets/ at the end.
-        const baseURL = '/api/cesdk-assets/assets/';
+        // ✅ Correct CDN bases for v1.57.0
+        const UI_ASSETS_BASE =
+          'https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/assets';
+        const ENGINE_BASE =
+          'https://cdn.img.ly/packages/imgly/cesdk-engine/1.57.0';
 
-        const config = {
+        const config: any = {
           license: import.meta.env.VITE_IMGLY_LICENSE_KEY,
-          theme: 'dark' as const,
-          baseURL, // SDK will resolve stylesheets + engine core from here
-          ui: { elements: { view: 'default' as const } }
+          theme: 'dark',
+          // UI assets (css, icons, i18n, templates, etc.)
+          baseURL: UI_ASSETS_BASE,
+          // Some builds of CE.SDK accept an explicit engine base;
+          // if your version ignores this, it's harmless.
+          engine: { baseURL: ENGINE_BASE },
+          ui: { elements: { view: 'default' } }
         };
 
-        instance = await CreativeEditorSDK.create(el, config);
+        instance = await CreativeEditorSDK.create(node, config);
 
-        // Example "Export" action
-        instance.ui?.addActionButton?.({
+        // Simple export button
+        instance?.ui?.addActionButton?.({
           id: 'viralyzer-export',
           label: 'Export MP4',
           icon: 'download',
           group: 'primary',
           async onClick() {
-            const blob = await instance.export?.render?.({ type: 'video', mimeType: 'video/mp4' });
-            if (!blob) return;
-            const url = URL.createObjectURL(blob);
-            await handleFinalVideoSaved(projectId, url);
+            try {
+              const blob = await instance.export?.render?.({
+                type: 'video',
+                mimeType: 'video/mp4'
+              });
+              if (!blob) return;
+              const url = URL.createObjectURL(blob);
+              await handleFinalVideoSaved(projectId, url);
+            } catch (e: any) {
+              console.error('Export failed', e);
+            }
           }
         });
       } catch (e: any) {
@@ -62,9 +76,13 @@ const ImgLyEditor: React.FC<Props> = ({ projectId }) => {
           <div className="text-center">
             <p className="font-bold mb-2">Could not load the editor.</p>
             <p className="text-xs text-gray-400">
-              Check Network tab for 404s; ensure the baseURL points to /api/cesdk-assets/assets/ and VITE_IMGLY_LICENSE_KEY is set.
+              This usually means the editor's core files could not be loaded.
+              Check the Network tab for 404s. Ensure baseURL and your license
+              key are correct.
             </p>
-            <p className="font-mono bg-red-900/50 p-2 rounded mt-2 text-xs">{error}</p>
+            <p className="font-mono bg-red-900/50 p-2 rounded mt-2 text-xs">
+              {error}
+            </p>
           </div>
         </div>
       ) : (
