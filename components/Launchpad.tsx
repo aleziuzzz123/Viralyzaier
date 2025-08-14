@@ -128,6 +128,7 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
                 idea: `Repurposed: ${project.topic}`,
                 reason: `Repurposed from ${project.platform} video.`,
                 suggestedTitle: `Shorts Cut: ${project.title}`,
+                potentialTitles: [], // Add this to satisfy the type
                 type: 'Experimental'
             }, targetPlatform);
             addToast('Repurposed project created! You can find it on your dashboard.', 'success');

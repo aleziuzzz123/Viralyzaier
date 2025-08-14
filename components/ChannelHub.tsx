@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Opportunity, Project } from '../types';
+import { Opportunity } from '../types';
 import { fetchChannelVideos } from '../services/youtubeService';
 import { performChannelAudit } from '../services/geminiService';
 import * as supabase from '../services/supabaseService';

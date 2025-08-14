@@ -1,4 +1,4 @@
-import { supabase } from '../services/supabaseClient.ts';
+import { supabase } from '../services/supabaseClient';
 
 type AssetKind = 'image' | 'video' | 'audio';
 const BUCKET = 'assets'; // change if your bucket name differs

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { UploadIcon } from './Icons.tsx';
+import { UploadIcon } from './Icons';
 import { useAppContext } from '../contexts/AppContext';
 
 interface VideoUploaderProps {

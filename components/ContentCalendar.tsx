@@ -47,7 +47,7 @@ const ContentCalendar: React.FC<CalendarProps> = () => {
     const calendarDays: { key: string; date: Date | null; projects: Project[] }[] = Array.from({ length: firstDay }, (_, i) => ({ key: `empty-${i}`, date: null, projects: [] as Project[] }))
         .concat(Array.from({ length: daysInMonth }, (_, i) => {
             const dayDate = new Date(currentYear, currentMonth, i + 1);
-            const dayProjects = projects.filter((p: Project) => {
+            const dayProjects: Project[] = projects.filter((p: Project) => {
                 if (!p.scheduledDate) return false;
                 const pDate = new Date(p.scheduledDate);
                 return pDate.getFullYear() === currentYear && pDate.getMonth() === currentMonth && pDate.getDate() === (i + 1);
