@@ -1,5 +1,5 @@
-import { Plan, PlanId } from '../types.ts';
-import * as supabase from './supabaseService.ts';
+import { Plan, PlanId } from '../types';
+import * as supabase from './supabaseService';
 
 export const PLANS: Plan[] = [
     {

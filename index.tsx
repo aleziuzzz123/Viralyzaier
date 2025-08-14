@@ -5,8 +5,7 @@
 
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import App from './App.tsx';
-import { translations } from './translations.ts';
+import App from './App';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;

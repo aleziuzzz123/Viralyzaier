@@ -1,4 +1,4 @@
-import { supabase, supabaseUrl, supabaseAnonKey } from './supabaseClient.ts';
+import { supabase, supabaseUrl, supabaseAnonKey } from './supabaseClient';
 import { 
     Project, 
     User, 
@@ -19,10 +19,10 @@ import {
     Subscription,
     BrandIdentity,
     Json,
-} from '../types.ts';
+} from '../types';
 import { type Session } from '@supabase/supabase-js';
-import { PLANS } from './paymentService.ts';
-import { getErrorMessage } from '../utils.ts';
+import { PLANS } from './paymentService';
+import { getErrorMessage } from '../utils';
 
 // --- Type Aliases for Supabase Payloads ---
 type ProfileInsert = Database['public']['Tables']['profiles']['Insert'];
@@ -215,7 +215,7 @@ export const createProfileForUser = async (userId: string, email: string | null 
         subscription: { planId: 'free', status: 'active', endDate: null },
         ai_credits: freePlan.creditLimit,
     };
-    const { data, error } = await supabase.from('profiles').insert([newUserProfile] as any).select('*').single();
+    const { data, error } = await supabase.from('profiles').insert([newUserProfile]).select('*').single();
     if (error) throw new Error(getErrorMessage(error));
     if (!data) throw new Error("Failed to create profile: no data returned.");
     return profileRowToUser(data, false);
@@ -223,7 +223,7 @@ export const createProfileForUser = async (userId: string, email: string | null 
 
 export const updateUserProfile = async (userId: string, updates: Partial<User>): Promise<User> => {
     const dbUpdates: ProfileUpdate = userToProfileUpdate(updates);
-    const { data, error } = await supabase.from('profiles').update(dbUpdates as any).eq('id', userId).select('*').single();
+    const { data, error } = await supabase.from('profiles').update(dbUpdates).eq('id', userId).select('*').single();
     if (error) throw new Error(getErrorMessage(error));
     if (!data) throw new Error("Failed to update profile: no data returned.");
     const { data: tokenData } = await supabase.from('user_youtube_tokens').select('user_id').eq('user_id', userId).maybeSingle();
@@ -284,7 +284,7 @@ export const createProject = async (projectData: Omit<Project, 'id' | 'lastUpdat
     
     const { data, error } = await supabase
         .from('projects')
-        .insert([newProjectData] as any)
+        .insert([newProjectData])
         .select('*')
         .single();
     if (error) throw new Error(getErrorMessage(error));
@@ -315,7 +315,7 @@ export const updateProject = async (projectId: string, updates: Partial<Project>
     if (updates.voiceoverVoiceId !== undefined) dbUpdates.voiceover_voice_id = updates.voiceoverVoiceId;
     if (updates.final_video_url !== undefined) dbUpdates.final_video_url = updates.final_video_url;
     
-    const { data, error } = await supabase.from('projects').update(dbUpdates as any).eq('id', projectId).select('*').single();
+    const { data, error } = await supabase.from('projects').update(dbUpdates).eq('id', projectId).select('*').single();
     if (error) {
         throw new Error(getErrorMessage(error));
     }
@@ -350,13 +350,13 @@ export const getNotifications = async (userId: string): Promise<Notification[]> 
 
 export const markNotificationAsRead = async (notificationId: string): Promise<void> => {
     const updates: NotificationUpdate = { is_read: true };
-    const { error } = await supabase.from('notifications').update(updates as any).eq('id', notificationId);
+    const { error } = await supabase.from('notifications').update(updates).eq('id', notificationId);
     if (error) throw new Error(getErrorMessage(error));
 };
 
 export const markAllNotificationsAsRead = async (userId: string): Promise<void> => {
     const updates: NotificationUpdate = { is_read: true };
-    const { error } = await supabase.from('notifications').update(updates as any).eq('user_id', userId);
+    const { error } = await supabase.from('notifications').update(updates).eq('user_id', userId);
     if (error) throw new Error(getErrorMessage(error));
 };
 
@@ -407,7 +407,7 @@ export const createBrandIdentity = async (identityData: Omit<BrandIdentity, 'id'
         channel_mission: identityData.channelMission,
         logo_url: identityData.logoUrl ?? null
     };
-    const { data, error } = await supabase.from('brand_identities').insert([newIdentityData] as any).select('*').single();
+    const { data, error } = await supabase.from('brand_identities').insert([newIdentityData]).select('*').single();
     if (error) throw new Error(getErrorMessage(error));
     if (!data) throw new Error("Failed to create brand identity: no data returned.");
     return brandIdentityRowToBrandIdentity(data);
@@ -428,7 +428,7 @@ export const updateBrandIdentity = async (identityId: string, updates: Partial<O
 
     const { data, error } = await supabase
         .from('brand_identities')
-        .update(dbUpdates as any)
+        .update(dbUpdates)
         .eq('id', identityId)
         .select('*')
         .single();

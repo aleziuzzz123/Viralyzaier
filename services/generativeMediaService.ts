@@ -1,5 +1,5 @@
-import { Platform, SceneAssets } from "../types.ts";
-import { invokeEdgeFunction } from './supabaseService.ts';
+import { Platform, SceneAssets } from "../types";
+import { invokeEdgeFunction } from './supabaseService';
 
 // This service is now secure. API keys are handled by backend proxy functions.
 // We only need to check if the function endpoints are available to the user.

@@ -1,5 +1,5 @@
-import { AiVideoModel } from '../types.js';
-import { invokeEdgeFunction } from './supabaseService.js';
+import { AiVideoModel } from '../types';
+import { invokeEdgeFunction } from './supabaseService';
 
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 

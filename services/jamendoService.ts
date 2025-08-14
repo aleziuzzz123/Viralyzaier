@@ -1,5 +1,5 @@
-import { NormalizedStockAsset, JamendoTrack } from "../types.js";
-import { invokeEdgeFunction } from './supabaseService.js';
+import { NormalizedStockAsset, JamendoTrack } from "../types";
+import { invokeEdgeFunction } from './supabaseService';
 
 const mapJamendoAsset = (track: JamendoTrack): NormalizedStockAsset => ({
     id: track.id,

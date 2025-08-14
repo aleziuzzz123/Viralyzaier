@@ -1,5 +1,5 @@
-import { ChannelStats, VideoPerformance } from '../types.ts';
-import { invokeEdgeFunction } from './supabaseService.ts';
+import { ChannelStats, VideoPerformance } from '../types';
+import { invokeEdgeFunction } from './supabaseService';
 
 // This service is now a client for our secure backend proxy.
 // It no longer contains any AI simulation logic.
@@ -120,7 +120,6 @@ export const fetchVideoPerformance = async (videoId: string): Promise<VideoPerfo
  * @returns The final URL of the published YouTube video.
  */
 export const publishVideo = async (
-    projectId: string, 
     videoFileUrl: string,
     title: string,
     description: string,
