@@ -23,21 +23,23 @@ export default function ImgLyEditor() {
       try {
         const host = window.location.hostname;
         
-        // This is the core logic. It determines the correct *absolute* URL for assets.
+        // This logic correctly determines the asset path whether running in AI Studio (CDN) or on Vercel (proxy).
         const onAiStudio = /aistudio\.google\.com|googleusercontent\.com/i.test(host);
 
+        // The 'baseURL' for the SDK should point to the directory containing the 'core', 'ui' etc. folders.
+        // On the CDN, this is the 'assets' directory.
         const baseURL = onAiStudio
-          ? 'https://cdn.img.ly/packages/cesdk-js/1.57.0/' // Use absolute CDN URL in AI Studio
-          : '/api/cesdk-assets/';                             // Use relative proxy URL on production/other envs
+          ? 'https://cdn.img.ly/packages/cesdk-js/1.57.0/assets/'
+          : '/api/cesdk-assets/assets/';
 
         const license = getEnv('VITE_IMGLY_LICENSE_KEY');
         if (!license) {
-          throw new Error('Missing VITE_IMGLY_LICENSE_KEY. Please check your configuration.');
+          throw new Error('Missing VITE_IMGLY_LICENSE_KEY. Please check your configuration in index.html.');
         }
 
         const inst = await CreativeEditor.create(containerRef.current, {
           license,
-          baseURL,
+          baseURL, // Use the corrected base URL
           theme: 'dark'
         });
 
@@ -46,6 +48,17 @@ export default function ImgLyEditor() {
           return;
         }
         instanceRef.current = inst;
+        
+        // Load default and demo assets to populate the editor.
+        // The baseURL for this method must be an absolute URL.
+        const assetSourceBaseURL = onAiStudio
+            ? 'https://cdn.img.ly/packages/cesdk-js/1.57.0/assets/'
+            : `${window.location.origin}/api/cesdk-assets/assets/`;
+
+        await inst.addDefaultAssetSources({ baseURL: assetSourceBaseURL });
+        await inst.addDemoAssetSources({ sceneMode: 'Design', baseURL: assetSourceBaseURL });
+        await inst.createDesignScene();
+
       } catch (e: any) {
         console.error('CESDK init failed:', e);
         setError(e?.message || String(e));
@@ -54,10 +67,12 @@ export default function ImgLyEditor() {
 
     return () => {
       disposed = true;
-      instanceRef.current?.dispose();
-      instanceRef.current = null;
+      if (instanceRef.current) {
+        instanceRef.current.dispose();
+        instanceRef.current = null;
+      }
     };
-  }, []); // Run only once on mount
+  }, []);
 
   return (
     <div className="w-full h-[70vh] rounded-lg overflow-hidden border border-zinc-800">
@@ -68,8 +83,9 @@ export default function ImgLyEditor() {
             {error}
           </code>
           <p className="mt-2 text-zinc-400">
-            (If you’re previewing in AI Studio, assets come from the CDN. On
-            viralyzaier.com they’re served via <code>/api/cesdk-assets/</code>.)
+            This is often due to an incorrect asset path or a missing license key.
+            The app is configured to load assets from the IMG.LY CDN when run in AI Studio,
+            and through a proxy (`/api/cesdk-assets/`) in other environments.
           </p>
         </div>
       ) : (

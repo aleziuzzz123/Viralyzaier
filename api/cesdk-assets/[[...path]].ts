@@ -1,7 +1,7 @@
 // api/cesdk-assets/[[...path]].ts
 export const config = { runtime: 'edge' };
 
-// CE.SDK CDN base (lock to the version you use in package.json)
+// CE.SDK CDN base (locked to the version in package.json)
 const CDN_BASE = 'https://cdn.img.ly/packages/cesdk-js/1.57.0/';
 const PREFIX = '/api/cesdk-assets/';
 
@@ -10,7 +10,7 @@ export default async function handler(req: Request) {
   const i = url.pathname.indexOf(PREFIX);
   const rest = i >= 0 ? url.pathname.slice(i + PREFIX.length) : '';
 
-  // Build the upstream URL by appending whatever was requested after /api/cesdk-assets/
+  // Build the upstream URL by appending the requested path to the CDN base
   const upstreamUrl = new URL(rest, CDN_BASE).toString();
 
   const upstream = await fetch(upstreamUrl, {
