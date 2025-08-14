@@ -1,79 +1,100 @@
-import React, { useEffect, useRef, useState } from 'react';
-import CreativeEditorSDK from '@cesdk/cesdk-js';
+import { useEffect, useRef, useState } from 'react';
+import CreativeEditor from '@cesdk/cesdk-js';
 
-type Props = { projectId?: string };
-
-function readEnv(name: string): string | undefined {
-  // Vite compile-time first
-  // @ts-ignore
-  const v = (import.meta as any).env?.[name];
-  if (v) return v as string;
-  // AI Studio / window.ENV fallback
-  if (typeof window !== 'undefined' && (window as any).ENV) {
-    return (window as any).ENV[name];
-  }
-  return undefined;
+function getEnv(key: string): string | undefined {
+  // Vite (prod) → import.meta.env; AI Studio → window.ENV (if you added it)
+  // Fall back to undefined (we'll error nicely).
+  const v = (import.meta as any)?.env?.[key] ?? (window as any)?.ENV?.[key];
+  return typeof v === 'string' && v.trim() ? v : undefined;
 }
 
-const CDN_ASSETS = 'https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/assets/';
-const PROD_ASSETS = () => `${window.location.origin}/api/cesdk-assets/`;
+// Decide where to load CE SDK assets from.
+// - In AI Studio / usercontent.goog -> use official CDN (no proxy available).
+// - On your real site (viralyzaier.com) -> use your Vercel proxy.
+function resolveAssetBaseURL(): string {
+  const host = typeof window !== 'undefined' ? window.location.host : '';
+  if (/ai\.studio|usercontent\.goog/i.test(host)) {
+    return 'https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/assets/'; // NOTE: trailing slash
+  }
+  return '/api/cesdk-assets/'; // NOTE: trailing slash
+}
 
-export default function ImgLyEditor({ projectId }: Props) {
-  const containerRef = useRef<HTMLDivElement>(null);
+// Ensure we have an **absolute** URL when we build link hrefs.
+function toAbsoluteBase(base: string): string {
+  const b = base.endsWith('/') ? base : base + '/';
+  if (/^https?:\/\//i.test(b)) return b;
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  return origin + (b.startsWith('/') ? b : '/' + b);
+}
+
+function injectCssOnce(baseURL: string) {
+  const abs = toAbsoluteBase(baseURL);
+  const ids = ['cesdk-core-css', 'cesdk-theme-css'];
+  const hrefs = [
+    abs + 'stylesheets/cesdk.css',
+    abs + 'stylesheets/cesdk-themes.css',
+  ];
+  hrefs.forEach((href, i) => {
+    if (!document.getElementById(ids[i])) {
+      const link = document.createElement('link');
+      link.id = ids[i];
+      link.rel = 'stylesheet';
+      link.href = href;
+      document.head.appendChild(link);
+    }
+  });
+}
+
+export default function ImgLyEditor() {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const instanceRef = useRef<CreativeEditor | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let disposed = false;
-    let instance: any;
-
     (async () => {
-      if (!containerRef.current) return;
       try {
-        const hostname = window.location.hostname;
-        const onVercel =
-          hostname.endsWith('viralyzaier.com') || hostname.endsWith('vercel.app');
+        if (!containerRef.current) return;
+        const baseURL = resolveAssetBaseURL();
+        injectCssOnce(baseURL);
 
-        const baseURL = onVercel ? PROD_ASSETS() : CDN_ASSETS;
-
-        const license = readEnv('VITE_IMGLY_LICENSE_KEY');
+        const license = getEnv('VITE_IMGLY_LICENSE_KEY');
         if (!license) throw new Error('Missing VITE_IMGLY_LICENSE_KEY');
 
-        instance = await CreativeEditorSDK.create(containerRef.current!, {
+        const inst = await CreativeEditor.create(containerRef.current!, {
           license,
-          baseURL: baseURL,
-          theme: 'dark'
+          baseURL,
+          theme: 'dark',
         });
-
-        if (disposed) {
-          instance.dispose();
-        }
+        if (disposed) { inst.dispose(); return; }
+        instanceRef.current = inst;
       } catch (e: any) {
         console.error('CESDK init failed:', e);
-        setError(e?.message ?? 'Failed to initialize editor');
+        setError(e?.message || String(e));
       }
     })();
-
     return () => {
       disposed = true;
-      if (instance) {
-          instance.dispose();
-      }
+      instanceRef.current?.dispose();
+      instanceRef.current = null;
     };
   }, []);
 
   return (
-    <div className="w-full h-[70vh] rounded-xl overflow-hidden border border-neutral-800">
+    <div className="w-full h-[70vh] rounded-lg overflow-hidden border border-zinc-800">
       {error ? (
-        <div className="p-4 text-red-300">
-          <p className="font-bold mb-1">Could not load the editor.</p>
-          <p className="text-xs">
-            {error}. If you are previewing inside AI Studio, the app will use the
-            CDN automatically; on viralyzaier.com it uses the proxy at
-            <code className="mx-1">/api/cesdk-assets/</code>.
+        <div className="p-4 text-red-400 text-sm">
+          <p className="font-semibold">Editor engine could not be loaded.</p>
+          <code className="text-xs bg-zinc-900 px-2 py-1 rounded mt-2 inline-block">
+            {error}
+          </code>
+          <p className="mt-2 text-zinc-400">
+            (If you’re previewing in AI Studio, assets come from the CDN. On
+            viralyzaier.com they’re served via <code>/api/cesdk-assets/</code>.)
           </p>
         </div>
       ) : (
-        <div ref={containerRef} className="w-full h-full bg-neutral-900" />
+        <div ref={containerRef} className="w-full h-full" />
       )}
     </div>
   );
