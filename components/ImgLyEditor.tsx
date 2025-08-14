@@ -1,23 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import CreativeEditor from '@cesdk/cesdk-js';
 
+// Helper to get env vars safely from either Vite or window.ENV
 function getEnv(key: string): string | undefined {
-  // Vite (prod) → import.meta.env; AI Studio → window.ENV (if you added it)
   const v = (import.meta as any)?.env?.[key] ?? (window as any)?.ENV?.[key];
   return typeof v === 'string' && v.trim() ? v : undefined;
-}
-
-// Decide where to load CE SDK assets from, ensuring it's always an absolute URL.
-function resolveAssetBaseURL(): string {
-  const host = typeof window !== 'undefined' ? window.location.host : '';
-  // For AI Studio preview, we must use the CDN due to CORS.
-  if (/ai\.studio|usercontent\.goog/i.test(host)) {
-    return 'https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/assets/';
-  }
-  // On the production site, construct an absolute URL for the proxy.
-  // This prevents the "Failed to construct 'URL': Invalid URL" error.
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  return `${origin}/api/cesdk-assets/`;
 }
 
 export default function ImgLyEditor() {
@@ -28,23 +15,36 @@ export default function ImgLyEditor() {
   useEffect(() => {
     let disposed = false;
     (async () => {
+      // Guard against running in non-browser environments
+      if (typeof window === 'undefined' || !containerRef.current) {
+        return;
+      }
+      
       try {
-        if (!containerRef.current) return;
+        const host = window.location.hostname;
+        const origin = window.location.origin;
         
-        const baseURL = resolveAssetBaseURL();
-        
+        // This is the core logic. It determines the correct *absolute* URL for assets.
+        const onAiStudio = /ai\.studio|usercontent\.goog/i.test(host);
+
+        const baseURL = onAiStudio
+          ? 'https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/assets/' // Use absolute CDN URL in AI Studio
+          : `${origin}/api/cesdk-assets/`;                             // Use absolute proxy URL on production/other envs
+
         const license = getEnv('VITE_IMGLY_LICENSE_KEY');
-        if (!license) throw new Error('Missing VITE_IMGLY_LICENSE_KEY');
-        
-        const inst = await CreativeEditor.create(containerRef.current!, {
+        if (!license) {
+          throw new Error('Missing VITE_IMGLY_LICENSE_KEY. Please check your configuration.');
+        }
+
+        const inst = await CreativeEditor.create(containerRef.current, {
           license,
-          baseURL,
-          ui: { theme: 'dark' },
+          baseURL, // baseURL is a top-level property
+          theme: 'dark',
         });
 
-        if (disposed) { 
-          inst.dispose(); 
-          return; 
+        if (disposed) {
+          inst.dispose();
+          return;
         }
         instanceRef.current = inst;
       } catch (e: any) {
@@ -52,12 +52,13 @@ export default function ImgLyEditor() {
         setError(e?.message || String(e));
       }
     })();
+
     return () => {
       disposed = true;
       instanceRef.current?.dispose();
       instanceRef.current = null;
     };
-  }, []);
+  }, []); // Run only once on mount
 
   return (
     <div className="w-full h-[70vh] rounded-lg overflow-hidden border border-zinc-800">
