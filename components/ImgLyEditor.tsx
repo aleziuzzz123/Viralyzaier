@@ -7,42 +7,17 @@ function getEnv(key: string): string | undefined {
   return typeof v === 'string' && v.trim() ? v : undefined;
 }
 
-// Decide where to load CE SDK assets from.
+// Decide where to load CE SDK assets from, ensuring it's always an absolute URL.
 function resolveAssetBaseURL(): string {
   const host = typeof window !== 'undefined' ? window.location.host : '';
-  // On the production site, use the local proxy.
-  if (/viralyzaier\.com/i.test(host)) {
-    return '/api/cesdk-assets/';
+  // For AI Studio preview, we must use the CDN due to CORS.
+  if (/ai\.studio|usercontent\.goog/i.test(host)) {
+    return 'https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/assets/';
   }
-  // For everything else (AI Studio, local dev), use the CDN.
-  return 'https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/assets/';
-}
-
-// Ensure we have an **absolute** URL when we build link hrefs.
-function toAbsoluteURL(base: string): string {
-  if (/^https?:\/\//i.test(base)) {
-    return base;
-  }
+  // On the production site, construct an absolute URL for the proxy.
+  // This prevents the "Failed to construct 'URL': Invalid URL" error.
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  return new URL(base, origin).href;
-}
-
-function injectCssOnce(baseURL: string) {
-  const absBase = toAbsoluteURL(baseURL);
-  const ids = ['cesdk-core-css', 'cesdk-theme-css'];
-  const hrefs = [
-    new URL('stylesheets/cesdk.css', absBase).href,
-    new URL('stylesheets/cesdk-themes.css', absBase).href,
-  ];
-  hrefs.forEach((href, i) => {
-    if (!document.getElementById(ids[i])) {
-      const link = document.createElement('link');
-      link.id = ids[i];
-      link.rel = 'stylesheet';
-      link.href = href;
-      document.head.appendChild(link);
-    }
-  });
+  return `${origin}/api/cesdk-assets/`;
 }
 
 export default function ImgLyEditor() {
@@ -57,15 +32,14 @@ export default function ImgLyEditor() {
         if (!containerRef.current) return;
         
         const baseURL = resolveAssetBaseURL();
-        injectCssOnce(baseURL);
-
+        
         const license = getEnv('VITE_IMGLY_LICENSE_KEY');
         if (!license) throw new Error('Missing VITE_IMGLY_LICENSE_KEY');
         
         const inst = await CreativeEditor.create(containerRef.current!, {
           license,
-          baseURL: baseURL,
-          theme: 'dark'
+          baseURL,
+          ui: { theme: 'dark' },
         });
 
         if (disposed) { 
