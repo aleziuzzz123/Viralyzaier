@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { UploadIcon } from './Icons.tsx';
-import { useAppContext } from '../contexts/AppContext.tsx';
+import { useAppContext } from '../contexts/AppContext';
 
 interface VideoUploaderProps {
   onFileSelect: (file: File) => void;

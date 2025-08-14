@@ -1,4 +1,3 @@
-/// <reference types="vite/client" />
 import { useEffect, useRef, useState } from 'react';
 
 declare global {

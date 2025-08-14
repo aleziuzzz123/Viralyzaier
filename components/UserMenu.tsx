@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { CrownIcon, CreditIcon, LogoutIcon, CogIcon } from './Icons';
-import { useAppContext } from './AppContext';
+import { useAppContext } from '../contexts/AppContext';
 
 interface UserMenuProps {
     onNavigate: (view: 'pricing' | 'settings') => void;

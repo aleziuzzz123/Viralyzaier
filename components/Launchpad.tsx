@@ -122,7 +122,7 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
         setLoading({ repurpose: true });
         addToast(`Repurposing for ${targetPlatform}... this may take a moment.`, 'info');
         try {
-            const newScript = await repurposeProject(project.script, project.title, project.platform, targetPlatform);
+            const repurposedScript = await repurposeProject(project.script, project.title, project.platform, targetPlatform);
             // Re-using this context function is a clean way to create a new project
             await handleCreateProjectFromIdea({
                 idea: `Repurposed: ${project.topic}`,

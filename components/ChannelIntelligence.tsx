@@ -44,7 +44,7 @@ const ChannelIntelligence: React.FC<ChannelIntelligenceProps> = ({ project }) =>
                     fetchChannelVideos()
                 ]);
                 setStats(channelStats);
-                setRecentVideos(channelVideos.map((v: { id: string; title: string; }) => ({id: v.id, title: v.title})));
+                setRecentVideos(channelVideos.map((v: any) => ({id: v.id, title: v.title})));
             } catch (e) {
                 setError(t('channel_intelligence.error_load'));
             } finally {
