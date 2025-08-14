@@ -1,6 +1,6 @@
 import React from 'react';
-import { LightBulbIcon, XCircleIcon } from './Icons.tsx';
-import { useAppContext } from '../contexts/AppContext.tsx';
+import { LightBulbIcon, XCircleIcon } from './Icons';
+import { useAppContext } from '../contexts/AppContext';
 
 interface TutorialCalloutProps {
     id: string;

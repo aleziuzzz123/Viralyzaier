@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { VideoStyle, Platform, BrandIdentity, ClonedVoice, Project } from '../types';
+import { VideoStyle, Platform, BrandIdentity, ClonedVoice } from '../types';
 import { useAppContext } from '../contexts/AppContext';
 import { generateVideoBlueprint } from '../services/geminiService';
 import { SparklesIcon, FilmIcon, TypeIcon, PaintBrushIcon } from './Icons';

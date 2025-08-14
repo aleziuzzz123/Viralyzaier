@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { analyzeTitles } from '../services/geminiService';
 import { TitleAnalysis, Platform, Project } from '../types';
-import { PlusIcon, TrashIcon, LightBulbIcon, MagicWandIcon } from './Icons';
+import { PlusIcon, TrashIcon, MagicWandIcon } from './Icons';
 import { useAppContext } from '../contexts/AppContext';
 import TitleAnalysisResult from './TitleAnalysisResult';
 
@@ -9,14 +9,6 @@ interface TitleOptimizerProps {
     onTitleSelect: (title: string) => void;
     platform: Platform;
 }
-
-const scoreColor = (score: number) => {
-  if (score >= 80) return 'text-green-400';
-  if (score >= 60) return 'text-lime-400';
-  if (score >= 40) return 'text-yellow-400';
-  if (score >= 20) return 'text-orange-400';
-  return 'text-red-400';
-};
 
 const TitleOptimizer: React.FC<TitleOptimizerProps> = ({ onTitleSelect, platform }) => {
   const { consumeCredits, projects, activeProjectId, t } = useAppContext();

@@ -95,7 +95,6 @@ const Launchpad: React.FC<LaunchpadProps> = ({ project }) => {
         setIsPublishing(true);
         try {
             const videoUrl = await publishVideo(
-                project.id, 
                 project.publishedUrl,
                 project.title,
                 project.launchPlan.seo.description,

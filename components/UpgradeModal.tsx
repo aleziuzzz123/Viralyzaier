@@ -1,6 +1,6 @@
 import React from 'react';
-import { CrownIcon, XCircleIcon } from './Icons.tsx';
-import { useAppContext } from '../contexts/AppContext.tsx';
+import { CrownIcon, XCircleIcon } from './Icons';
+import { useAppContext } from './AppContext';
 
 const UpgradeModal: React.FC = () => {
     const { isUpgradeModalOpen, setUpgradeModalOpen, upgradeReason, setActiveProjectId, t } = useAppContext();
