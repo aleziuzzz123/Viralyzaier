@@ -13,13 +13,13 @@ const CONTENT_TYPES: Record<string, string> = {
 
 function pickTarget(path: string) {
   // Normalize common css shortcuts:
-  if (path === 'cesdk.css') return CDN_JS + 'styles/cesdk.css';
-  if (path === 'cesdk-themes.css') return CDN_JS + 'styles/cesdk-themes.css';
+  if (path === 'cesdk.css') return CDN_JS + 'stylesheets/cesdk.css';
+  if (path === 'cesdk-themes.css') return CDN_JS + 'stylesheets/cesdk-themes.css';
 
   // Engine files come in as /core/<filename>; on CDN they are in the engine root
   if (path.startsWith('core/')) return CDN_ENGINE + path.replace(/^core\//, '');
 
-  // Everything else (e.g., styles/*) lives under cesdk-js assets
+  // Everything else (e.g., stylesheets/*) lives under cesdk-js assets
   return CDN_JS + path;
 }
 
