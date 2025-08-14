@@ -49,7 +49,7 @@ export default function ImgLyEditor() {
         const instance = await CreativeEditorSDK.create(containerRef.current, {
           license,
           baseURL, // The SDK will request paths like `v1.57.0/assets/core` relative to this
-          ui: { theme: 'dark' }
+          ui: { elements: { theme: 'dark' } }
         });
 
         await instance.createDesignScene();
