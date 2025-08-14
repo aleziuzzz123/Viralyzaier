@@ -9,10 +9,9 @@
     "strict": false,
     "noImplicitAny": false,
     "resolveJsonModule": true,
-    "allowImportingTsExtensions": true,
     "baseUrl": ".",
     "types": ["vite/client"]
   },
   "include": ["**/*"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": ["node_modules", "dist", "supabase"]
 }
