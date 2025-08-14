@@ -1,69 +1,57 @@
 // api/cesdk-assets/[[...path]].ts
 export const config = { runtime: 'edge' };
 
-const ORIGIN = 'https://cdn.img.ly';
-const JS_BASE = `${ORIGIN}/packages/imgly/cesdk-js/1.57.0`;
-const ENGINE_BASE = `${ORIGIN}/packages/imgly/cesdk-engine/v1.57.0`;
+// CDN roots for the two packages
+const CDN_JS      = 'https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0';
+const CDN_ENGINE  = 'https://cdn.img.ly/packages/imgly/cesdk-engine/v1.57.0';
 
+// Very permissive CORS for static assets
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Expose-Headers': 'Content-Length, Content-Type, Date, ETag',
 };
 
-function contentType(path: string): string {
-  if (path.endsWith('.css')) return 'text/css; charset=utf-8';
-  if (path.endsWith('.js') || path.endsWith('.mjs')) return 'application/javascript; charset=utf-8';
-  if (path.endsWith('.wasm')) return 'application/wasm';
-  if (path.endsWith('.data')) return 'application/octet-stream';
-  return 'application/octet-stream';
-}
-
 export default async function handler(req: Request) {
-  const url = new URL(req.url);
-  const relPath = url.pathname.replace(/^\/api\/cesdk-assets\/?/, '');
+  // Strip the /api/cesdk-assets/ prefix
+  const relative = new URL(req.url).pathname.replace(/^\/api\/cesdk-assets\//, '');
 
-  if (!relPath) {
-    return new Response('Bad Request', { status: 400, headers: CORS });
-  }
+  // Map UI vs engine assets
+  const upstream = relative.startsWith('core/')
+    ? `${CDN_ENGINE}/${relative.replace(/^core\//, '')}`
+    : `${CDN_JS}/assets/${relative}`;
 
-  let cdnURL: string;
-
-  if (relPath.startsWith('core/')) {
-    // Engine assets (wasm, data) are in a separate package
-    cdnURL = `${ENGINE_BASE}/${relPath.substring('core/'.length)}`;
-  } else {
-    // All other assets (UI, stylesheets, fonts) are in the JS package under /assets
-    cdnURL = `${JS_BASE}/assets/${relPath}`;
-  }
+  const headers = new Headers(CORS);
+  // long cache for immutable versioned files
+  headers.set('Cache-Control', 'public, max-age=31536000, immutable');
 
   try {
-    const upstream = await fetch(cdnURL, {
-      headers: { 'User-Agent': 'viralyzer-asset-proxy' },
+    const res = await fetch(upstream, {
+      // Important: pass-through the GET cleanly
+      method: 'GET',
+      headers: { 'User-Agent': 'viralyzer-cesdk-proxy' },
     });
 
-    if (!upstream.ok) {
-        // Forward the error status from the CDN
-        return new Response(upstream.body, { status: upstream.status, headers: CORS });
+    if (!res.ok) {
+      return new Response(`NOT_FOUND\n${upstream}`, {
+        status: 404,
+        headers: { ...Object.fromEntries(headers), 'Content-Type': 'text/plain; charset=utf-8' },
+      });
     }
 
-    const body = await upstream.arrayBuffer();
+    const ct = res.headers.get('Content-Type') || '';
+    headers.set('Content-Type', ct);
 
-    const extraCache = /\.(wasm|data|mjs|js|css)$/.test(cdnURL)
-      ? { 'Cache-Control': 'public, max-age=31536000, immutable' }
-      : {};
-
-    const headers = {
-      ...CORS,
-      ...extraCache,
-      'Content-Type': upstream.headers.get('Content-Type') || contentType(cdnURL),
-      'Content-Length': body.byteLength.toString(),
-    };
-
-    return new Response(body, { status: 200, headers });
-  } catch (e: any) {
-    return new Response(JSON.stringify({ error: e?.message || 'proxy failed' }), {
+    // Stream the bytes (works for wasm/data/css/js)
+    return new Response(res.body, { status: 200, headers });
+  } catch (err: any) {
+    return new Response(JSON.stringify({ error: 'proxy failed', upstream, message: err?.message }), {
       status: 502,
-      headers: { ...CORS, 'Content-Type': 'application/json' },
+      headers: { ...Object.fromEntries(CORS_ENTRIES(headers)), 'Content-Type': 'application/json' },
     });
   }
+}
+
+function CORS_ENTRIES(h: Headers): [string, string][] {
+  return [['Access-Control-Allow-Origin', h.get('Access-Control-Allow-Origin')!],
+          ['Access-Control-Expose-Headers', h.get('Access-Control-Expose-Headers')!]];
 }
