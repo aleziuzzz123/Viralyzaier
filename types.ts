@@ -11,8 +11,8 @@ export type Json =
   | number
   | boolean
   | null
-  | { [key: string]: any }
-  | any[];
+  | { [key: string]: Json | undefined }
+  | Json[];
 
 // --- UI & System Types ---
 export interface Toast { id: number; message: string; type: 'success' | 'error' | 'info'; }

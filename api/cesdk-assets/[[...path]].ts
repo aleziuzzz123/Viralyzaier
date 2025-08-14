@@ -1,60 +1,69 @@
 // api/cesdk-assets/[[...path]].ts
 export const config = { runtime: 'edge' };
 
-// Add trailing slash for safe URL joining.
-const BASE = 'https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/';
+const ORIGIN = 'https://cdn.img.ly';
+const JS_BASE = `${ORIGIN}/packages/imgly/cesdk-js/1.57.0`;
+const ENGINE_BASE = `${ORIGIN}/packages/imgly/cesdk-engine/v1.57.0`;
 
-const corsHeaders = {
+const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Expose-Headers': 'Content-Length, Content-Type, Date, ETag',
 };
 
-function contentType(path: string) {
-  const ext = path.split('.').pop()?.toLowerCase();
-  if (ext === 'wasm') return 'application/wasm';
-  if (ext === 'css') return 'text/css; charset=utf-8';
-  if (ext === 'js' || ext === 'mjs') return 'application/javascript; charset=utf-8';
-  if (ext === 'svg') return 'image/svg+xml';
-  if (ext === 'json') return 'application/json; charset=utf-8';
-  return undefined;
+function contentType(path: string): string {
+  if (path.endsWith('.css')) return 'text/css; charset=utf-8';
+  if (path.endsWith('.js') || path.endsWith('.mjs')) return 'application/javascript; charset=utf-8';
+  if (path.endsWith('.wasm')) return 'application/wasm';
+  if (path.endsWith('.data')) return 'application/octet-stream';
+  return 'application/octet-stream';
 }
 
 export default async function handler(req: Request) {
   const url = new URL(req.url);
-  const path = url.pathname.replace(/^\/api\/cesdk-assets\/?/, '');
-  
-  if (!path) {
-    return new Response('Missing asset path.', { status: 400, headers: corsHeaders });
+  const relPath = url.pathname.replace(/^\/api\/cesdk-assets\/?/, '');
+
+  if (!relPath) {
+    return new Response('Bad Request', { status: 400, headers: CORS });
   }
-  
+
+  let cdnURL: string;
+
+  if (relPath.startsWith('core/')) {
+    // Engine assets (wasm, data) are in a separate package
+    cdnURL = `${ENGINE_BASE}/${relPath.substring('core/'.length)}`;
+  } else {
+    // All other assets (UI, stylesheets, fonts) are in the JS package under /assets
+    cdnURL = `${JS_BASE}/assets/${relPath}`;
+  }
+
   try {
-    const targetUrl = new URL(path, BASE);
-    const upstream = await fetch(targetUrl.toString(), { headers: { 'User-Agent': 'viralyzer-cesdk-proxy' } });
-    
+    const upstream = await fetch(cdnURL, {
+      headers: { 'User-Agent': 'viralyzer-asset-proxy' },
+    });
+
     if (!upstream.ok) {
-        const errorText = await upstream.text();
-        return new Response(`Upstream fetch failed: ${upstream.status} - ${errorText}`, { status: upstream.status, headers: corsHeaders });
+        // Forward the error status from the CDN
+        return new Response(upstream.body, { status: upstream.status, headers: CORS });
     }
 
-    const buf = await upstream.arrayBuffer();
-    const headers = new Headers(corsHeaders);
+    const body = await upstream.arrayBuffer();
 
-    const ct = contentType(path) || upstream.headers.get('Content-Type');
-    if (ct) headers.set('Content-Type', ct);
+    const extraCache = /\.(wasm|data|mjs|js|css)$/.test(cdnURL)
+      ? { 'Cache-Control': 'public, max-age=31536000, immutable' }
+      : {};
 
-    if (upstream.headers.has('Content-Length')) {
-        headers.set('Content-Length', upstream.headers.get('Content-Length')!);
-    }
-    
-    headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+    const headers = {
+      ...CORS,
+      ...extraCache,
+      'Content-Type': upstream.headers.get('Content-Type') || contentType(cdnURL),
+      'Content-Length': body.byteLength.toString(),
+    };
 
-    return new Response(buf, { status: 200, headers });
-    
-  } catch (error) {
-    // This will catch the `new URL()` error if it occurs.
-    return new Response(JSON.stringify({ error: `Proxy internal error: ${error.message}` }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
+    return new Response(body, { status: 200, headers });
+  } catch (e: any) {
+    return new Response(JSON.stringify({ error: e?.message || 'proxy failed' }), {
+      status: 502,
+      headers: { ...CORS, 'Content-Type': 'application/json' },
     });
   }
 }

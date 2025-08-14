@@ -24,6 +24,15 @@ import { type Session } from '@supabase/supabase-js';
 import { PLANS } from './paymentService.ts';
 import { getErrorMessage } from '../utils.ts';
 
+// --- Type Aliases for Supabase Payloads ---
+type ProfileInsert = Database['public']['Tables']['profiles']['Insert'];
+type ProfileUpdate = Database['public']['Tables']['profiles']['Update'];
+type ProjectInsert = Database['public']['Tables']['projects']['Insert'];
+type ProjectUpdate = Database['public']['Tables']['projects']['Update'];
+type NotificationUpdate = Database['public']['Tables']['notifications']['Update'];
+type BrandIdentityInsert = Database['public']['Tables']['brand_identities']['Insert'];
+type BrandIdentityUpdate = Database['public']['Tables']['brand_identities']['Update'];
+
 // --- Type Guards for Data Validation ---
 const isValidSubscription = (sub: any): sub is Subscription => {
     return sub && typeof sub === 'object' &&
@@ -32,9 +41,9 @@ const isValidSubscription = (sub: any): sub is Subscription => {
 };
 
 // Helper to sanitize JSON before sending it to Supabase
-const sanitizeJson = (value: any): Json | null => {
+const sanitizeJson = (value: any) => {
     // Simple deep-copy for safety. Prevents issues with complex objects.
-    return value ? JSON.parse(JSON.stringify(value)) as Json : null;
+    return value ? JSON.parse(JSON.stringify(value)) : null;
 }
 
 
@@ -50,8 +59,8 @@ export const profileRowToUser = (row: any, youtubeConnected: boolean): User => (
     cloned_voices: (row.cloned_voices as unknown as ClonedVoice[] | null) || [],
 });
 
-const userToProfileUpdate = (updates: Partial<User>): Database['public']['Tables']['profiles']['Update'] => {
-    const dbUpdates: Database['public']['Tables']['profiles']['Update'] = {};
+const userToProfileUpdate = (updates: Partial<User>): ProfileUpdate => {
+    const dbUpdates: ProfileUpdate = {};
     if (updates.aiCredits !== undefined) dbUpdates.ai_credits = updates.aiCredits;
     if (updates.channelAudit !== undefined) dbUpdates.channel_audit = sanitizeJson(updates.channelAudit);
     if (updates.cloned_voices !== undefined) dbUpdates.cloned_voices = sanitizeJson(updates.cloned_voices);
@@ -200,20 +209,20 @@ export const getUserProfile = async (userId: string): Promise<User | null> => {
 export const createProfileForUser = async (userId: string, email: string | null | undefined): Promise<User> => {
     const freePlan = PLANS.find(p => p.id === 'free')!;
     const fallbackEmail = email || `user_${userId.split('-')[0]}@viralyzaier.app`;
-    const newUserProfile: Database['public']['Tables']['profiles']['Insert'] = {
+    const newUserProfile: ProfileInsert = {
         id: userId,
         email: fallbackEmail,
         subscription: { planId: 'free', status: 'active', endDate: null },
         ai_credits: freePlan.creditLimit,
     };
-    const { data, error } = await supabase.from('profiles').insert(newUserProfile).select('*').single();
+    const { data, error } = await supabase.from('profiles').insert([newUserProfile]).select('*').single();
     if (error) throw new Error(getErrorMessage(error));
     if (!data) throw new Error("Failed to create profile: no data returned.");
     return profileRowToUser(data, false);
 };
 
 export const updateUserProfile = async (userId: string, updates: Partial<User>): Promise<User> => {
-    const dbUpdates = userToProfileUpdate(updates);
+    const dbUpdates: ProfileUpdate = userToProfileUpdate(updates);
     const { data, error } = await supabase.from('profiles').update(dbUpdates).eq('id', userId).select('*').single();
     if (error) throw new Error(getErrorMessage(error));
     if (!data) throw new Error("Failed to update profile: no data returned.");
@@ -249,7 +258,7 @@ export const getProjectDetails = async (projectId: string): Promise<Project | nu
 
 
 export const createProject = async (projectData: Omit<Project, 'id' | 'lastUpdated'>, userId: string): Promise<Project> => {
-    const newProjectData: Database['public']['Tables']['projects']['Insert'] = {
+    const newProjectData: ProjectInsert = {
         user_id: userId,
         name: projectData.name,
         topic: projectData.topic,
@@ -275,7 +284,7 @@ export const createProject = async (projectData: Omit<Project, 'id' | 'lastUpdat
     
     const { data, error } = await supabase
         .from('projects')
-        .insert(newProjectData)
+        .insert([newProjectData])
         .select('*')
         .single();
     if (error) throw new Error(getErrorMessage(error));
@@ -284,7 +293,7 @@ export const createProject = async (projectData: Omit<Project, 'id' | 'lastUpdat
 };
 
 export const updateProject = async (projectId: string, updates: Partial<Project>): Promise<Project> => {
-    const dbUpdates: Database['public']['Tables']['projects']['Update'] = { last_updated: new Date().toISOString() };
+    const dbUpdates: ProjectUpdate = { last_updated: new Date().toISOString() };
     
     if (updates.name !== undefined) dbUpdates.name = updates.name;
     if (updates.topic !== undefined) dbUpdates.topic = updates.topic;
@@ -340,13 +349,13 @@ export const getNotifications = async (userId: string): Promise<Notification[]> 
 };
 
 export const markNotificationAsRead = async (notificationId: string): Promise<void> => {
-    const updates: Database['public']['Tables']['notifications']['Update'] = { is_read: true };
+    const updates: NotificationUpdate = { is_read: true };
     const { error } = await supabase.from('notifications').update(updates).eq('id', notificationId);
     if (error) throw new Error(getErrorMessage(error));
 };
 
 export const markAllNotificationsAsRead = async (userId: string): Promise<void> => {
-    const updates: Database['public']['Tables']['notifications']['Update'] = { is_read: true };
+    const updates: NotificationUpdate = { is_read: true };
     const { error } = await supabase.from('notifications').update(updates).eq('user_id', userId);
     if (error) throw new Error(getErrorMessage(error));
 };
@@ -385,12 +394,12 @@ export const getBrandIdentitiesForUser = async (userId: string): Promise<BrandId
 };
 
 export const createBrandIdentity = async (identityData: Omit<BrandIdentity, 'id' | 'created_at' | 'user_id'>, userId: string): Promise<BrandIdentity> => {
-    const newIdentityData: Database['public']['Tables']['brand_identities']['Insert'] = {
+    const newIdentityData: BrandIdentityInsert = {
         user_id: userId,
         name: identityData.name,
         tone_of_voice: identityData.toneOfVoice,
         writing_style_guide: identityData.writingStyleGuide,
-        color_palette: identityData.colorPalette,
+        color_palette: identityData.colorPalette as Json,
         font_selection: identityData.fontSelection,
         thumbnail_formula: identityData.thumbnailFormula,
         visual_style_guide: identityData.visualStyleGuide,
@@ -398,18 +407,18 @@ export const createBrandIdentity = async (identityData: Omit<BrandIdentity, 'id'
         channel_mission: identityData.channelMission,
         logo_url: identityData.logoUrl ?? null
     };
-    const { data, error } = await supabase.from('brand_identities').insert(newIdentityData).select('*').single();
+    const { data, error } = await supabase.from('brand_identities').insert([newIdentityData]).select('*').single();
     if (error) throw new Error(getErrorMessage(error));
     if (!data) throw new Error("Failed to create brand identity: no data returned.");
     return brandIdentityRowToBrandIdentity(data);
 };
 
 export const updateBrandIdentity = async (identityId: string, updates: Partial<Omit<BrandIdentity, 'id' | 'created_at' | 'user_id'>>): Promise<BrandIdentity> => {
-    const dbUpdates: Database['public']['Tables']['brand_identities']['Update'] = {};
+    const dbUpdates: BrandIdentityUpdate = {};
     if (updates.name !== undefined) dbUpdates.name = updates.name;
     if (updates.toneOfVoice !== undefined) dbUpdates.tone_of_voice = updates.toneOfVoice;
     if (updates.writingStyleGuide !== undefined) dbUpdates.writing_style_guide = updates.writingStyleGuide;
-    if (updates.colorPalette !== undefined) dbUpdates.color_palette = updates.colorPalette;
+    if (updates.colorPalette !== undefined) dbUpdates.color_palette = updates.colorPalette as Json;
     if (updates.fontSelection !== undefined) dbUpdates.font_selection = updates.fontSelection;
     if (updates.thumbnailFormula !== undefined) dbUpdates.thumbnail_formula = updates.thumbnailFormula;
     if (updates.visualStyleGuide !== undefined) dbUpdates.visual_style_guide = updates.visualStyleGuide;
