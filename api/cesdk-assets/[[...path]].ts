@@ -2,7 +2,7 @@
 export const config = { runtime: 'edge' };
 
 // CE.SDK CDN base (lock to the version you use in package.json)
-const CDN_BASE = 'https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/assets/';
+const CDN_BASE = 'https://cdn.img.ly/packages/cesdk-js/1.57.0/';
 const PREFIX = '/api/cesdk-assets/';
 
 export default async function handler(req: Request) {
@@ -24,7 +24,6 @@ export default async function handler(req: Request) {
   hdr.set('Content-Type', upstream.headers.get('content-type') ?? 'application/octet-stream');
   hdr.set('Cache-Control', upstream.headers.get('cache-control') ?? 'public, max-age=31536000, immutable');
   hdr.set('Cross-Origin-Resource-Policy', 'cross-origin');
-  hdr.set('Access-Control-Allow-Origin', '*');
 
   return new Response(upstream.body, { status: upstream.status, headers: hdr });
 }
