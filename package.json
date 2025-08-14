@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "rm -f api/cesdk-assets/[...path].ts",
     "build": "vite build",
     "preview": "vite preview"
   },
