@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "prebuild": "rm -f api/cesdk-assets/[...path].ts",
+    "postinstall": "node scripts/copy-cesdk-assets.mjs",
     "build": "vite build",
     "preview": "vite preview"
   },
