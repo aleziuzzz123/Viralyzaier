@@ -40,10 +40,8 @@ export default function ImgLyEditor({ projectId }: Props) {
 
         instance = await CreativeEditorSDK.create(containerRef.current!, {
           license,
-          theme: 'dark',
-          ui: {
-            baseURL // <- this is the critical line
-          }
+          baseURL: baseURL,
+          theme: 'dark'
         });
 
         if (disposed) {
