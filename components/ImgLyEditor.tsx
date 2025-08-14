@@ -29,19 +29,19 @@ export default function ImgLyEditor() {
       try {
         if (!containerRef.current) return;
 
-        const isAiStudio = typeof location !== 'undefined' && /aistudio\.google\.com|googleusercontent\.com/i.test(location.hostname);
-        // Where assets live:
-        // - In AI Studio we use the CDN (avoids CORS/DEV peculiarities)
-        // - On our domain (Vercel), we serve from /public/assets
+        const onProd = typeof location !== 'undefined' && location.hostname.endsWith('viralyzaier.com');
         const CDN_ASSETS = 'https://cdn.img.ly/packages/imgly/cesdk/1.57.0/assets';
-        const LOCAL_ASSETS = '/assets';
+        const LOCAL_ASSETS_PATH = '/assets';
+        
+        const assetsBaseURL = onProd ? LOCAL_ASSETS_PATH : CDN_ASSETS;
+        const coreBaseURL = onProd ? 'core/' : `${assetsBaseURL}/core`;
 
-        const assetsBaseURL = isAiStudio ? CDN_ASSETS : LOCAL_ASSETS;
-        const coreBaseURL   = isAiStudio ? `${CDN_ASSETS}/core` : 'core/'; // relative to baseURL when local
+        // Absolute URL is needed for injecting CSS and for addDefaultAssetSources
+        const absoluteAssetsURL = onProd ? `${window.location.origin}${LOCAL_ASSETS_PATH}` : CDN_ASSETS;
 
         // Load CESDK UI styles (must exist before init)
-        injectCss(`${assetsBaseURL}/ui/stylesheets/cesdk.css`);
-        injectCss(`${assetsBaseURL}/ui/stylesheets/cesdk-themes.css`);
+        injectCss(`${absoluteAssetsURL}/ui/stylesheets/cesdk.css`);
+        injectCss(`${absoluteAssetsURL}/ui/stylesheets/cesdk-themes.css`);
 
         const licenseKey = getEnv('VITE_IMGLY_LICENSE_KEY');
         if (!licenseKey) {
@@ -50,18 +50,13 @@ export default function ImgLyEditor() {
 
         const instance = await CreativeEditorSDK.create(containerRef.current, {
           license: licenseKey,
-          baseURL: assetsBaseURL,           // root for assets folder
-          core: { baseURL: coreBaseURL },   // where WASM/worker/data live
-          theme: 'dark'                     // 'theme' is a top-level property
+          baseURL: assetsBaseURL,             // Use relative path for local, absolute for CDN
+          core: { baseURL: coreBaseURL },     // Relative to baseURL for local
+          theme: 'dark'
         });
 
-        // Register default libraries (stickers, shapes, etc.)
-        // IMPORTANT: CESDK expects an **absolute URL** here.
-        const absoluteAssets = isAiStudio
-          ? CDN_ASSETS
-          : `${window.location.origin}${LOCAL_ASSETS}`;
-
-        await instance.addDefaultAssetSources({ baseURL: absoluteAssets });
+        // Register default libraries (stickers, shapes, etc.) which requires an absolute URL.
+        await instance.addDefaultAssetSources({ baseURL: absoluteAssetsURL });
         await instance.createDesignScene(); // optional: ensures we see a canvas
 
         dispose = () => instance.dispose();
