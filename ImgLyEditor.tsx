@@ -50,7 +50,11 @@ const ImgLyEditor: FC = () => {
         const UI_CSS = isAiStudio
           ? 'https://cdn.img.ly/packages/imgly/cesdk-ui/latest/stylesheets/cesdk.css'
           : `${window.location.origin}/api/cesdk-assets/ui/stylesheets/cesdk.css`;
-
+          : `https://www.viralyzaier.com/api/cesdk-assets/cesdk.css`;
+          : `https://www.viralyzaier.com/api/cesdk-assets/cesdk-themes.css`;
+          : `hhttps://www.viralyzaier.com/api/cesdk-assets/core/cesdk-v1.57.0-ET3GRITS.wasm`;
+        
+          
         const UI_THEME_CSS = isAiStudio
           ? 'https://cdn.img.ly/packages/imgly/cesdk-ui/latest/stylesheets/cesdk-themes.css'
           : `${window.location.origin}/api/cesdk-assets/ui/stylesheets/cesdk-themes.css`;
