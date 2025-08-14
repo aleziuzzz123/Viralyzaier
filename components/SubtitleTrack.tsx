@@ -34,7 +34,7 @@ const SubtitleTrack: React.FC<SubtitleTrackProps> = ({ timeline, onUpdate, durat
 
     return (
         <div className="relative w-full h-12 bg-gray-800 rounded-md my-1">
-            {(timeline.subtitles || []).map(sub => {
+            {(timeline.subtitles || []).map((sub: Subtitle) => {
                 if (typeof sub.start !== 'number' || typeof sub.end !== 'number' || duration === 0) return null;
                 const left = (sub.start / duration) * 100;
                 const width = ((sub.end - sub.start) / duration) * 100;

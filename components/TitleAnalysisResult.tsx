@@ -1,7 +1,7 @@
 import React from 'react';
-import { TitleAnalysis } from '../types.ts';
-import { LightBulbIcon } from './Icons.tsx';
-import { useAppContext } from '../contexts/AppContext.tsx';
+import { TitleAnalysis } from '../types';
+import { LightBulbIcon } from './Icons';
+import { useAppContext } from '../contexts/AppContext';
 
 interface TitleAnalysisResultProps {
   results: { analysis: TitleAnalysis; suggestions: string[] };

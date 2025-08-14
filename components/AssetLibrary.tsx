@@ -15,21 +15,21 @@ const AssetLibrary: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'video' | 'audio'>('video');
 
     const allAssets = useMemo<FlatAsset[]>(() => {
-        return projects.flatMap((project) => {
+        return projects.flatMap((project: Project) => {
             if (!project.assets) return [];
-            return Object.entries(project.assets).flatMap(([sceneIndex, assets]) => {
+            return Object.entries(project.assets).flatMap(([sceneIndex, sceneAssets]: [string, SceneAssets]) => {
                 const flatAssets: FlatAsset[] = [];
-                if (assets.visualUrl) {
+                if (sceneAssets.visualUrl) {
                     flatAssets.push({
-                        url: assets.visualUrl,
+                        url: sceneAssets.visualUrl,
                         type: 'video', // Note: This assumes all visuals in the library are videos.
                         projectName: project.name,
                         scene: parseInt(sceneIndex) + 1,
                     });
                 }
-                if (assets.voiceoverUrl) {
+                if (sceneAssets.voiceoverUrl) {
                     flatAssets.push({
-                        url: assets.voiceoverUrl,
+                        url: sceneAssets.voiceoverUrl,
                         type: 'audio',
                         projectName: project.name,
                         scene: parseInt(sceneIndex) + 1,

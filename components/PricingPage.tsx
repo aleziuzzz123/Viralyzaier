@@ -3,12 +3,13 @@ import { Plan, PlanId } from '../types';
 import { PLANS } from '../services/paymentService';
 import { CheckBadgeIcon, CrownIcon } from './Icons';
 import { useAppContext } from '../contexts/AppContext';
+import { TranslationKey } from '../translations';
 
 interface PlanCardProps {
     plan: Plan;
     onSelect: () => void;
     isCurrent: boolean;
-    t: (key: string, replacements?: { [key: string]: string | number }) => string;
+    t: (key: TranslationKey, replacements?: { [key: string]: string | number }) => string;
 }
 
 const PlanCard: React.FC<PlanCardProps> = ({ plan, onSelect, isCurrent, t }) => {
@@ -48,7 +49,7 @@ const PlanCard: React.FC<PlanCardProps> = ({ plan, onSelect, isCurrent, t }) => 
                 {plan.features.map((featureKey: string, i: number) => (
                     <li key={i} className="flex items-start">
                         <CheckBadgeIcon className="w-6 h-6 mr-3 text-green-400 flex-shrink-0" />
-                        <span className="text-gray-300">{t(featureKey as any)}</span>
+                        <span className="text-gray-300">{t(featureKey as TranslationKey)}</span>
                     </li>
                 ))}
             </ul>
