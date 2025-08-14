@@ -8,15 +8,15 @@ function getEnv(key: string): string | undefined {
     return typeof v === 'string' && v.trim() ? v : undefined;
 }
 
-// Small helper to inject CSS before SDK init
-function injectCss(href: string) {
-  const id = `cesdk-css-${href}`;
-  if (document.getElementById(id)) return;
-  const link = document.createElement('link');
-  link.id = id;
-  link.rel = 'stylesheet';
-  link.href = href;
-  document.head.appendChild(link);
+// Helper to inject CSS before SDK init
+function ensureCss(href: string) {
+  if (!document.querySelector(`link[data-cesdk="${href}"]`)) {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = href;
+    link.setAttribute('data-cesdk', href);
+    document.head.appendChild(link);
+  }
 }
 
 export default function ImgLyEditor() {
@@ -29,35 +29,34 @@ export default function ImgLyEditor() {
       try {
         if (!containerRef.current) return;
 
-        const onProd = typeof location !== 'undefined' && location.hostname.endsWith('viralyzaier.com');
-        const CDN_ASSETS = 'https://cdn.img.ly/packages/imgly/cesdk/1.57.0/assets';
-        const LOCAL_ASSETS_PATH = '/assets';
-        
-        const assetsBaseURL = onProd ? LOCAL_ASSETS_PATH : CDN_ASSETS;
-        const coreBaseURL = onProd ? 'core/' : `${assetsBaseURL}/core`;
+        const IS_AI_STUDIO =
+          typeof window !== 'undefined' &&
+          // ai studio runs under aistudio.google.com (embedding/preview)
+          (window.top?.location?.hostname ?? window.location.hostname).includes('aistudio.google.com');
 
-        // Absolute URL is needed for injecting CSS and for addDefaultAssetSources
-        const absoluteAssetsURL = onProd ? `${window.location.origin}${LOCAL_ASSETS_PATH}` : CDN_ASSETS;
+        const ASSET_BASE = IS_AI_STUDIO
+          ? 'https://cdn.img.ly/packages/imgly/cesdk/v1.57.0'
+          : '/api/cesdk-assets';
 
-        // Load CESDK UI styles (must exist before init)
-        injectCss(`${absoluteAssetsURL}/ui/stylesheets/cesdk.css`);
-        injectCss(`${absoluteAssetsURL}/ui/stylesheets/cesdk-themes.css`);
-
-        const licenseKey = getEnv('VITE_IMGLY_LICENSE_KEY');
-        if (!licenseKey) {
-            throw new Error("VITE_IMGLY_LICENSE_KEY is not configured. Please check your setup.");
+        const license = getEnv('VITE_IMGLY_LICENSE_KEY') || '';
+        if (!license) {
+          throw new Error("VITE_IMGLY_LICENSE_KEY is not configured. Please check your setup.");
         }
+        
+        // CESDK loads assets relative to its baseURL. By pointing it to our proxy,
+        // the proxy can correctly fetch from the CDN. The CSS also needs to be
+        // loaded from the correct, full path.
+        const cssBase = IS_AI_STUDIO ? `${ASSET_BASE}/assets/ui` : ASSET_BASE;
+        ensureCss(`${cssBase}/stylesheets/cesdk.css`);
+        ensureCss(`${cssBase}/stylesheets/cesdk-themes.css`);
 
         const instance = await CreativeEditorSDK.create(containerRef.current, {
-          license: licenseKey,
-          baseURL: assetsBaseURL,             // Use relative path for local, absolute for CDN
-          core: { baseURL: coreBaseURL },     // Relative to baseURL for local
+          license,
+          baseURL: ASSET_BASE, // The SDK will request paths like /assets/core relative to this
           theme: 'dark'
         });
 
-        // Register default libraries (stickers, shapes, etc.) which requires an absolute URL.
-        await instance.addDefaultAssetSources({ baseURL: absoluteAssetsURL });
-        await instance.createDesignScene(); // optional: ensures we see a canvas
+        await instance.createDesignScene();
 
         dispose = () => instance.dispose();
       } catch (e: any) {
@@ -76,7 +75,7 @@ export default function ImgLyEditor() {
           <strong>Editor engine could not be loaded.</strong>
           <div>{error}</div>
           <div style={{ marginTop: 8, opacity: 0.8 }}>
-            If you’re previewing in AI Studio, assets come from the CDN. On viralyzaier.com they’re served from <code>/assets</code>.
+            If you’re previewing in AI Studio, assets come from the CDN. On viralyzaier.com they’re served from the <code>/api/cesdk-assets</code> proxy.
           </div>
         </div>
       ) : null}
