@@ -29,31 +29,27 @@ export default function ImgLyEditor() {
       try {
         if (!containerRef.current) return;
 
-        const IS_AI_STUDIO =
+        const onAiStudio =
           typeof window !== 'undefined' &&
-          // ai studio runs under aistudio.google.com (embedding/preview)
           (window.top?.location?.hostname ?? window.location.hostname).includes('aistudio.google.com');
 
-        const ASSET_BASE = IS_AI_STUDIO
-          ? 'https://cdn.img.ly/packages/imgly/cesdk/v1.57.0'
-          : '/api/cesdk-assets';
-
+        const baseURL = onAiStudio ? 'https://cdn.img.ly/cesdk/' : '/api/cesdk-assets/';
+        
         const license = getEnv('VITE_IMGLY_LICENSE_KEY') || '';
         if (!license) {
           throw new Error("VITE_IMGLY_LICENSE_KEY is not configured. Please check your setup.");
         }
         
-        // CESDK loads assets relative to its baseURL. By pointing it to our proxy,
-        // the proxy can correctly fetch from the CDN. The CSS also needs to be
-        // loaded from the correct, full path.
-        const cssBase = IS_AI_STUDIO ? `${ASSET_BASE}/assets/ui` : ASSET_BASE;
+        // The CSS paths still need to be fully qualified and versioned. The proxy will handle this path.
+        const VERSION = '1.57.0'; // from package.json
+        const cssBase = onAiStudio ? `https://cdn.img.ly/packages/imgly/cesdk/${VERSION}/assets/ui` : `/api/cesdk-assets/${VERSION}/assets/ui`;
         ensureCss(`${cssBase}/stylesheets/cesdk.css`);
         ensureCss(`${cssBase}/stylesheets/cesdk-themes.css`);
 
         const instance = await CreativeEditorSDK.create(containerRef.current, {
           license,
-          baseURL: ASSET_BASE, // The SDK will request paths like /assets/core relative to this
-          theme: 'dark'
+          baseURL, // The SDK will request paths like `v1.57.0/assets/core` relative to this
+          ui: { theme: 'dark' }
         });
 
         await instance.createDesignScene();

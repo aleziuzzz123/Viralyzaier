@@ -1,29 +1,39 @@
 // api/cesdk-assets/[[...path]].ts
 export const config = { runtime: 'edge' };
 
-const VERSION = 'v1.57.0';
-const CDN_BASE = `https://cdn.img.ly/packages/imgly/cesdk/${VERSION}`;
+// Point to the CE.SDK asset CDN root (adjust if needed).
+// Using a generic path so the function doesn't 404 if versions change.
+const CDN_ROOT = 'https://cdn.img.ly/cesdk';
 
-function addCors(h: Headers) {
-  const out = new Headers(h);
-  out.set('access-control-allow-origin', '*');
-  out.set('access-control-allow-methods', 'GET,OPTIONS');
-  out.set('access-control-allow-headers', '*,authorization,content-type');
-  if (!out.has('cache-control')) {
-    out.set('cache-control', 'public, max-age=31536000, immutable');
-  }
-  return out;
-}
+const guessType = (p: string) => {
+  if (p.endsWith('.css')) return 'text/css; charset=utf-8';
+  if (p.endsWith('.js') || p.endsWith('.mjs')) return 'application/javascript; charset=utf-8';
+  if (p.endsWith('.wasm')) return 'application/wasm';
+  if (p.endsWith('.data')) return 'application/octet-stream';
+  if (p.endsWith('.woff2')) return 'font/woff2';
+  if (p.endsWith('.woff')) return 'font/woff';
+  if (p.endsWith('.ttf')) return 'font/ttf';
+  return 'application/octet-stream';
+};
 
 export default async function handler(req: Request) {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: addCors(new Headers()) });
-  }
   const url = new URL(req.url);
-  const rel = url.pathname.replace(/^\/api\/cesdk-assets\/?/, '');
-  if (!rel) {
-    return new Response('OK', { status: 200, headers: addCors(new Headers({'content-type':'text/plain'})) });
+  const subPath = url.pathname.replace(/^\/api\/cesdk-assets\/?/, '');
+  if (!subPath) {
+    return new Response('Missing asset path', { status: 400 });
   }
-  const upstream = await fetch(`${CDN_BASE}/${rel}`, { headers: { 'accept-encoding': 'gzip' } });
-  return new Response(upstream.body, { status: upstream.status, headers: addCors(upstream.headers) });
+  const remoteUrl = `${CDN_ROOT}/${subPath}`;
+  const upstream = await fetch(remoteUrl, { redirect: 'follow' });
+  if (!upstream.ok || !upstream.body) {
+    return new Response(`Upstream ${upstream.status} for ${remoteUrl}`, { status: upstream.status || 502 });
+  }
+  const type = upstream.headers.get('content-type') ?? guessType(subPath);
+  return new Response(upstream.body, {
+    status: 200,
+    headers: {
+      'Content-Type': type,
+      'Cache-Control': 'public, max-age=31536000, immutable',
+      'Access-Control-Allow-Origin': '*'
+    }
+  });
 }
