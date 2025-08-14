@@ -18,7 +18,7 @@ const FinalEditStep: React.FC<{
         );
     }
     
-    return <ImgLyEditor projectId={project.id} />;
+    return <ImgLyEditor />;
 };
 
 export default FinalEditStep;

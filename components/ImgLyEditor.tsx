@@ -1,94 +1,68 @@
-import React, { useEffect, useRef, useState } from "react";
-import CreativeEditorSDK, { DefaultAssets } from "@cesdk/cesdk-js";
+import { useEffect, useRef, useState } from 'react';
 
-type Props = {
-  projectId?: string;
-  onSaved?: (blob: Blob) => void;
-};
+declare global {
+  interface Window {
+    ENV?: Record<string, string>;
+  }
+}
 
-const ImgLyEditor: React.FC<Props> = ({ projectId, onSaved }) => {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const instanceRef = useRef<CreativeEditorSDK | null>(null);
+const env = (k: string) =>
+  (typeof import.meta !== 'undefined' && (import.meta as any).env?.[k]) ||
+  (typeof window !== 'undefined' ? window.ENV?.[k] : undefined);
+
+export default function ImgLyEditor() {
+  const containerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
-
-  // Helper to read license from Vite env or window.ENV (fallback)
-  const license =
-    import.meta.env.VITE_IMGLY_LICENSE_KEY ||
-    (window as any)?.ENV?.VITE_IMGLY_LICENSE_KEY;
 
   useEffect(() => {
     let disposed = false;
+    let instance: any;
 
     (async () => {
       try {
         if (!containerRef.current) return;
+        const { default: CreativeEditor } = await import('@cesdk/cesdk-js');
 
-        if (!license) {
-          throw new Error(
-            "Missing VITE_IMGLY_LICENSE_KEY. Set it in Vercel env and redeploy."
-          );
-        }
+        const license = env('VITE_IMGLY_LICENSE_KEY');
+        if (!license) throw new Error('Missing VITE_IMGLY_LICENSE_KEY');
 
-        // IMPORTANT: baseURL points to CDN *assets* folder
-        const baseURL =
-          "https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/assets";
-
-        const cesdk = await CreativeEditorSDK.create(containerRef.current, {
-          license: String(license),
-          baseURL, // this enables loading core/…(wasm,data,js) and ui/stylesheets/…
-          ui: {
-            // theme configuration MUST live under ui
-            theme: "light",
-          },
-          // Optional: preload default asset sources
-          assets: {
-            resolver: DefaultAssets({ baseURL }),
-          },
+        instance = await CreativeEditor.create(containerRef.current!, {
+          license,
+          // IMPORTANT: this must match the edge route above
+          baseURL: '/api/cesdk-assets',
+          ui: { theme: 'dark' } as any,
         });
 
         if (disposed) {
-          await cesdk.dispose();
-          return;
-        }
-
-        instanceRef.current = cesdk;
-
-        // Example: load a blank scene
-        await cesdk.engine.scene.reset();
-
-        // If you load a project by ID, do it here
-        if (projectId) {
-          // await loadFromYourBackend(projectId, cesdk);
+          instance.dispose();
         }
       } catch (e: any) {
-        console.error("CESDK init failed:", e);
-        setError(e?.message || "Failed to initialize editor");
+        console.error('CESDK init failed:', e);
+        setError(e?.message || 'Failed to initialize editor');
       }
     })();
 
     return () => {
       disposed = true;
-      if (instanceRef.current) {
-        instanceRef.current.dispose().catch(() => {});
-        instanceRef.current = null;
+      // The instance might not be assigned if the async function fails early.
+      if (instance) {
+        try {
+          instance.dispose();
+        } catch (disposeError) {
+          // Log dispose error if necessary, but don't crash.
+          console.error('CESDK dispose failed:', disposeError);
+        }
       }
     };
-  }, [license, projectId]);
+  }, []);
 
-  return (
-    <div className="w-full h-[70vh] rounded-lg overflow-hidden">
-      {error ? (
-        <div className="p-4 text-red-300 bg-red-900/30 rounded-md">
-          <p className="font-bold mb-1">Could not load the editor.</p>
-          <p className="text-xs">
-            Check VITE_IMGLY_LICENSE_KEY and network access to cdn.img.ly.
-          </p>
-        </div>
-      ) : (
-        <div ref={containerRef} className="w-full h-full" />
-      )}
-    </div>
-  );
-};
+  if (error) {
+    return (
+      <div className="p-4 text-red-500 font-mono text-sm">
+        Could not load the editor: {error}
+      </div>
+    );
+  }
 
-export default ImgLyEditor;
+  return <div ref={containerRef} className="w-full h-[70vh] rounded-xl bg-neutral-900" />;
+}

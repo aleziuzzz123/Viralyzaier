@@ -15,8 +15,8 @@ const ChannelHub: React.FC<ChannelHubProps> = () => {
 
     const handleConnectChannel = () => {
         if (!user) return;
-        const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || (window as any).ENV?.VITE_GOOGLE_CLIENT_ID;
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || (window as any).ENV?.VITE_SUPABASE_URL;
+        const googleClientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (window as any).ENV?.VITE_GOOGLE_CLIENT_ID;
+        const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || (window as any).ENV?.VITE_SUPABASE_URL;
 
         if (!googleClientId || googleClientId.includes('YOUR_')) {
             setError("VITE_GOOGLE_CLIENT_ID is not configured. Please check your environment variables.");
