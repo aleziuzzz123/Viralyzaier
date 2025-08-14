@@ -10,7 +10,8 @@
     "noImplicitAny": false,
     "resolveJsonModule": true,
     "allowImportingTsExtensions": true,
-    "baseUrl": "."
+    "baseUrl": ".",
+    "types": ["vite/client"]
   },
   "include": ["**/*"],
   "exclude": ["node_modules", "dist"]
