@@ -22,14 +22,13 @@ export default function ImgLyEditor() {
       
       try {
         const host = window.location.hostname;
-        const origin = window.location.origin;
         
         // This is the core logic. It determines the correct *absolute* URL for assets.
         const onAiStudio = /ai\.studio|usercontent\.goog/i.test(host);
 
         const baseURL = onAiStudio
-          ? 'https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/assets/' // Use absolute CDN URL in AI Studio
-          : `${origin}/api/cesdk-assets/`;                             // Use absolute proxy URL on production/other envs
+          ? 'https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/' // Use absolute CDN URL in AI Studio
+          : '/api/cesdk-assets/';                             // Use relative proxy URL on production/other envs
 
         const license = getEnv('VITE_IMGLY_LICENSE_KEY');
         if (!license) {
@@ -39,7 +38,7 @@ export default function ImgLyEditor() {
         const inst = await CreativeEditor.create(containerRef.current, {
           license,
           baseURL, // baseURL is a top-level property
-          theme: 'dark',
+          theme: 'dark'
         });
 
         if (disposed) {
