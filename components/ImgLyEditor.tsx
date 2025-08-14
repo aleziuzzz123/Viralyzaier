@@ -1,52 +1,94 @@
-import { useEffect, useRef, useState } from "react";
-import CreativeEditorSDK from "@cesdk/cesdk-js";
+import React, { useEffect, useRef, useState } from "react";
+import CreativeEditorSDK, { DefaultAssets } from "@cesdk/cesdk-js";
 
-export default function ImgLyEditor() {
+type Props = {
+  projectId?: string;
+  onSaved?: (blob: Blob) => void;
+};
+
+const ImgLyEditor: React.FC<Props> = ({ projectId, onSaved }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const instanceRef = useRef<CreativeEditorSDK | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Helper to read license from Vite env or window.ENV (fallback)
+  const license =
+    import.meta.env.VITE_IMGLY_LICENSE_KEY ||
+    (window as any)?.ENV?.VITE_IMGLY_LICENSE_KEY;
+
   useEffect(() => {
-    let instance: any;
+    let disposed = false;
 
-    async function init() {
+    (async () => {
       try {
-        const license = import.meta.env.VITE_IMGLY_LICENSE_KEY;
-        if (!license) throw new Error("VITE_IMGLY_LICENSE_KEY is missing");
+        if (!containerRef.current) return;
 
-        instance = await CreativeEditorSDK.create(containerRef.current!, {
-          // your license
-          license,
+        if (!license) {
+          throw new Error(
+            "Missing VITE_IMGLY_LICENSE_KEY. Set it in Vercel env and redeploy."
+          );
+        }
 
-          // IMPORTANT: load assets & UI straight from the CDN (no proxy)
-          baseURL: "https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/assets",
+        // IMPORTANT: baseURL points to CDN *assets* folder
+        const baseURL =
+          "https://cdn.img.ly/packages/imgly/cesdk-js/1.57.0/assets";
 
-          theme: "dark"
+        const cesdk = await CreativeEditorSDK.create(containerRef.current, {
+          license: String(license),
+          baseURL, // this enables loading core/…(wasm,data,js) and ui/stylesheets/…
+          ui: {
+            // theme configuration MUST live under ui
+            theme: "light",
+          },
+          // Optional: preload default asset sources
+          assets: {
+            resolver: DefaultAssets({ baseURL }),
+          },
         });
 
-        // Optional: demo assets & a fresh design scene
-        await instance.addDefaultAssetSources();
-        await instance.addDemoAssetSources({ sceneMode: "Design" });
-        await instance.createDesignScene();
+        if (disposed) {
+          await cesdk.dispose();
+          return;
+        }
+
+        instanceRef.current = cesdk;
+
+        // Example: load a blank scene
+        await cesdk.engine.scene.reset();
+
+        // If you load a project by ID, do it here
+        if (projectId) {
+          // await loadFromYourBackend(projectId, cesdk);
+        }
       } catch (e: any) {
-        console.error(e);
-        setError(e?.message ?? String(e));
+        console.error("CESDK init failed:", e);
+        setError(e?.message || "Failed to initialize editor");
       }
-    }
+    })();
 
-    init();
-    return () => { instance?.dispose?.(); };
-  }, []);
+    return () => {
+      disposed = true;
+      if (instanceRef.current) {
+        instanceRef.current.dispose().catch(() => {});
+        instanceRef.current = null;
+      }
+    };
+  }, [license, projectId]);
 
-  if (error) {
-    return (
-      <div className="p-4 text-red-500">
-        Could not load the editor: {error}
-      </div>
-    );
-  }
+  return (
+    <div className="w-full h-[70vh] rounded-lg overflow-hidden">
+      {error ? (
+        <div className="p-4 text-red-300 bg-red-900/30 rounded-md">
+          <p className="font-bold mb-1">Could not load the editor.</p>
+          <p className="text-xs">
+            Check VITE_IMGLY_LICENSE_KEY and network access to cdn.img.ly.
+          </p>
+        </div>
+      ) : (
+        <div ref={containerRef} className="w-full h-full" />
+      )}
+    </div>
+  );
+};
 
-  return <div ref={containerRef} style={{ height: "calc(100vh - 80px)" }} />;
-}
-
-
-
+export default ImgLyEditor;
