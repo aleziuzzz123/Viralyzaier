@@ -1,10 +1,10 @@
 import React, { useEffect } from 'react';
-import { Project } from '../types.ts';
-import { FilePlusIcon } from './Icons.tsx';
-import KanbanBoard from './KanbanBoard.tsx';
-import { PLANS } from '../services/paymentService.ts';
-import { useAppContext } from '../contexts/AppContext.tsx';
-import Loader from './Loader.tsx';
+import { Project } from '../types';
+import { FilePlusIcon } from './Icons';
+import KanbanBoard from './KanbanBoard';
+import { PLANS } from '../services/paymentService';
+import { useAppContext } from '../contexts/AppContext';
+import Loader from './Loader';
 
 interface DashboardProps {
     onSelectProject: (id: string) => void;

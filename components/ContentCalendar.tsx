@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { SparklesIcon, XCircleIcon } from './Icons.tsx';
-import { getSchedulingSuggestion } from '../services/geminiService.ts';
-import { useAppContext } from '../contexts/AppContext.tsx';
-import { Project } from '../types.ts';
+import { SparklesIcon, XCircleIcon } from './Icons';
+import { getSchedulingSuggestion } from '../services/geminiService';
+import { useAppContext } from '../contexts/AppContext';
+import { Project } from '../types';
 
 interface CalendarProps {
 }

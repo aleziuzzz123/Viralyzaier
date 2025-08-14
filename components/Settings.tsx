@@ -1,9 +1,9 @@
 import React, { useState, useCallback } from 'react';
-import { useAppContext } from '../contexts/AppContext.tsx';
-import { SparklesIcon, UploadIcon, UserCircleIcon, RefreshIcon } from './Icons.tsx';
-import { invokeEdgeFunction } from '../services/supabaseService.ts';
-import { ClonedVoice, User } from '../types.ts';
-import BrandIdentityHub from './BrandIdentityHub.tsx';
+import { useAppContext } from '../contexts/AppContext';
+import { SparklesIcon, UploadIcon, UserCircleIcon, RefreshIcon } from './Icons';
+import { invokeEdgeFunction } from '../services/supabaseService';
+import { ClonedVoice, User } from '../types';
+import BrandIdentityHub from './BrandIdentityHub';
 
 const Settings: React.FC = () => {
     const { user, t, requirePermission, addToast, setUser, consumeCredits } = useAppContext();

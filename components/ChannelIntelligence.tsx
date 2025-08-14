@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ChannelStats, VideoPerformance, PerformanceReview, ContentGapSuggestion, Project } from '../types.ts';
-import { fetchChannelStats, fetchVideoPerformance, fetchChannelVideos } from '../services/youtubeService.ts';
-import { reviewVideoPerformance, suggestContentGaps } from '../services/geminiService.ts';
-import { SparklesIcon, LightBulbIcon, ThumbsUpIcon, CtaIcon } from './Icons.tsx';
-import { useAppContext } from '../contexts/AppContext.tsx';
+import { ChannelStats, VideoPerformance, PerformanceReview, ContentGapSuggestion, Project } from '../types';
+import { fetchChannelStats, fetchVideoPerformance, fetchChannelVideos } from '../services/youtubeService';
+import { reviewVideoPerformance, suggestContentGaps } from '../services/geminiService';
+import { SparklesIcon, LightBulbIcon, ThumbsUpIcon, CtaIcon } from './Icons';
+import { useAppContext } from '../contexts/AppContext';
 
 interface ChannelIntelligenceProps {
     project: Project; 

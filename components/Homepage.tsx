@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { SparklesIcon, YouTubeIcon, TikTokIcon, InstagramIcon, LightBulbIcon, ScriptIcon, PhotoIcon, RocketLaunchIcon, ChevronDownIcon } from './Icons.tsx';
-import LoginModal from './LoginModal.tsx';
-import { useAppContext } from '../contexts/AppContext.tsx';
-import LanguageSwitcher from './LanguageSwitcher.tsx';
+import { SparklesIcon, YouTubeIcon, TikTokIcon, InstagramIcon, LightBulbIcon, ScriptIcon, PhotoIcon, RocketLaunchIcon, ChevronDownIcon } from './Icons';
+import LoginModal from './LoginModal';
+import { useAppContext } from '../contexts/AppContext';
+import LanguageSwitcher from './LanguageSwitcher';
 
 const generatedImages = {
     featureBlueprint: `https://storage.googleapis.com/generative-ai-codelabs/Viralyzer%205.0%20App%20Dev/feature_blueprint.jpeg`,

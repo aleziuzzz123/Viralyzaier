@@ -1,12 +1,12 @@
 import React from 'react';
-import { Project, WorkflowStep } from '../types.ts';
-import { useAppContext } from '../contexts/AppContext.tsx';
-import ScriptGenerator from './ScriptGenerator.tsx';
-import FinalEditStep from './FinalEditStep.tsx';
-import Launchpad from './Launchpad.tsx';
-import TutorialCallout from './TutorialCallout.tsx';
-import { TranslationKey } from '../translations.ts';
-import AnalysisStep from './AnalysisStep.tsx';
+import { Project, WorkflowStep } from '../types';
+import { useAppContext } from '../contexts/AppContext';
+import ScriptGenerator from './ScriptGenerator';
+import FinalEditStep from './FinalEditStep';
+import Launchpad from './Launchpad';
+import TutorialCallout from './TutorialCallout';
+import { TranslationKey } from '../translations';
+import AnalysisStep from './AnalysisStep';
 
 interface ProjectViewProps {
     project: Project;

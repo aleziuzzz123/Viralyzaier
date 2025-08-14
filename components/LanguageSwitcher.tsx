@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useAppContext } from '../contexts/AppContext.tsx';
-import { Language } from '../translations.ts';
-import { GlobeIcon, ChevronDownIcon } from './Icons.tsx';
+import { useAppContext } from '../contexts/AppContext';
+import { Language } from '../translations';
+import { GlobeIcon, ChevronDownIcon } from './Icons';
 
 const languageOptions: { code: Language, name: string }[] = [
     { code: 'en', name: 'English' },

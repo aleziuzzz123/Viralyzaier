@@ -1,6 +1,6 @@
 import React from 'react';
-import { Project } from '../types.ts';
-import { useAppContext } from '../contexts/AppContext.tsx';
+import { Project } from '../types';
+import { useAppContext } from '../contexts/AppContext';
 
 interface AssetStudioProps {
     project: Project;

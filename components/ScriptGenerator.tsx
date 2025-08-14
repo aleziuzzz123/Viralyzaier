@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Project, Script, Scene } from '../types.ts';
-import { CheckBadgeIcon, MagicWandIcon, SparklesIcon, PlusIcon, TrashIcon, CheckCircleIcon, PhotoIcon } from './Icons.tsx';
-import { useAppContext } from '../contexts/AppContext.tsx';
-import { rewriteScriptScene, generateStoryboardImage } from '../services/geminiService.ts';
-import { getErrorMessage } from '../utils.ts';
+import { Project, Script, Scene } from '../types';
+import { CheckBadgeIcon, MagicWandIcon, SparklesIcon, PlusIcon, TrashIcon, CheckCircleIcon, PhotoIcon } from './Icons';
+import { useAppContext } from '../contexts/AppContext';
+import { rewriteScriptScene, generateStoryboardImage } from '../services/geminiService';
+import { getErrorMessage } from '../utils';
 
 interface ScriptEditorProps {
     project: Project;

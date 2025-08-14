@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Project, LaunchPlan } from '../types.ts';
-import { generateSeo, analyzeAndGenerateThumbnails, getSchedulingSuggestion, repurposeProject } from '../services/geminiService.ts';
-import { publishVideo } from '../services/youtubeService.ts';
-import { SparklesIcon, ClipboardCopyIcon, DownloadIcon, YouTubeIcon, CheckCircleIcon, CalendarIcon } from './Icons.tsx';
-import { useAppContext } from '../contexts/AppContext.tsx';
-import { getErrorMessage } from '../utils.ts';
+import { Project, LaunchPlan } from '../types';
+import { generateSeo, analyzeAndGenerateThumbnails, getSchedulingSuggestion, repurposeProject } from '../services/geminiService';
+import { publishVideo } from '../services/youtubeService';
+import { SparklesIcon, ClipboardCopyIcon, DownloadIcon, YouTubeIcon, CheckCircleIcon, CalendarIcon } from './Icons';
+import { useAppContext } from '../contexts/AppContext';
+import { getErrorMessage } from '../utils';
 
 interface LaunchpadProps {
     project: Project;

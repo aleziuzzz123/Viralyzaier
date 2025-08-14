@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Opportunity } from '../types.ts';
-import { fetchChannelVideos } from '../services/youtubeService.ts';
-import { performChannelAudit } from '../services/geminiService.ts';
-import * as supabase from '../services/supabaseService.ts';
-import { SparklesIcon, ChartPieIcon, YouTubeIcon } from './Icons.tsx';
-import { useAppContext } from '../contexts/AppContext.tsx';
+import { Opportunity } from '../types';
+import { fetchChannelVideos } from '../services/youtubeService';
+import { performChannelAudit } from '../services/geminiService';
+import * as supabase from '../services/supabaseService';
+import { SparklesIcon, ChartPieIcon, YouTubeIcon } from './Icons';
+import { useAppContext } from '../contexts/AppContext';
 
 interface ChannelHubProps {}
 

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { useAppContext } from '../contexts/AppContext.tsx';
-import { PhotoIcon, MicIcon, ClipboardCopyIcon } from './Icons.tsx';
-import { Project } from '../types.ts';
+import { useAppContext } from '../contexts/AppContext';
+import { PhotoIcon, MicIcon, ClipboardCopyIcon } from './Icons';
+import { Project, SceneAssets } from '../types';
 
 interface FlatAsset {
     url: string;
@@ -15,10 +15,9 @@ const AssetLibrary: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'video' | 'audio'>('video');
 
     const allAssets = useMemo<FlatAsset[]>(() => {
-        return projects.flatMap((project: Project) => {
+        return projects.flatMap((project) => {
             if (!project.assets) return [];
-            const sceneAssets = project.assets as any; // Quick fix for unknown type
-            return Object.entries(sceneAssets).flatMap(([sceneIndex, assets]: [string, any]) => {
+            return Object.entries(project.assets).flatMap(([sceneIndex, assets]) => {
                 const flatAssets: FlatAsset[] = [];
                 if (assets.visualUrl) {
                     flatAssets.push({

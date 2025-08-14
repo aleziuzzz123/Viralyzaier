@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { VideoStyle, Platform, BrandIdentity, ClonedVoice } from '../types.ts';
-import { useAppContext } from '../contexts/AppContext.tsx';
-import { generateVideoBlueprint } from '../services/geminiService.ts';
-import { SparklesIcon, FilmIcon, TypeIcon, PaintBrushIcon } from './Icons.tsx';
-import { getErrorMessage } from '../utils.ts';
-import { ELEVENLABS_VOICES } from '../services/generativeMediaService.ts';
+import { VideoStyle, Platform, BrandIdentity, ClonedVoice } from '../types';
+import { useAppContext } from '../contexts/AppContext';
+import { generateVideoBlueprint } from '../services/geminiService';
+import { SparklesIcon, FilmIcon, TypeIcon, PaintBrushIcon } from './Icons';
+import { getErrorMessage } from '../utils';
+import { ELEVENLABS_VOICES } from '../services/generativeMediaService';
 
 interface ProjectKickoffProps {
     onProjectCreated: (projectId: string) => void;

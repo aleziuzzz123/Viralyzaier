@@ -1,8 +1,8 @@
 import React, { useState, useCallback } from 'react';
-import { Project, CompetitorAnalysisResult } from '../types.ts';
-import { analyzeCompetitorVideo } from '../services/geminiService.ts';
-import { SparklesIcon, TargetIcon, LightBulbIcon, CheckIcon } from './Icons.tsx';
-import { useAppContext } from '../contexts/AppContext.tsx';
+import { Project, CompetitorAnalysisResult } from '../types';
+import { analyzeCompetitorVideo } from '../services/geminiService';
+import { SparklesIcon, TargetIcon, LightBulbIcon, CheckIcon } from './Icons';
+import { useAppContext } from '../contexts/AppContext';
 
 interface CompetitorAnalysisProps {
     project: Project;

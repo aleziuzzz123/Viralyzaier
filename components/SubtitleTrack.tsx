@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Subtitle, TimelineState } from '../types.ts';
+import { Subtitle, TimelineState } from '../types';
 
 interface SubtitleTrackProps {
     timeline: TimelineState;
@@ -31,49 +31,44 @@ const SubtitleTrack: React.FC<SubtitleTrackProps> = ({ timeline, onUpdate, durat
         onUpdate({ subtitles: newSubtitles });
         setEditingId(null);
     };
-    
-    const handleSubtitleClick = (e: React.MouseEvent, subId: string) => {
-        e.stopPropagation();
-        onSelectSubtitle(selectedSubtitleId === subId ? null : subId);
-    };
-
-    if (duration === 0) return null; // Prevent division by zero
 
     return (
-        <div className="w-full h-12 bg-gray-900/50 rounded relative">
-            {timeline.subtitles.map((sub: Subtitle) => (
-                <div 
-                    key={sub.id} 
-                    style={{ 
-                        left: `${(sub.start / duration) * 100}%`, 
-                        width: `${((sub.end - sub.start) / duration) * 100}%` 
-                    }} 
-                    className="absolute h-full p-1 group" 
-                >
+        <div className="relative w-full h-12 bg-gray-800 rounded-md my-1">
+            {(timeline.subtitles || []).map(sub => {
+                if (typeof sub.start !== 'number' || typeof sub.end !== 'number' || duration === 0) return null;
+                const left = (sub.start / duration) * 100;
+                const width = ((sub.end - sub.start) / duration) * 100;
+                const isSelected = selectedSubtitleId === sub.id;
+
+                return (
                     <div 
-                        className={`w-full h-full bg-indigo-500/80 rounded text-white text-xs px-2 overflow-hidden flex items-center cursor-pointer transition-all ${selectedSubtitleId === sub.id ? 'ring-2 ring-pink-500' : ''}`} 
-                        onClick={(e) => handleSubtitleClick(e, sub.id)}
+                        key={sub.id} 
+                        className={`absolute h-full p-1 cursor-pointer group ${isSelected ? 'ring-2 ring-indigo-400 z-10' : ''}`}
+                        style={{ left: `${left}%`, width: `${width}%` }}
+                        onClick={() => onSelectSubtitle(sub.id)}
                         onDoubleClick={() => handleStartEditing(sub)}
                     >
-                        {editingId === sub.id ? (
-                            <input 
-                                ref={inputRef}
-                                type="text" 
-                                value={editText} 
-                                onChange={e => setEditText(e.target.value)} 
-                                onBlur={handleSaveEdit} 
-                                onKeyDown={e => {
-                                    if(e.key === 'Enter') handleSaveEdit();
-                                    if(e.key === 'Escape') setEditingId(null);
-                                }}
-                                className="w-full h-full bg-transparent outline-none text-xs" 
-                            />
-                        ) : ( 
-                            <span className="truncate">{sub.text}</span>
-                        )}
+                        <div className="w-full h-full bg-indigo-600/50 rounded-sm flex items-center justify-center overflow-hidden">
+                            {editingId === sub.id ? (
+                                <input 
+                                    ref={inputRef}
+                                    type="text"
+                                    value={editText}
+                                    onChange={(e) => setEditText(e.target.value)}
+                                    onBlur={handleSaveEdit}
+                                    onKeyDown={(e) => { 
+                                        if (e.key === 'Enter') handleSaveEdit(); 
+                                        if (e.key === 'Escape') setEditingId(null); 
+                                    }}
+                                    className="w-full h-full bg-indigo-800 text-white text-xs text-center border-0 outline-none p-0"
+                                />
+                            ) : (
+                                <p className="text-white text-xs truncate px-1">{sub.text}</p>
+                            )}
+                        </div>
                     </div>
-                </div>
-            ))}
+                );
+            })}
         </div>
     );
 };

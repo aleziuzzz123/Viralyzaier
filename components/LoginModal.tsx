@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { signInWithPassword, signUp, sendPasswordResetEmail } from '../services/supabaseService.ts';
-import { SparklesIcon, XCircleIcon } from './Icons.tsx';
-import { useAppContext } from '../contexts/AppContext.tsx';
+import { signInWithPassword, signUp, sendPasswordResetEmail } from '../services/supabaseService';
+import { SparklesIcon, XCircleIcon } from './Icons';
+import { useAppContext } from '../contexts/AppContext';
 
 interface LoginModalProps {
     isOpen: boolean;

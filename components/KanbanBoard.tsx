@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Project, ProjectStatus, Platform } from '../types.ts';
-import { YouTubeIcon, TikTokIcon, InstagramIcon, PlusIcon, PencilIcon, RocketLaunchIcon, SparklesIcon } from './Icons.tsx';
-import { useAppContext } from '../contexts/AppContext.tsx';
+import { Project, ProjectStatus, Platform } from '../types';
+import { YouTubeIcon, TikTokIcon, InstagramIcon, PlusIcon, PencilIcon, RocketLaunchIcon, SparklesIcon } from './Icons';
+import { useAppContext } from '../contexts/AppContext';
 
 const platformIcons: { [key in Platform]: React.FC<{className?: string}> } = {
     youtube_long: YouTubeIcon,

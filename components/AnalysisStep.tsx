@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Project, Analysis } from '../types.ts';
-import { useAppContext } from '../contexts/AppContext.tsx';
-import * as geminiService from '../services/geminiService.ts';
-import AnalysisLoader from './AnalysisLoader.tsx';
-import AnalysisResult from './AnalysisResult.tsx';
+import { Project, Analysis } from '../types';
+import { useAppContext } from '../contexts/AppContext';
+import * as geminiService from '../services/geminiService';
+import AnalysisLoader from './AnalysisLoader';
+import AnalysisResult from './AnalysisResult';
 
 interface AnalysisStepProps {
     project: Project;

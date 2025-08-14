@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
-import { useAppContext } from '../contexts/AppContext.tsx';
-import { Notification } from '../types.ts';
-import { SparklesIcon } from './Icons.tsx';
+import { useAppContext } from '../contexts/AppContext';
+import { Notification } from '../types';
+import { SparklesIcon } from './Icons';
 
 interface NotificationsPanelProps {
     onClose: () => void;

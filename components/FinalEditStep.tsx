@@ -1,7 +1,7 @@
 import React from 'react';
-import { Project } from '../types.ts';
-import { useAppContext } from '../contexts/AppContext.tsx';
-import ImgLyEditor from './ImgLyEditor.tsx';
+import { Project } from '../types';
+import { useAppContext } from '../contexts/AppContext';
+import ImgLyEditor from './ImgLyEditor';
 
 const FinalEditStep: React.FC<{
     project: Project;

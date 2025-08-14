@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { CalendarIcon, XCircleIcon } from './Icons.tsx';
-import { useAppContext } from '../contexts/AppContext.tsx';
+import { CalendarIcon, XCircleIcon } from './Icons';
+import { useAppContext } from '../contexts/AppContext';
 
 const ScheduleModal: React.FC = () => {
     const { 
