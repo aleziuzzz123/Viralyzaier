@@ -162,11 +162,11 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         } finally {
             setIsInitialLoading(false);
         }
-    }, []);
+    }, [setIsInitialLoading, setUser, setProjects, setNotifications, setBrandIdentities, setBackendError]);
 
     useEffect(() => {
         supabase.getSession().then(({ session }) => setSession(session));
-        const { data: authListener } = supabase.onAuthStateChange((_event, session) => {
+        const authListener = supabase.onAuthStateChange((_event, session) => {
             setSession(session);
             if (session?.user) {
                 loadInitialData(session.user.id);
@@ -211,14 +211,18 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         localStorage.setItem('dismissedTutorials', JSON.stringify(newDismissed));
     };
 
+    const openConfirmationModal = useCallback((title: string, message: ReactNode, onConfirm: () => void) => {
+        setConfirmation({ isOpen: true, title, message, onConfirm });
+    }, []);
+
     const handleLogout = useCallback(() => {
         const confirmLogout = () => {
             supabase.signOut().then(() => addToast(t('toast.logged_out'), 'success'));
         };
         openConfirmationModal(t('confirmation_modal.logout_title'), t('confirmation_modal.logout_message'), confirmLogout);
-    }, [t, addToast]);
+    }, [t, addToast, openConfirmationModal]);
     
-    const lockAndExecute = useCallback(async <T>(asyncFunction: () => Promise<T>): Promise<T | undefined> => {
+    const lockAndExecute = useCallback(async (asyncFunction: () => Promise<any>): Promise<any | undefined> => {
         if (executionLock.current) {
             addToast('Another AI process is already running. Please wait.', 'info');
             return;
@@ -234,7 +238,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         } finally {
             executionLock.current = false;
         }
-    }, [addToast]);
+    }, [addToast, setBackendError]);
 
     const consumeCredits = useCallback(async (amount: number) => {
         if (!user) return false;
@@ -259,7 +263,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             addToast(getErrorMessage(e), 'error');
             return false;
         }
-    }, [user, t]);
+    }, [user, t, addToast, setUser, setUpgradeReason, setUpgradeModalOpen]);
     
     const requirePermission = useCallback((requiredPlan: PlanId) => {
         if (!user) return false;
@@ -274,7 +278,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         });
         setUpgradeModalOpen(true);
         return false;
-    }, [user]);
+    }, [user, setUpgradeReason, setUpgradeModalOpen]);
 
     const handleSubscriptionChange = useCallback(async (planId: PlanId) => {
         if (!user || user.subscription.planId === planId) {
@@ -305,7 +309,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             addToast(t('toast.failed_update_project'), 'error');
             return false;
         }
-    }, [t, addToast, activeProjectId]);
+    }, [t, addToast, activeProjectId, setProjects, setActiveProjectDetails]);
 
     const handleCreateProjectForBlueprint = useCallback(async (topic: string, platform: Platform, title: string, voiceoverVoiceId: string, videoSize: '16:9'|'9:16'|'1:1', blueprint: Blueprint): Promise<string | null> => {
         if (!user) return null;
@@ -337,7 +341,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             addToast(getErrorMessage(e), 'error');
             return null;
         }
-    }, [user, addToast, t]);
+    }, [user, addToast, t, setProjects]);
     
     const handleCreateProjectFromIdea = useCallback(async (idea: Opportunity | ContentGapSuggestion, platform: Platform) => {
         if (!user) return;
@@ -361,7 +365,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         } catch(e) {
              addToast(getErrorMessage(e), 'error');
         }
-    }, [user, addToast, t]);
+    }, [user, addToast, t, setProjects, setActiveProjectId]);
 
     const handleCreateProjectFromInsights = useCallback(async (review: PerformanceReview, oldProject: Project) => {
         if (!user) return;
@@ -387,7 +391,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         } catch (e) {
             addToast(getErrorMessage(e), 'error');
         }
-    }, [user, addToast, t]);
+    }, [user, addToast, t, setProjects, setActiveProjectId]);
 
     const handleDeleteProject = useCallback((projectId: string) => {
         const confirmDelete = async () => {
@@ -401,20 +405,17 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             }
         };
         openConfirmationModal(t('confirmation_modal.delete_project_title'), t('confirmation_modal.delete_project_message'), confirmDelete);
-    }, [activeProjectId, t, addToast]);
+    }, [activeProjectId, t, addToast, openConfirmationModal, setProjects, setActiveProjectId]);
     
     const addProjects = useCallback((newProjects: Project[]) => {
         setProjects(prev => [...newProjects, ...prev]);
-    }, []);
+    }, [setProjects]);
 
     const openScheduleModal = (projectId: string) => { setProjectToSchedule(projectId); setIsScheduleModalOpen(true); };
-    const closeScheduleModal = () => setIsScheduleModalOpen(false);
+    const closeScheduleModal = () => { setIsScheduleModalOpen(false); setProjectToSchedule(null); };
     const clearBackendError = () => setBackendError(null);
-
-    const openConfirmationModal = (title: string, message: ReactNode, onConfirm: () => void) => {
-        setConfirmation({ isOpen: true, title, message, onConfirm });
-    };
-    const handleConfirmation = () => { confirmation.onConfirm(); setConfirmation({ isOpen: false, title: '', message: '', onConfirm: () => {} }); };
+    
+    const handleConfirmation = () => { if (confirmation.isOpen) { confirmation.onConfirm(); } setConfirmation({ isOpen: false, title: '', message: '', onConfirm: () => {} }); };
     const handleCancelConfirmation = () => setConfirmation({ isOpen: false, title: '', message: '', onConfirm: () => {} });
     
     const handleCreateBrandIdentity = useCallback(async (identity: Omit<BrandIdentity, 'id'|'user_id'|'created_at'>) => {
@@ -424,7 +425,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             setBrandIdentities(prev => [...prev, newIdentity]);
             addToast("Brand Identity created!", 'success');
         } catch (e) { addToast(getErrorMessage(e), 'error'); }
-    }, [user, addToast]);
+    }, [user, addToast, setBrandIdentities]);
 
     const handleUpdateBrandIdentity = useCallback(async (id: string, updates: Partial<BrandIdentity>) => {
         try {
@@ -432,7 +433,7 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             setBrandIdentities(prev => prev.map(b => b.id === id ? updatedIdentity : b));
             addToast("Brand Identity updated!", 'success');
         } catch (e) { addToast(getErrorMessage(e), 'error'); }
-    }, [addToast]);
+    }, [addToast, setBrandIdentities]);
 
     const handleDeleteBrandIdentity = useCallback(async (id: string) => {
         try {
@@ -440,18 +441,18 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             setBrandIdentities(prev => prev.filter(b => b.id !== id));
             addToast("Brand Identity deleted!", 'success');
         } catch (e) { addToast(getErrorMessage(e), 'error'); }
-    }, [addToast]);
+    }, [addToast, setBrandIdentities]);
 
     const markNotificationAsRead = useCallback(async (id: string) => {
         setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
         try { await supabase.markNotificationAsRead(id); } catch (e) { console.error(e); }
-    }, []);
+    }, [setNotifications]);
 
     const markAllNotificationsAsRead = useCallback(async () => {
         if (!user) return;
         setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
         try { await supabase.markAllNotificationsAsRead(user.id); } catch (e) { console.error(e); }
-    }, [user]);
+    }, [user, setNotifications]);
 
     return (
         <AppContext.Provider value={{
