@@ -1,11 +1,9 @@
 {
-  "headers": [
+  "rewrites": [
     {
-      "source": "/(.*)\\.wasm",
-      "headers": [
-        { "key": "Content-Type", "value": "application/wasm" },
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
-      ]
+      "source": "/api/cesdk-assets/:path*",
+      "destination": "https://cdn.img.ly/packages/imgly/:path*"
     }
   ]
 }
+
