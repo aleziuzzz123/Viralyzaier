@@ -1,48 +1,61 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+// A tiny CDN proxy for CE.SDK assets that compiles without @vercel/node types.
 
-const CDN_ROOT = 'https://cdn.img.ly/packages/imgly';
+const CDN_ROOT = "https://cdn.img.ly/packages/imgly";
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const segments = (req.query.path as string[] | undefined) ?? [];
-  if (!segments.length) return res.status(400).send('Missing path');
-
-  // Example valid forwards:
-  // /api/cesdk-assets/cesdk-ui/latest/stylesheets/cesdk.css
-  // /api/cesdk-assets/cesdk-engine/latest/core/cesdk-v1.57.0-ET3GRITS.wasm
-  const target = `${CDN_ROOT}/${segments.join('/')}`;
-
+export default async function handler(req: any, res: any) {
   try {
+    const segments = (req?.query?.path as string[] | undefined) ?? [];
+    if (!segments.length) {
+      res.status(400).send("Missing path");
+      return;
+    }
+
+    // Example forwarded URLs:
+    // /api/cesdk-assets/cesdk-ui/latest/stylesheets/cesdk.css
+    // /api/cesdk-assets/cesdk-engine/latest/core/cesdk-<version>.wasm
+    const target = `${CDN_ROOT}/${segments.join("/")}`;
+
     const upstream = await fetch(target, {
+      method: req.method === "HEAD" ? "HEAD" : "GET",
       headers: {
+        // let the browser stream the WASM if it asked for a Range
         ...(req.headers.range ? { Range: String(req.headers.range) } : {}),
-        Accept: '*/*',
-        'User-Agent': req.headers['user-agent'] || 'cesdk-proxy'
-      }
+        Accept: "*/*",
+        "User-Agent": req.headers["user-agent"] || "cesdk-proxy",
+      },
     });
 
+    // mirror status & a few important headers
     res.status(upstream.status);
-    for (const h of [
-      'Content-Type',
-      'Content-Length',
-      'ETag',
-      'Last-Modified',
-      'Cache-Control',
-      'Accept-Ranges',
-      'Content-Range',
-      'Cross-Origin-Resource-Policy',
-      'Content-Encoding'
-    ]) {
+    const copy = (h: string) => {
       const v = upstream.headers.get(h);
       if (v) res.setHeader(h, v);
-    }
-    if (!upstream.headers.get('Cache-Control')) {
-      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    };
+    copy("Content-Type");
+    copy("Content-Length");
+    copy("ETag");
+    copy("Last-Modified");
+    copy("Cache-Control");
+    copy("Accept-Ranges");
+    copy("Content-Range");
+    copy("Cross-Origin-Resource-Policy");
+
+    // default caching if CDN didn’t send one
+    if (!upstream.headers.get("Cache-Control")) {
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
     }
 
-    const buf = Buffer.from(await upstream.arrayBuffer());
-    res.send(buf);
+    if (req.method === "HEAD") {
+      // no body for HEAD
+      res.end();
+      return;
+    }
+
+    const body = Buffer.from(await upstream.arrayBuffer());
+    res.send(body);
   } catch (err: any) {
-    res.status(502).send(`Proxy error: ${err?.message || String(err)}`);
+    res
+      .status(502)
+      .send(`Proxy error: ${err?.message || String(err)}`);
   }
 }
-
