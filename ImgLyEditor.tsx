@@ -1,34 +1,22 @@
-// components/ImgLyEditor.tsx
-import React, { useEffect, useRef, useState } from 'react';
-import type { FC } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import CreativeEditorSDK from '@cesdk/cesdk-js';
 
-// Allow reading a license injected via <script> in non-Vite contexts.
-declare global {
-  interface Window {
-    VITE_IMGLY_LICENSE_KEY?: string;
-  }
-}
-
-function ensureTrailingSlash(url: string) {
-  return url.endsWith('/') ? url : `${url}/`;
-}
-
-function injectCssOnce(href: string) {
-  if (document.querySelector(`link[rel="stylesheet"][href="${href}"]`)) return;
+function injectCss(href: string) {
+  if (document.querySelector(`link[data-cesdk-css="${href}"]`)) return;
   const link = document.createElement('link');
   link.rel = 'stylesheet';
   link.href = href;
+  link.setAttribute('data-cesdk-css', href);
   document.head.appendChild(link);
 }
 
-const ImgLyEditor: FC = () => {
+const ImgLyEditor: React.FC = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [instance, setInstance] = useState<any | null>(null);
 
   useEffect(() => {
     let disposed = false;
-    let instance: any;
 
     async function init() {
       try {
@@ -38,131 +26,77 @@ const ImgLyEditor: FC = () => {
           typeof window !== 'undefined' &&
           window.location.hostname.includes('aistudio.google.com');
 
-        // --------- Where assets come from ----------
-        // In AI Studio → direct CDN (CORS-friendly)
-        // On your domain → your Vercel proxy (/api/cesdk-assets)
-        const CORE_BASE = ensureTrailingSlash(
-          isAiStudio
-            ? 'https://cdn.img.ly/packages/imgly/cesdk-engine/latest/'
-            : `${window.location.origin}/api/cesdk-assets/core/`
-        );
+        // Where to load the engine (WASM) from:
+        // - In AI Studio -> load straight from CDN
+        // - On your site (Vercel) -> load through your proxy route
+        const ENGINE_BASE = isAiStudio
+          ? 'https://cdn.img.ly/packages/imgly/cesdk-engine/latest'
+          : '/api/cesdk-assets/cesdk-engine/latest';
 
+        // Load the UI CSS (required)
         const UI_CSS = isAiStudio
-          ? 'https://cdn.img.ly/packages/imgly/cesdk-ui/latest/stylesheets/cesdk.css'
-          : `${window.location.origin}/api/cesdk-assets/ui/stylesheets/cesdk.css`;
-          : `https://www.viralyzaier.com/api/cesdk-assets/cesdk.css`;
-          : `https://www.viralyzaier.com/api/cesdk-assets/cesdk-themes.css`;
-          : `hhttps://www.viralyzaier.com/api/cesdk-assets/core/cesdk-v1.57.0-ET3GRITS.wasm`;
-        
-          
-        const UI_THEME_CSS = isAiStudio
-          ? 'https://cdn.img.ly/packages/imgly/cesdk-ui/latest/stylesheets/cesdk-themes.css'
-          : `${window.location.origin}/api/cesdk-assets/ui/stylesheets/cesdk-themes.css`;
+          ? [
+              'https://cdn.img.ly/packages/imgly/cesdk-ui/latest/stylesheets/cesdk.css',
+              'https://cdn.img.ly/packages/imgly/cesdk-ui/latest/stylesheets/cesdk-themes.css'
+            ]
+          : [
+              '/api/cesdk-assets/cesdk-ui/latest/stylesheets/cesdk.css',
+              '/api/cesdk-assets/cesdk-ui/latest/stylesheets/cesdk-themes.css'
+            ];
 
-        // Must inject UI CSS before the editor initializes, or the engine may misbehave.
-        injectCssOnce(UI_CSS);
-        injectCssOnce(UI_THEME_CSS);
+        UI_CSS.forEach(injectCss);
 
-        // --------- License ----------
-        const license =
-          (import.meta as any)?.env?.VITE_IMGLY_LICENSE_KEY ||
-          window.VITE_IMGLY_LICENSE_KEY;
+        const LICENSE =
+          (import.meta as any).env?.VITE_IMGLY_LICENSE_KEY ||
+          (process as any).env?.VITE_IMGLY_LICENSE_KEY;
 
-        if (!license) {
+        if (!LICENSE) {
           setError(
-            'Missing IMG.LY license key (VITE_IMGLY_LICENSE_KEY). Add it to your environment.'
+            'Missing IMG.LY License key (VITE_IMGLY_LICENSE_KEY). Add it to your Vercel env vars.'
           );
           return;
         }
 
-        // --------- Create the editor ----------
-        if (!containerRef.current) {
-          setError('Editor container not found.');
+        if (!containerRef.current) return;
+
+        const editor = await CreativeEditorSDK.create(containerRef.current, {
+          baseURL: ENGINE_BASE,            // <-- points to engine (wasm)
+          license: LICENSE,
+          ui: { theme: 'dark' }
+          // No addDefaultAssetSources here. Not needed to start the editor.
+        });
+
+        if (disposed) {
+          await editor.dispose();
           return;
         }
 
-        instance = await CreativeEditorSDK.create(containerRef.current, {
-          license,
-          baseURL: CORE_BASE, // IMPORTANT: engine (.wasm/.data/.js) is resolved from here
-          ui: {
-            theme: 'dark',
-          },
-        });
-
-        // Optional but recommended: load default asset sources (stickers, shapes, etc.)
-        try {
-          await instance.addDefaultAssetSources?.();
-        } catch {
-          // Non-fatal if not needed
-        }
-
-        // Optional: open a blank scene so users see the canvas immediately
-        try {
-          await instance.createDesign?.();
-        } catch {
-          // Ignore if not available in current SDK build
-        }
-
-        if (disposed) {
-          // If the component unmounted during async init, dispose immediately.
-          instance?.dispose?.();
-        }
+        setInstance(editor);
       } catch (e: any) {
-        console.error('[CESDK] init failed:', e);
-        // Typical engine errors when baseURL/CSS is wrong:
-        // - "readFile is not a function"
-        // - "Aborted(both async and sync fetching of the wasm failed)"
+        console.error(e);
         setError(
           e?.message ||
-            'Editor engine could not be loaded. Check WASM/CSS asset paths and license.'
+            'Failed to initialize CreativeEditor SDK. Check baseURL, CSS, and license.'
         );
       }
     }
 
     init();
-
     return () => {
       disposed = true;
-      try {
-        instance?.dispose?.();
-      } catch {
-        /* noop */
-      }
+      if (instance) instance.dispose?.();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
-    <div style={{ height: '80vh', width: '100%', position: 'relative' }}>
-      <div ref={containerRef} style={{ height: '100%', width: '100%' }} />
-      {error && (
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            display: 'grid',
-            placeItems: 'center',
-            background: 'rgba(0,0,0,0.6)',
-            color: '#fff',
-            padding: 16,
-            textAlign: 'center',
-            fontFamily: 'ui-sans-serif, system-ui, -apple-system',
-          }}
-        >
-          <div>
-            <strong>Editor engine could not be loaded.</strong>
-            <div style={{ marginTop: 8, whiteSpace: 'pre-wrap' }}>{error}</div>
-            <div style={{ marginTop: 12, opacity: 0.8, fontSize: 12 }}>
-              In AI Studio the app loads assets from the IMG.LY CDN.
-              On your domain they are proxied through <code>/api/cesdk-assets/</code>.
-            </div>
-          </div>
-        </div>
-      )}
+    <div className="w-full h-full">
+      {error ? (
+        <div className="text-red-400 text-sm p-4 whitespace-pre-wrap">{error}</div>
+      ) : null}
+      <div ref={containerRef} style={{ width: '100%', height: '80vh' }} />
     </div>
   );
 };
 
 export default ImgLyEditor;
-
-
-
