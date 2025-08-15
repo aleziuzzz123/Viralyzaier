@@ -1,59 +1,76 @@
-import { useEffect, useRef, useState } from 'react';
-import CreativeEditorSDK from '@cesdk/cesdk-js';
+import { useEffect, useRef, useState } from "react";
+import CreativeEditorSDK from "@cesdk/cesdk-js";
 
-function injectCssOnce(href: string, id: string) {
-  if (document.getElementById(id)) return;
-  const el = document.createElement('link');
-  el.id = id;
-  el.rel = 'stylesheet';
-  el.href = href;
-  document.head.appendChild(el);
+function injectCss(href: string) {
+  if (document.querySelector(`link[rel="stylesheet"][href="${href}"]`)) return;
+  const link = document.createElement("link");
+  link.rel = "stylesheet";
+  link.href = href;
+  document.head.appendChild(link);
 }
 
-const CDN = 'https://cdn.img.ly/packages/imgly';
-const ENGINE_BASE = `${CDN}/cesdk-engine/latest`;
-const UI_BASE = `${CDN}/cesdk-ui/latest`;
-
-export default function ImgLyEditor() {
-  const container = useRef<HTMLDivElement | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+const ImgLyEditor = () => {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const instanceRef = useRef<any>(null);
 
   useEffect(() => {
-    (async () => {
+    const run = async () => {
       try {
-        // Load UI styles from the CDN
-        injectCssOnce(`${UI_BASE}/stylesheets/cesdk.css`, 'cesdk-css');
-        injectCssOnce(`${UI_BASE}/stylesheets/cesdk-themes.css`, 'cesdk-themes-css');
+        // 1) Inject UI CSS (rewrite sends this to the CDN)
+        injectCss("/api/cesdk-assets/cesdk-ui/latest/stylesheets/cesdk.css");
+        injectCss("/api/cesdk-assets/cesdk-ui/latest/stylesheets/cesdk-themes.css");
 
-        const license = import.meta.env.VITE_IMGLY_LICENSE_KEY;
+        const license = import.meta.env.VITE_IMG_LY_LICENSE_KEY;
         if (!license) {
-          setErr('Missing IMG.LY license key (VITE_IMGLY_LICENSE_KEY).');
-          return;
+          throw new Error(
+            "Missing VITE_IMG_LY_LICENSE_KEY – set it in your Vercel project env vars."
+          );
         }
 
-        // Tell the engine exactly where its wasm/data live (CDN)
-        const sdk = await (CreativeEditorSDK as any).create(container.current!, {
+        // 2) Create the editor
+        const cesdk = await CreativeEditorSDK.create(containerRef.current!, {
           license,
-          theme: 'dark',
-          baseURL: ENGINE_BASE,          // some versions read this
-          engine: { baseURL: ENGINE_BASE } // others read this - keep both for safety
+          // Make sure the engine loads its wasm/data from our rewrite
+          baseURL: "/api/cesdk-assets/cesdk-ui/latest", // UI looks here for assets
+          engineBaseUrl: "/api/cesdk-assets/cesdk-engine/latest", // wasm/data live here
+          theme: "dark",
+          ui: { panels: { inspector: true, pages: true, libraries: true } }
         });
 
-        // Optional: if your version supports it
-        // await (sdk as any).addDefaultAssetSources?.();
+        instanceRef.current = cesdk;
 
+        // Optional: load a blank scene
+        await cesdk.createDesignScene();
       } catch (e: any) {
-        console.error(e);
-        setErr(e?.message ?? String(e));
+        setError(
+          `${e?.message || e} — Check the Network tab: /api/cesdk-assets/* must return 200.`
+        );
       }
-    })();
+    };
+
+    run();
+
+    return () => {
+      if (instanceRef.current) {
+        instanceRef.current.dispose?.();
+        instanceRef.current = null;
+      }
+    };
   }, []);
 
   return (
-    <div className="h-[75vh]">
-      {err && <p className="text-red-500 text-sm mb-3">{err}</p>}
-      <div ref={container} className="w-full h-full" />
+    <div className="w-full h-full">
+      {error && (
+        <div style={{ color: "#ff6b6b", padding: 12, fontFamily: "monospace" }}>
+          {error}
+        </div>
+      )}
+      <div ref={containerRef} style={{ width: "100%", height: "80vh" }} />
     </div>
   );
-}
+};
+
+export default ImgLyEditor;
+
 
