@@ -1,4 +1,3 @@
-// components/ImgLyEditor.tsx
 import { useEffect, useRef, useState } from 'react';
 import CreativeEditorSDK from '@cesdk/cesdk-js';
 
@@ -13,8 +12,8 @@ function injectCss(href: string) {
 
 const ImgLyEditor: React.FC = () => {
   const hostRef = useRef<HTMLDivElement | null>(null);
-  const [err, setErr] = useState<string | null>(null);
   const editorRef = useRef<any>(null);
+  const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -31,7 +30,7 @@ const ImgLyEditor: React.FC = () => {
           ? 'https://cdn.img.ly/packages/imgly/cesdk-engine/latest'
           : '/api/cesdk-assets/cesdk-engine/latest';
 
-        const UI_CSS = isAiStudio
+        const CSS = isAiStudio
           ? [
               'https://cdn.img.ly/packages/imgly/cesdk-ui/latest/stylesheets/cesdk.css',
               'https://cdn.img.ly/packages/imgly/cesdk-ui/latest/stylesheets/cesdk-themes.css'
@@ -40,8 +39,7 @@ const ImgLyEditor: React.FC = () => {
               '/api/cesdk-assets/cesdk-ui/latest/stylesheets/cesdk.css',
               '/api/cesdk-assets/cesdk-ui/latest/stylesheets/cesdk-themes.css'
             ];
-
-        UI_CSS.forEach(injectCss);
+        CSS.forEach(injectCss);
 
         const LICENSE =
           (import.meta as any).env?.VITE_IMGLY_LICENSE_KEY ||
@@ -91,4 +89,5 @@ const ImgLyEditor: React.FC = () => {
 };
 
 export default ImgLyEditor;
+
 
