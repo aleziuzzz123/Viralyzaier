@@ -1,81 +1,86 @@
-'use client';
-import { useEffect, useRef, useState } from 'react';
-import CreativeEditorSDK from '@cesdk/cesdk-js';
+import { useEffect, useRef, useState } from "react";
+import CreativeEditorSDK from "@cesdk/cesdk-js";
 
-// Helper to get env vars safely from either Vite or window.ENV
-function getEnv(key: string): string | undefined {
-    const v = (import.meta as any)?.env?.[key] ?? (window as any)?.ENV?.[key];
-    return typeof v === 'string' && v.trim() ? v : undefined;
+function injectStylesheet(href: string) {
+  if (document.querySelector(`link[rel="stylesheet"][href="${href}"]`)) return;
+  const link = document.createElement("link");
+  link.rel = "stylesheet";
+  link.href = href;
+  document.head.appendChild(link);
 }
 
-// Helper to inject CSS before SDK init
-function ensureCss(href: string) {
-  if (!document.querySelector(`link[data-cesdk="${href}"]`)) {
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = href;
-    link.setAttribute('data-cesdk', href);
-    document.head.appendChild(link);
-  }
-}
-
-export default function ImgLyEditor() {
+const ImgLyEditor: React.FC = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let dispose: (() => void) | undefined;
+    let instance: any;
+
     (async () => {
       try {
-        if (!containerRef.current) return;
+        // Detect AI Studio vs your domain
+        const isAiStudio =
+          typeof window !== "undefined" &&
+          window.location.hostname.includes("aistudio.google.com");
 
-        const onAiStudio =
-          typeof window !== 'undefined' &&
-          (window.top?.location?.hostname ?? window.location.hostname).includes('aistudio.google.com');
+        // IMPORTANT:
+        // - For AI Studio we load directly from the IMG.LY CDN.
+        // - On your site we go through your proxy (/api/cesdk-assets) which forwards to the CDN.
+        const CDN_ROOT = isAiStudio
+          ? "https://cdn.img.ly/packages/imgly"
+          : "/api/cesdk-assets";
 
-        const baseURL = onAiStudio ? 'https://cdn.img.ly/cesdk/' : '/api/cesdk-assets/';
-        
-        const license = getEnv('VITE_IMGLY_LICENSE_KEY') || '';
-        if (!license) {
-          throw new Error("VITE_IMGLY_LICENSE_KEY is not configured. Please check your setup.");
+        // ✅ UI styles come from the cesdk-ui package
+        injectStylesheet(`${CDN_ROOT}/cesdk-ui/latest/stylesheets/cesdk.css`);
+        injectStylesheet(
+          `${CDN_ROOT}/cesdk-ui/latest/stylesheets/cesdk-themes.css`
+        );
+
+        // ✅ baseURL must point at cesdk-engine (NOT /core and NOT the proxy root)
+        const baseURL = `${CDN_ROOT}/cesdk-engine`;
+
+        const LICENSE =
+          (import.meta as any).env?.VITE_IMGLY_LICENSE_KEY ||
+          (window as any)?.VITE_IMGLY_LICENSE_KEY;
+
+        if (!LICENSE) {
+          setError(
+            "Missing IMG.LY License key (VITE_IMGLY_LICENSE_KEY). Add it in your env."
+          );
+          return;
         }
-        
-        // The CSS paths still need to be fully qualified and versioned. The proxy will handle this path.
-        const VERSION = '1.57.0'; // from package.json
-        const cssBase = onAiStudio ? `https://cdn.img.ly/packages/imgly/cesdk/${VERSION}/assets/ui` : `/api/cesdk-assets/${VERSION}/assets/ui`;
-        ensureCss(`${cssBase}/stylesheets/cesdk.css`);
-        ensureCss(`${cssBase}/stylesheets/cesdk-themes.css`);
 
-        const instance = await CreativeEditorSDK.create(containerRef.current, {
-          license,
-          baseURL, // The SDK will request paths like `v1.57.0/assets/core` relative to this
-          ui: { elements: { theme: 'dark' } }
+        instance = await CreativeEditorSDK.create(containerRef.current!, {
+          license: LICENSE,
+          baseURL, // the SDK will request `${baseURL}/core/<wasm|data>`
+          ui: { theme: "dark" },
         });
-
-        await instance.createDesignScene();
-
-        dispose = () => instance.dispose();
       } catch (e: any) {
-        console.error('CESDK init failed:', e);
-        setError(e?.message || String(e));
+        console.error("CESDK init failed:", e);
+        setError(
+          `${e?.message || e}.\nCheck that /api/cesdk-assets correctly proxies to the CDN and that CSS & license are set.`
+        );
       }
     })();
 
-    return () => { try { dispose?.(); } catch {} };
+    return () => {
+      if (instance) {
+        try {
+          instance.dispose?.();
+        } catch {}
+      }
+    };
   }, []);
 
   return (
-    <div style={{ width: '100%', height: '100%' }}>
+    <div className="w-full h-[80vh]">
       {error ? (
-        <div style={{ color: '#f99', padding: 16 }}>
-          <strong>Editor engine could not be loaded.</strong>
-          <div>{error}</div>
-          <div style={{ marginTop: 8, opacity: 0.8 }}>
-            If you’re previewing in AI Studio, assets come from the CDN. On viralyzaier.com they’re served from the <code>/api/cesdk-assets</code> proxy.
-          </div>
-        </div>
-      ) : null}
-      <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+        <pre style={{ color: "#f87171", whiteSpace: "pre-wrap" }}>{error}</pre>
+      ) : (
+        <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
+      )}
     </div>
   );
-}
+};
+
+export default ImgLyEditor;
