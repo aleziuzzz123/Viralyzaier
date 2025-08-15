@@ -26,14 +26,10 @@ const ImgLyEditor: React.FC = () => {
           typeof window !== 'undefined' &&
           window.location.hostname.includes('aistudio.google.com');
 
-        // Where to load the engine (WASM) from:
-        // - In AI Studio -> load straight from CDN
-        // - On your site (Vercel) -> load through your proxy route
         const ENGINE_BASE = isAiStudio
           ? 'https://cdn.img.ly/packages/imgly/cesdk-engine/latest'
           : '/api/cesdk-assets/cesdk-engine/latest';
 
-        // Load the UI CSS (required)
         const UI_CSS = isAiStudio
           ? [
               'https://cdn.img.ly/packages/imgly/cesdk-ui/latest/stylesheets/cesdk.css',
@@ -51,26 +47,22 @@ const ImgLyEditor: React.FC = () => {
           (process as any).env?.VITE_IMGLY_LICENSE_KEY;
 
         if (!LICENSE) {
-          setError(
-            'Missing IMG.LY License key (VITE_IMGLY_LICENSE_KEY). Add it to your Vercel env vars.'
-          );
+          setError('Missing IMG.LY license (VITE_IMGLY_LICENSE_KEY).');
           return;
         }
 
         if (!containerRef.current) return;
 
         const editor = await CreativeEditorSDK.create(containerRef.current, {
-          baseURL: ENGINE_BASE,            // <-- points to engine (wasm)
+          baseURL: ENGINE_BASE,
           license: LICENSE,
           ui: { theme: 'dark' }
-          // No addDefaultAssetSources here. Not needed to start the editor.
         });
 
         if (disposed) {
           await editor.dispose();
           return;
         }
-
         setInstance(editor);
       } catch (e: any) {
         console.error(e);
@@ -100,3 +92,4 @@ const ImgLyEditor: React.FC = () => {
 };
 
 export default ImgLyEditor;
+
