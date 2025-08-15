@@ -1,3 +1,4 @@
+// components/ImgLyEditor.tsx
 import { useEffect, useRef, useState } from 'react';
 import CreativeEditorSDK from '@cesdk/cesdk-js';
 
@@ -11,16 +12,16 @@ function injectCss(href: string) {
 }
 
 const ImgLyEditor: React.FC = () => {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [instance, setInstance] = useState<any | null>(null);
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const editorRef = useRef<any>(null);
 
   useEffect(() => {
-    let disposed = false;
+    let cancelled = false;
 
-    async function init() {
+    async function boot() {
       try {
-        setError(null);
+        setErr(null);
 
         const isAiStudio =
           typeof window !== 'undefined' &&
@@ -47,46 +48,44 @@ const ImgLyEditor: React.FC = () => {
           (process as any).env?.VITE_IMGLY_LICENSE_KEY;
 
         if (!LICENSE) {
-          setError('Missing IMG.LY license (VITE_IMGLY_LICENSE_KEY).');
+          setErr('Missing IMG.LY license (VITE_IMGLY_LICENSE_KEY).');
           return;
         }
+        if (!hostRef.current) return;
 
-        if (!containerRef.current) return;
-
-        const editor = await CreativeEditorSDK.create(containerRef.current, {
+        const instance = await CreativeEditorSDK.create(hostRef.current, {
           baseURL: ENGINE_BASE,
           license: LICENSE,
           ui: { theme: 'dark' }
         });
 
-        if (disposed) {
-          await editor.dispose();
+        if (cancelled) {
+          await instance.dispose?.();
           return;
         }
-        setInstance(editor);
+        editorRef.current = instance;
       } catch (e: any) {
         console.error(e);
-        setError(
+        setErr(
           e?.message ||
-            'Failed to initialize CreativeEditor SDK. Check baseURL, CSS, and license.'
+            'Failed to initialize CESDK. Check baseURL, CSS & license.'
         );
       }
     }
 
-    init();
+    boot();
     return () => {
-      disposed = true;
-      if (instance) instance.dispose?.();
+      cancelled = true;
+      editorRef.current?.dispose?.();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <div className="w-full h-full">
-      {error ? (
-        <div className="text-red-400 text-sm p-4 whitespace-pre-wrap">{error}</div>
-      ) : null}
-      <div ref={containerRef} style={{ width: '100%', height: '80vh' }} />
+      {err && (
+        <div className="p-3 text-sm text-red-400 whitespace-pre-wrap">{err}</div>
+      )}
+      <div ref={hostRef} style={{ width: '100%', height: '80vh' }} />
     </div>
   );
 };
