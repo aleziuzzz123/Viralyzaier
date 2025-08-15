@@ -1,91 +1,80 @@
-// components/ImgLyEditor.tsx
 import { useEffect, useRef, useState } from 'react';
-import CreativeEditorSDK, { CreativeEditor } from '@cesdk/cesdk-js';
+import CreativeEditorSDK, { addDefaultAssetSources } from '@cesdk/cesdk-js';
 
-function injectCSS(href: string) {
-  if (document.querySelector(`link[rel="stylesheet"][href="${href}"]`)) return;
+function injectCss(href: string) {
+  if (document.querySelector(`link[href="${href}"]`)) return;
   const link = document.createElement('link');
   link.rel = 'stylesheet';
   link.href = href;
   document.head.appendChild(link);
 }
 
-const ImgLyEditor: React.FC = () => {
-  const containerRef = useRef<HTMLDivElement | null>(null);
+const isAiStudio =
+  typeof window !== 'undefined' &&
+  window.location.hostname.includes('aistudio.google.com');
+
+// Where the engine & default assets live
+const ENGINE_BASE = isAiStudio
+  ? 'https://cdn.img.ly/packages/imgly/cesdk-engine/latest/'
+  : '/api/cesdk-assets/cesdk-engine/';
+
+// Where the UI CSS lives
+const UI_CSS = isAiStudio
+  ? [
+      'https://cdn.img.ly/packages/imgly/cesdk-ui/latest/stylesheets/cesdk.css',
+      'https://cdn.img.ly/packages/imgly/cesdk-ui/latest/stylesheets/cesdk-themes.css'
+    ]
+  : [
+      '/api/cesdk-assets/cesdk-ui/latest/stylesheets/cesdk.css',
+      '/api/cesdk-assets/cesdk-ui/latest/stylesheets/cesdk-themes.css'
+    ];
+
+export default function ImgLyEditor() {
+  const containerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let instance: CreativeEditor | null = null;
+    UI_CSS.forEach(injectCss);
 
-    const onAiStudio =
-      typeof window !== 'undefined' &&
-      window.location.hostname.includes('aistudio.google.com');
-
-    // Where the engine files live
-    const ENGINE_BASE = onAiStudio
-      ? 'https://cdn.img.ly/packages/imgly/cesdk-engine/latest/' // CDN inside AI Studio
-      : '/api/cesdk-assets/'; // proxied through Vercel in production
-
-    // Correct CSS locations
-    const CSS = onAiStudio
-      ? [
-          'https://cdn.img.ly/packages/imgly/cesdk-engine/latest/ui/stylesheets/cesdk.css',
-          'https://cdn.img.ly/packages/imgly/cesdk-engine/latest/ui/stylesheets/cesdk-themes.css',
-        ]
-      : [
-          '/api/cesdk-assets/ui/stylesheets/cesdk.css',
-          '/api/cesdk-assets/ui/stylesheets/cesdk-themes.css',
-        ];
-
-    async function init() {
+    let disposed = false;
+    (async () => {
       try {
-        // Ensure CSS is present BEFORE init
-        CSS.forEach(injectCSS);
+        const licenseKey =
+          (import.meta as any).env?.VITE_IMGLY_LICENSE_KEY ?? '';
 
-        const license =
-          (import.meta as any).env?.VITE_IMGLY_LICENSE_KEY ??
-          (process as any)?.env?.VITE_IMGLY_LICENSE_KEY;
-
-        if (!license) {
+        if (!licenseKey) {
           setError(
-            'Missing IMG.LY license key (VITE_IMGLY_LICENSE_KEY). Add it to your env.'
+            'Missing VITE_IMGLY_LICENSE_KEY env var. Add it in Vercel → Project → Settings → Environment Variables.'
           );
           return;
         }
 
-        instance = await CreativeEditorSDK.create(containerRef.current!, {
-          license,
-          baseURL: ENGINE_BASE, // 👈 do not add "cesdk-engine" or "latest" again
-          theme: 'dark',
-          // CESDK expects theme inside ui
-          ui: {
-            theme: 'dark',
-          },
+        const instance = await CreativeEditorSDK.create(containerRef.current!, {
+          license: licenseKey,
+          baseURL: ENGINE_BASE, // *** critical: includes /cesdk-engine/ ***
+          ui: { theme: 'dark' }
         });
+
+        // Pull in stickers, shapes, etc. from the same base
+        await addDefaultAssetSources(instance, { baseURL: ENGINE_BASE });
+
+        if (disposed) instance.dispose();
       } catch (e: any) {
-        console.error('CE.SDK init failed', e);
         setError(String(e?.message ?? e));
       }
-    }
+    })();
 
-    init();
     return () => {
-      if (instance) {
-        instance.dispose();
-        instance = null;
-      }
+      disposed = true;
     };
   }, []);
 
   return (
-    <div style={{ height: '80vh' }}>
+    <div className="w-full h-[70vh]">
       {error ? (
-        <pre style={{ color: '#f66' }}>{error}</pre>
-      ) : (
-        <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
-      )}
+        <div className="p-4 text-red-500 text-sm whitespace-pre-wrap">{error}</div>
+      ) : null}
+      <div ref={containerRef} className="w-full h-full" />
     </div>
   );
-};
-
-export default ImgLyEditor;
+}
